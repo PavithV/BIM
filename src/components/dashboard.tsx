@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUploader } from '@/components/file-uploader';
 import { ModelViewer } from '@/components/model-viewer';
@@ -9,51 +9,52 @@ import { ChatAssistant } from '@/components/chat-assistant';
 import { Building, Bot, BarChart3, Menu, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
-import { getStartingPrompts, getAIChatFeedback } from '@/app/actions';
-import { useAuth, useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { getStartingPrompts, getAIChatFeedback, getChatMessages, addChatMessage } from '@/app/actions';
+import { useAuth, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { Timestamp, collection, addDoc, orderBy, query } from 'firebase/firestore';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 export type Message = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  createdAt: Timestamp;
+  createdAt: { // Using a serializable object for Timestamps
+    seconds: number;
+    nanoseconds: number;
+  };
 };
 
 export default function Dashboard() {
   const [ifcFile, setIfcFile] = useState<File | null>(null);
   const [ifcData, setIfcData] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [startingPrompts, setStartingPrompts] = useState<string[]>([]);
+  const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   
   const auth = useAuth();
   const { user } = useUser();
   const router = useRouter();
-  const firestore = useFirestore();
 
-  const messagesRef = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return collection(firestore, 'users', user.uid, 'messages');
-  }, [user, firestore]);
-
-  const messagesQuery = useMemoFirebase(() => {
-    if (!messagesRef) return null;
-    return query(messagesRef, orderBy('createdAt', 'asc'));
-  }, [messagesRef]);
-
-  const { data: messages, isLoading: messagesLoading } = useCollection<Message>(messagesQuery);
-
-  const [activeMessages, setActiveMessages] = useState<Message[]>([]);
+  const loadMessages = useCallback(async () => {
+    if (!user) return;
+    setMessagesLoading(true);
+    try {
+      const { messages, error } = await getChatMessages();
+      if (error) {
+        console.error("Error loading messages:", error);
+        setActiveMessages([]);
+      } else if (messages) {
+        setActiveMessages(messages);
+      }
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
-    if (messages) {
-      setActiveMessages(messages);
-    }
-  }, [messages]);
-
+    loadMessages();
+  }, [loadMessages]);
 
   useEffect(() => {
     async function fetchPrompts() {
@@ -67,20 +68,32 @@ export default function Dashboard() {
 
   const handleSignOut = async () => {
     await signOut(auth);
+    await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
   };
 
   const handleSendMessage = async (userQuestion: string) => {
-    if (!userQuestion.trim() || !ifcData || !messagesRef) return;
-  
-    const newUserMessage: Omit<Message, 'id'> = {
+    if (!userQuestion.trim() || !ifcData || !user) return;
+
+    const newUserMessage: Message = {
+      id: `user-${Date.now()}`,
       role: 'user',
       content: userQuestion,
-      createdAt: Timestamp.now(),
+      createdAt: {
+        seconds: Math.floor(Date.now() / 1000),
+        nanoseconds: 0,
+      }
     };
     
-    addDocumentNonBlocking(messagesRef, newUserMessage);
+    setActiveMessages(prev => [...prev, newUserMessage]);
     setIsLoading(true);
+
+    // Optimistically add message to DB, don't wait
+    addChatMessage({
+      role: 'user',
+      content: userQuestion,
+      createdAt: newUserMessage.createdAt,
+    });
   
     try {
       const result = await getAIChatFeedback({
@@ -90,21 +103,37 @@ export default function Dashboard() {
   
       const assistantMessageContent = result.feedback || result.error || 'Entschuldigung, ein Fehler ist aufgetreten.';
       
-      const newAssistantMessage: Omit<Message, 'id'> = {
+      const newAssistantMessage: Message = {
+        id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: assistantMessageContent,
-        createdAt: Timestamp.now(),
+        createdAt: {
+            seconds: Math.floor(Date.now() / 1000),
+            nanoseconds: 0,
+        },
       };
-      addDocumentNonBlocking(messagesRef, newAssistantMessage);
+
+      // Add assistant message to DB
+      await addChatMessage({
+        role: 'assistant',
+        content: assistantMessageContent,
+        createdAt: newAssistantMessage.createdAt
+      });
+      // reload messages to get correct IDs and order
+      loadMessages();
 
     } catch (error) {
       console.error("Error in handleSendMessage flow:", error);
-      const errorMessage: Omit<Message, 'id'> = {
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
         role: 'assistant',
         content: 'Ein unerwarteter Fehler ist aufgetreten.',
-        createdAt: Timestamp.now(),
+        createdAt: {
+            seconds: Math.floor(Date.now() / 1000),
+            nanoseconds: 0,
+        },
       };
-      addDocumentNonBlocking(messagesRef, errorMessage);
+      setActiveMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
