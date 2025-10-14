@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, doc, getDocs, setDoc, getDoc } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUploader } from '@/components/file-uploader';
 import { ModelViewer } from '@/components/model-viewer';
@@ -14,6 +14,9 @@ import { getStartingPrompts, getAIChatFeedback } from '@/app/actions';
 import { useAuth, useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import { ProjectSelector } from './project-selector';
+import type { IFCModel } from '@/lib/types';
+
 
 export type Message = {
   id: string;
@@ -23,8 +26,7 @@ export type Message = {
 };
 
 export default function Dashboard() {
-  const [ifcFile, setIfcFile] = useState<File | null>(null);
-  const [ifcData, setIfcData] = useState<string | null>(null);
+  const [activeProject, setActiveProject] = useState<IFCModel | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [startingPrompts, setStartingPrompts] = useState<string[]>([]);
   
@@ -34,9 +36,9 @@ export default function Dashboard() {
   const router = useRouter();
 
   const messagesRef = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return collection(firestore, 'users', user.uid, 'messages');
-  }, [user, firestore]);
+    if (!user || !firestore || !activeProject) return null;
+    return collection(firestore, 'users', user.uid, 'ifcModels', activeProject.id, 'messages');
+  }, [user, firestore, activeProject]);
 
   const messagesQuery = useMemoFirebase(() => {
     if (!messagesRef) return null;
@@ -44,26 +46,25 @@ export default function Dashboard() {
   }, [messagesRef]);
 
   const { data: activeMessages, isLoading: messagesLoading } = useCollection<Message>(messagesQuery);
-
+  
   useEffect(() => {
     async function fetchPrompts() {
-      setIsLoading(true);
       const result = await getStartingPrompts();
       if (result.prompts) {
         setStartingPrompts(result.prompts);
       }
-      setIsLoading(false);
     }
     fetchPrompts();
   }, []);
 
   const handleSignOut = async () => {
     await signOut(auth);
+    setActiveProject(null);
     router.push('/login');
   };
 
   const handleSendMessage = async (userQuestion: string) => {
-    if (!userQuestion.trim() || !ifcData || !messagesRef) return;
+    if (!userQuestion.trim() || !activeProject?.fileContent || !messagesRef) return;
 
     const userMessage: Omit<Message, 'id'> = {
       role: 'user',
@@ -77,7 +78,7 @@ export default function Dashboard() {
       await addDoc(messagesRef, userMessage);
       
       const result = await getAIChatFeedback({
-        ifcModelData: ifcData,
+        ifcModelData: activeProject.fileContent,
         userQuestion: userQuestion,
       });
   
@@ -106,14 +107,31 @@ export default function Dashboard() {
     }
   };
 
-  const handleFileUploaded = (file: File, data: string) => {
-    setIfcFile(file);
-    setIfcData(data);
+  const handleFileUploaded = async (file: File, fileContent: string) => {
+    if (!user || !firestore) return;
+    
+    setIsLoading(true);
+    try {
+        const newProjectRef = doc(collection(firestore, 'users', user.uid, 'ifcModels'));
+        const newProject: IFCModel = {
+            id: newProjectRef.id,
+            userId: user.uid,
+            fileName: file.name,
+            fileSize: file.size,
+            fileContent: fileContent,
+            uploadDate: serverTimestamp(),
+        }
+        await setDoc(newProjectRef, newProject);
+        setActiveProject(newProject);
+    } catch(error) {
+        console.error("Error saving new project:", error);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const resetProject = () => {
-    setIfcFile(null);
-    setIfcData(null);
+    setActiveProject(null);
   };
   
   const memoizedMessages = useMemo(() => activeMessages || [], [activeMessages]);
@@ -127,8 +145,8 @@ export default function Dashboard() {
       </div>
       <div className="hidden md:flex items-center gap-4">
         <span className="text-sm text-muted-foreground">{user?.email}</span>
-        {ifcFile && (
-          <Button variant="outline" onClick={resetProject}>Neues Projekt</Button>
+        {activeProject && (
+          <Button variant="outline" onClick={resetProject}>Projektauswahl</Button>
         )}
         <Button variant="ghost" size="icon" onClick={handleSignOut} title="Abmelden">
           <LogOut className="w-5 h-5" />
@@ -152,11 +170,11 @@ export default function Dashboard() {
                 </SheetTitle>
             </SheetHeader>
             <div className="flex-1 overflow-y-auto p-4">
-              {ifcFile ? (
+              {activeProject ? (
                 <>
                 <div className="mb-4">
-                   <h2 className="font-semibold">{ifcFile.name}</h2>
-                   <p className="text-sm text-muted-foreground">{(ifcFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                   <h2 className="font-semibold">{activeProject.fileName}</h2>
+                   <p className="text-sm text-muted-foreground">{(activeProject.fileSize / 1024 / 1024).toFixed(2)} MB</p>
                 </div>
                 <Tabs defaultValue="analysis" className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
@@ -178,12 +196,12 @@ export default function Dashboard() {
                 </>
               ) : (
                 <div className="pt-10">
-                    <FileUploader onFileUploaded={handleFileUploaded} />
+                    <ProjectSelector onSelectProject={setActiveProject} onUploadNew={handleFileUploaded} />
                 </div>
               )}
             </div>
             <div className="p-4 border-t space-y-2">
-                {ifcFile && <Button variant="outline" onClick={resetProject} className="w-full">Neues Projekt</Button>}
+                {activeProject && <Button variant="outline" onClick={resetProject} className="w-full">Projektauswahl</Button>}
                 <Button variant="outline" onClick={handleSignOut} className="w-full">
                   <LogOut className="mr-2 h-4 w-4" />
                   Abmelden
@@ -199,15 +217,15 @@ export default function Dashboard() {
     <div className="flex flex-col h-screen bg-background">
       <Header />
       <main className="flex-1 overflow-hidden">
-        {ifcFile ? (
+        {activeProject ? (
           <div className="flex h-full">
             <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
-              <ModelViewer file={ifcFile} />
+              <ModelViewer file={new File([], activeProject.fileName)} />
             </div>
             <div className="hidden md:flex flex-col w-[400px] lg:w-[450px] border-l bg-card h-full">
               <div className="p-4 lg:p-6 border-b">
-                <h2 className="font-semibold font-headline truncate" title={ifcFile.name}>{ifcFile.name}</h2>
-                <p className="text-sm text-muted-foreground">{(ifcFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                <h2 className="font-semibold font-headline truncate" title={activeProject.fileName}>{activeProject.fileName}</h2>
+                <p className="text-sm text-muted-foreground">{(activeProject.fileSize / 1024 / 1024).toFixed(2)} MB</p>
               </div>
               <Tabs defaultValue="analysis" className="flex-1 flex flex-col overflow-hidden">
                 <div className="px-4 lg:px-6 pt-4">
@@ -238,7 +256,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="flex items-center justify-center h-full p-4">
-            <FileUploader onFileUploaded={handleFileUploaded} />
+            <ProjectSelector onSelectProject={setActiveProject} onUploadNew={handleFileUploaded} />
           </div>
         )}
       </main>

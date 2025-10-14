@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -30,7 +31,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "IFCModel",
       "type": "object",
-      "description": "Represents an uploaded IFC model.",
+      "description": "Represents an uploaded IFC model, including its content and metadata.",
       "properties": {
         "id": {
           "type": "string",
@@ -38,74 +39,47 @@
         },
         "userId": {
           "type": "string",
-          "description": "Reference to User. (Relationship: User 1:N IFCModel)"
-        },
-        "uploadDate": {
-          "type": "string",
-          "description": "Date and time when the IFC model was uploaded.",
-          "format": "date-time"
+          "description": "The ID of the user who uploaded the model. (Relationship: User 1:N IFCModel)"
         },
         "fileName": {
           "type": "string",
           "description": "Original filename of the uploaded IFC model."
+        },
+        "fileSize": {
+          "type": "number",
+          "description": "Size of the IFC model file in bytes."
+        },
+        "fileContent": {
+            "type": "string",
+            "description": "The full text content of the IFC model file."
+        },
+        "uploadDate": {
+          "type": "object",
+          "description": "Timestamp when the model was uploaded.",
+          "properties": {
+            "seconds": { "type": "number" },
+            "nanoseconds": { "type": "number" }
+          }
         }
       },
       "required": [
         "id",
         "userId",
-        "uploadDate",
-        "fileName"
-      ]
-    },
-    "AnalysisResult": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "AnalysisResult",
-      "type": "object",
-      "description": "Represents the analysis results for a given IFC model.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the AnalysisResult entity."
-        },
-        "ifcModelId": {
-          "type": "string",
-          "description": "Reference to IFCModel. (Relationship: IFCModel 1:N AnalysisResult)"
-        },
-        "analysisType": {
-          "type": "string",
-          "description": "Type of analysis performed (e.g., Sustainability, Energy Efficiency, Accessibility)."
-        },
-        "resultData": {
-          "type": "string",
-          "description": "JSON data containing the results of the analysis."
-        },
-        "analysisDate": {
-          "type": "string",
-          "description": "Date and time when the analysis was performed.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "ifcModelId",
-        "analysisType",
-        "resultData",
-        "analysisDate"
+        "fileName",
+        "fileSize",
+        "fileContent",
+        "uploadDate"
       ]
     },
     "ChatMessage": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ChatMessage",
       "type": "object",
-      "description": "Represents a single message in a user's chat history with the AI coach.",
+      "description": "Represents a single message in a chat history related to a specific IFC model.",
       "properties": {
         "id": {
           "type": "string",
           "description": "Unique identifier for the ChatMessage entity."
-        },
-        "userId": {
-          "type": "string",
-          "description": "The ID of the user who this message belongs to. (Relationship: User 1:N ChatMessage)"
         },
         "role": {
           "type": "string",
@@ -127,7 +101,6 @@
       },
       "required": [
         "id",
-        "userId",
         "role",
         "content",
         "createdAt"
@@ -148,7 +121,7 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores user data, using the Firebase Auth UID as the document ID. This enables path-based ownership for user-specific data.",
+          "description": "Stores user data, using the Firebase Auth UID as the document ID.",
           "params": [
             {
               "name": "userId",
@@ -164,7 +137,7 @@
           "schema": {
             "$ref": "#/backend/entities/IFCModel"
           },
-          "description": "Stores IFC models uploaded by a user. The path includes the userId to ensure ownership. The IFCModel entity includes userId which MUST be the same as the userId in the path.",
+          "description": "Stores metadata and content for IFC models uploaded by a user. The path includes the userId to ensure ownership.",
           "params": [
             {
               "name": "userId",
@@ -178,41 +151,21 @@
         }
       },
       {
-        "path": "/users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId}",
-        "definition": {
-          "entityName": "AnalysisResult",
-          "schema": {
-            "$ref": "#/backend/entities/AnalysisResult"
-          },
-          "description": "Stores analysis results for a specific IFC model. The path includes the userId and ifcModelId to maintain the relationship and ensure correct ownership.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The Firebase Auth UID of the user who owns the IFC model and its analysis results."
-            },
-            {
-              "name": "ifcModelId",
-              "description": "The unique identifier of the IFC model associated with the analysis result."
-            },
-            {
-              "name": "analysisResultId",
-              "description": "The unique identifier of the analysis result."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/users/{userId}/messages/{messageId}",
+        "path": "/users/{userId}/ifcModels/{ifcModelId}/messages/{messageId}",
         "definition": {
           "entityName": "ChatMessage",
           "schema": {
             "$ref": "#/backend/entities/ChatMessage"
           },
-          "description": "Stores the chat message history for a specific user. The path includes the userId to ensure ownership.",
+          "description": "Stores the chat message history for a specific IFC model belonging to a user.",
           "params": [
             {
               "name": "userId",
-              "description": "The Firebase Auth UID of the user who owns the chat message."
+              "description": "The Firebase Auth UID of the user."
+            },
+            {
+              "name": "ifcModelId",
+              "description": "The ID of the IFC model this chat is associated with."
             },
             {
               "name": "messageId",
@@ -222,6 +175,6 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to support the BIMCoach Studio application, focusing on user authentication, IFC model storage, analysis results, and the relationships between them. The structure prioritizes authorization independence and simplifies security rules.\n\n*   **Users:** User data is stored in a `users` collection using the user's UID as the document ID. This path-based ownership simplifies security rules for user-specific data.\n*   **IFC Models:** IFC models are stored in a subcollection `ifcModels` under each user's document (`/users/{userId}/ifcModels/{ifcModelId}`). This structure maintains a clear ownership hierarchy and enables easy retrieval of models associated with a specific user.\n*   **Analysis Results:** Analysis results are stored in a subcollection `analysisResults` under each IFC model (`/users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId}`). This nested structure maintains the relationship between users, models, and their analysis results.\n*   **Chat Messages:** Chat messages are stored in a subcollection `messages` under each user's document (`/users/{userId}/messages/{messageId}`). This ensures that each user's chat history is private and linked directly to their account, simplifying data retrieval and security rules."
+    "reasoning": "The Firestore structure is designed to support multiple projects (IFC models) per user, with each project having its own isolated chat history. The `users/{userId}` collection stores public user profiles. Each user document contains an `ifcModels` subcollection to store their projects. Each project document in `ifcModels` then contains a `messages` subcollection for its specific chat. This hierarchical structure ensures clear data ownership, simplifies security rules, and makes it easy to query for all projects of a user or all messages for a specific project."
   }
 }
