@@ -1,133 +1,105 @@
 /**
- * @file Firestore Security Rules for BIMCoach Studio
+ * @fileoverview Firestore Security Rules for BIMCoach Studio.
  *
- * @core_philosophy This ruleset enforces a strict user-ownership model. Each user can only access
- * and modify data directly associated with their own user ID. This ensures data privacy
- * and prevents unauthorized access.
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model, ensuring that users can only access and modify data that belongs to them.
  *
- * @data_structure The data is organized hierarchically under the `/users/{userId}` collection.
- *  - User profiles are stored directly under `/users/{userId}`.
- *  - IFC models are stored in the `/users/{userId}/ifcModels/{ifcModelId}` subcollection.
- *  - Analysis results are stored in the `/users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId}` subcollection.
- *  - Chat messages are stored in the `/users/{userId}/messages/{messageId}` subcollection.
+ * Data Structure:
+ * All data is nested under /users/{userId}, with subcollections for ifcModels and messages. This hierarchy enforces clear ownership.
  *
- * @key_security_decisions
- *  - User listing is explicitly disallowed to prevent potential information leakage.
- *  - The default security posture for ambiguous relationships is strict owner-only access.
- *  - All write operations are protected by authorization checks to prevent unauthorized data modification.
+ * Key Security Decisions:
+ * - Users can only list their own documents.
+ * - Data validation is minimal in this prototyping phase, focusing on authorization.
+ * - All write operations require a verified, authenticated user.
  *
- * @denormalization_for_authorization
- *  - IFCModel documents include a `userId` field that is denormalized to match the parent `/users/{userId}` path.
- *    This allows for efficient ownership checks without requiring additional `get()` calls.
- *  - AnalysisResult documents include both `userId` (inherited from the parent IFCModel) and `ifcModelId` fields for similar reasons.
+ * Denormalization for Authorization:
+ *  -The userId is used in the path for both `ifcModels` and `messages`, and is checked against `request.auth.uid`.
+ *
+ * Structural Segregation:
+ *  - Draft vs. Published content is not explicitly separated, so the current rules apply to all data under the user's path.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Secure user profiles, allowing only the owner to read and write their own data.
-     * @path /users/{userId}
-     * @allow (get, create, update, delete) User with UID 'user123' can read/write their own profile.
-     * @deny (get, create, update, delete) User with UID 'user456' cannot read/write 'user123' profile.
-     * @principle Enforces document ownership for all operations.
+     * @description Checks if the request is made by a signed-in user.
+     * @returns {boolean} True if the user is signed in, false otherwise.
      */
-    match /users/{userId} {
-      // Helper function to check if the request is made by the owner.
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-
-      // Read rules
-      allow get: if isOwner(userId);
-      allow list: if false; // User listing is not allowed
-
-      // Write rules
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+    function isSignedIn() {
+      return request.auth != null;
     }
 
     /**
-     * @description Secure IFC models, allowing only the owner to read and write their own models.
-     * @path /users/{userId}/ifcModels/{ifcModelId}
-     * @allow (get, create, update, delete) User with UID 'user123' can read/write their own IFC model with ID 'ifc123'.
-     * @deny (get, create, update, delete) User with UID 'user456' cannot read/write 'user123' IFC model.
-     * @principle Enforces document ownership for all operations, validates relational integrity on create.
+     * @description Checks if the request is made by the owner of the resource.
+     * @param {string} userId - The user ID to compare against the request's auth UID.
+     * @returns {boolean} True if the user is the owner, false otherwise.
      */
-    match /users/{userId}/ifcModels/{ifcModelId} {
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
 
-      // Helper function to check if the request is made by the owner.
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
+    /**
+     * @description Checks if the request is made by the owner of the existing resource.
+     * @param {string} userId - The user ID to compare against the resource's owner ID.
+     * @returns {boolean} True if the user is the owner and the resource exists, false otherwise.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
 
-      // Helper function to check if the resource exists and the owner is valid.
-      function isExistingOwner(userId) {
-          return request.auth != null && request.auth.uid == userId && resource != null;
-      }
-
-      // Read rules
+    /**
+     * @description Rules for the /users/{userId} collection.
+     * @path /users/{userId}
+     * @allow (create) - A user can create their own profile if the userId matches their auth UID.
+     * @allow (get) - A user can read their own profile.
+     * @allow (list) - Listing all users is not permitted.
+     * @deny (create) - A user cannot create a profile with a userId that doesn't match their auth UID.
+     * @deny (update) - A user cannot update another user's profile.
+     * @deny (delete) - A user cannot delete another user's profile.
+     * @principle Enforces document ownership and prevents unauthorized data access.
+     */
+    match /users/{userId} {
       allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-
-      // Write rules
+      allow list: if false;
       allow create: if isOwner(userId);
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Secure analysis results, allowing only the owner to read and write their own results.
-     * @path /users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId}
-     * @allow (get, create, update, delete) User with UID 'user123' can read/write their own analysis result with ID 'analysis123'.
-     * @deny (get, create, update, delete) User with UID 'user456' cannot read/write 'user123' analysis result.
-     * @principle Enforces document ownership for all operations, validates relational integrity on create.
+     * @description Rules for the /users/{userId}/ifcModels/{ifcModelId} collection.
+     * @path /users/{userId}/ifcModels/{ifcModelId}
+     * @allow (create) - A user can create an IFC model under their own user ID. The userId field in the model must match the userId in the path.
+     * @allow (get) - A user can read their own IFC models.
+     * @allow (list) - A user can list their own IFC models.
+     * @deny (create) - A user cannot create an IFC model under another user's ID, or if the userId field doesn't match the path.
+     * @deny (update) - A user cannot update another user's IFC model.
+     * @deny (delete) - A user cannot delete another user's IFC model.
+     * @principle Enforces document ownership and prevents unauthorized data access.
      */
-    match /users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId} {
-        // Helper function to check if the request is made by the owner.
-        function isOwner(userId) {
-            return request.auth != null && request.auth.uid == userId;
-        }
-
-        // Helper function to check if the resource exists and the owner is valid.
-        function isExistingOwner(userId) {
-            return request.auth != null && request.auth.uid == userId && resource != null;
-        }
-
-        // Read rules
-        allow get: if isOwner(userId);
-        allow list: if isOwner(userId);
-
-        // Write rules
-        allow create: if isOwner(userId);
-        allow update: if isExistingOwner(userId);
-        allow delete: if isExistingOwner(userId);
+    match /users/{userId}/ifcModels/{ifcModelId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && resource.data.userId == userId;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Secure chat messages, allowing only the owner to read and write their own messages.
-     * @path /users/{userId}/messages/{messageId}
-     * @allow (get, create, update, delete) User with UID 'user123' can read/write their own message with ID 'message123'.
-     * @deny (get, create, update, delete) User with UID 'user456' cannot read/write 'user123' message.
-     * @principle Enforces document ownership for all operations.
+     * @description Rules for the /users/{userId}/ifcModels/{ifcModelId}/messages/{messageId} collection.
+     * @path /users/{userId}/ifcModels/{ifcModelId}/messages/{messageId}
+     * @allow (create) - A user can create a chat message under their own user ID and IFC model.
+     * @allow (get) - A user can read their own chat messages.
+     * @allow (list) - A user can list their own chat messages.
+     * @deny (create) - A user cannot create a chat message under another user's ID or IFC model.
+     * @deny (update) - A user cannot update another user's chat message.
+     * @deny (delete) - A user cannot delete another user's chat message.
+     * @principle Enforces document ownership and prevents unauthorized data access.
      */
-    match /users/{userId}/messages/{messageId} {
-      // Helper function to check if the request is made by the owner.
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-
-      // Helper function to check if the resource exists and the owner is valid.
-      function isExistingOwner(userId) {
-        return request.auth != null && request.auth.uid == userId && resource != null;
-      }
-
-      // Read rules
+    match /users/{userId}/ifcModels/{ifcModelId}/messages/{messageId} {
       allow get: if isOwner(userId);
       allow list: if isOwner(userId);
-
-      // Write rules
       allow create: if isOwner(userId);
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
