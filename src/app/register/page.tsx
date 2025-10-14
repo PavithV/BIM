@@ -12,7 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Building, Loader2 } from 'lucide-react';
-import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -42,11 +44,22 @@ export default function RegisterPage() {
       await updateProfile(user, { displayName: name });
       
       const userRef = doc(firestore, 'users', user.uid);
-      setDocumentNonBlocking(userRef, {
+      const userData = {
         id: user.uid,
         name: name,
         email: email,
-      }, { merge: true });
+      };
+
+      setDoc(userRef, userData, { merge: true }).catch((error) => {
+        errorEmitter.emit(
+          'permission-error',
+          new FirestorePermissionError({
+            path: userRef.path,
+            operation: 'create',
+            requestResourceData: userData,
+          })
+        );
+      });
 
       toast({
         title: 'Registrierung erfolgreich',
