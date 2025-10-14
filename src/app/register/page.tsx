@@ -12,9 +12,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Building, Loader2 } from 'lucide-react';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
-
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -44,44 +41,8 @@ export default function RegisterPage() {
       await updateProfile(user, { displayName: name });
       
       const userRef = doc(firestore, 'users', user.uid);
-      const userData = {
-        name: name,
-        email: email,
-      };
+      await setDoc(userRef, { name, email });
       
-      // Use a try-catch for the Firestore operation and emit a contextual error
-      try {
-        await setDoc(userRef, userData);
-      } catch (firestoreError) {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-              path: userRef.path,
-              operation: 'create',
-              requestResourceData: userData
-          }));
-          // Re-throw or handle as a registration failure
-          throw firestoreError;
-      }
-
-
-      // Create session cookie
-      const idToken = await user.getIdToken();
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${idToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Server-side session creation failed.');
-      }
-
-      toast({
-        title: 'Registrierung erfolgreich',
-        description: 'Ihr Konto wurde erstellt. Sie werden weitergeleitet.',
-      });
-
       router.push('/');
 
     } catch (error: any) {
@@ -91,14 +52,13 @@ export default function RegisterPage() {
         errorMessage = 'Diese E-Mail-Adresse wird bereits verwendet.';
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = 'Bitte geben Sie eine gültige E-Mail-Adresse ein.';
-      } else if (error.code === 'firestore/permission-denied') {
-          errorMessage = 'Fehler beim Speichern der Benutzerdaten. Überprüfen Sie Ihre Firestore-Sicherheitsregeln.'
       }
       toast({
         title: 'Fehler bei der Registrierung',
         description: errorMessage,
         variant: 'destructive',
       });
+    } finally {
       setIsLoading(false);
     }
   };

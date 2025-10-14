@@ -24,27 +24,12 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const idToken = await userCredential.user.getIdToken();
-
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${idToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.');
-      }
-
+      await signInWithEmailAndPassword(auth, email, password);
       router.push('/');
     } catch (error: any) {
       console.error(error);
-      let errorMessage = error.message || 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.';
-      if (error.code === 'auth/invalid-credential') {
+      let errorMessage = 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.';
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
         errorMessage = 'Ungültige E-Mail-Adresse oder Passwort.';
       }
       toast({
@@ -52,6 +37,7 @@ export default function LoginPage() {
         description: errorMessage,
         variant: 'destructive',
       });
+    } finally {
       setIsLoading(false);
     }
   };

@@ -34,19 +34,16 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function fetchPrompts() {
-      setIsLoading(true);
       const result = await getStartingPrompts();
       if (result.prompts) {
         setStartingPrompts(result.prompts);
       }
-      setIsLoading(false);
     }
     fetchPrompts();
   }, []);
 
   const handleSignOut = async () => {
     await signOut(auth);
-    await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
   };
 
