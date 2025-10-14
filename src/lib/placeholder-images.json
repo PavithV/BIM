@@ -1,3 +1,10 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "model-viewer-placeholder",
+      "description": "A placeholder image for the BIM model viewer, showing an abstract architectural structure.",
+      "imageUrl": "https://picsum.photos/seed/bim/1200/900",
+      "imageHint": "architecture abstract"
+    }
+  ]
 }
