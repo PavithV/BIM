@@ -6,10 +6,13 @@ import { FileUploader } from '@/components/file-uploader';
 import { ModelViewer } from '@/components/model-viewer';
 import { AnalysisPanel } from '@/components/analysis-panel';
 import { ChatAssistant } from '@/components/chat-assistant';
-import { Building, Bot, BarChart3, Menu } from 'lucide-react';
+import { Building, Bot, BarChart3, Menu, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { getStartingPrompts, getAIChatFeedback } from '@/app/actions';
+import { useAuth, useUser } from '@/firebase';
+import { signOut } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
 
 export type Message = {
   id: number;
@@ -20,11 +23,14 @@ export type Message = {
 export default function Dashboard() {
   const [ifcFile, setIfcFile] = useState<File | null>(null);
   const [ifcData, setIfcData] = useState<string | null>(null);
-
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [startingPrompts, setStartingPrompts] = useState<string[]>([]);
   
+  const auth = useAuth();
+  const { user } = useUser();
+  const router = useRouter();
+
   useEffect(() => {
     async function fetchPrompts() {
       const result = await getStartingPrompts();
@@ -34,6 +40,11 @@ export default function Dashboard() {
     }
     fetchPrompts();
   }, []);
+
+  const handleSignOut = async () => {
+    await signOut(auth);
+    router.push('/login');
+  };
 
   const handleSendMessage = async (userQuestion: string) => {
     if (!userQuestion.trim() || !ifcData) return;
@@ -78,9 +89,13 @@ export default function Dashboard() {
         <h1 className="text-xl md:text-2xl font-bold font-headline text-primary">BIMCoach Studio</h1>
       </div>
       <div className="hidden md:flex items-center gap-4">
+        <span className="text-sm text-muted-foreground">{user?.email}</span>
         {ifcFile && (
           <Button variant="outline" onClick={resetProject}>Neues Projekt</Button>
         )}
+        <Button variant="ghost" size="icon" onClick={handleSignOut} title="Abmelden">
+          <LogOut className="w-5 h-5" />
+        </Button>
       </div>
       <div className="md:hidden">
         <Sheet>
@@ -130,8 +145,12 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
-            <div className="p-4 border-t">
+            <div className="p-4 border-t space-y-2">
                 {ifcFile && <Button variant="outline" onClick={resetProject} className="w-full">Neues Projekt</Button>}
+                <Button variant="outline" onClick={handleSignOut} className="w-full">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Abmelden
+                </Button>
             </div>
           </SheetContent>
         </Sheet>
