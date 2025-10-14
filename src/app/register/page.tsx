@@ -45,20 +45,21 @@ export default function RegisterPage() {
       
       const userRef = doc(firestore, 'users', user.uid);
       const userData = {
-        id: user.uid,
         name: name,
         email: email,
       };
 
-      setDoc(userRef, userData, { merge: true }).catch((error) => {
-        errorEmitter.emit(
-          'permission-error',
-          new FirestorePermissionError({
-            path: userRef.path,
-            operation: 'create',
-            requestResourceData: userData,
-          })
-        );
+      // No need for custom error emitter here, let the promise handle it
+      await setDoc(userRef, userData);
+
+      // Create session cookie
+      const idToken = await user.getIdToken();
+      await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
       });
 
       toast({
@@ -75,6 +76,8 @@ export default function RegisterPage() {
         errorMessage = 'Diese E-Mail-Adresse wird bereits verwendet.';
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = 'Bitte geben Sie eine gültige E-Mail-Adresse ein.';
+      } else if (error.code === 'firestore/permission-denied') {
+          errorMessage = 'Fehler beim Speichern der Benutzerdaten. Überprüfen Sie Ihre Firestore-Sicherheitsregeln.'
       }
       toast({
         title: 'Fehler bei der Registrierung',

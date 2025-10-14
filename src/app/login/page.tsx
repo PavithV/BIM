@@ -27,13 +27,17 @@ export default function LoginPage() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const idToken = await userCredential.user.getIdToken();
 
-      await fetch('/api/auth/login', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
       });
+
+      if (!response.ok) {
+        throw new Error('Server-side session creation failed.');
+      }
 
       router.push('/');
     } catch (error: any) {
