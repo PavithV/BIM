@@ -3,107 +3,154 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Enforces user-level access control for user profiles.
+     * @description Secure the root of the database.  No direct access is allowed.
+     * @path /
+     * @allow (get, list) if false
+     * @deny (create, update, delete) always
+     * @principle Prevents unauthorized access to the database root.
+     */
+    match /{document=**} {
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows users to read and write their own user document.
      * @path /users/{userId}
-     * @allow (create) User with UID 'user_abc' can create their own profile.
-     * @allow (get) User with UID 'user_abc' can read their own profile.
-     * @allow (update) User with UID 'user_abc' can update their own profile.
-     * @allow (delete) User with UID 'user_abc' can delete their own profile.
-     * @deny (create) User with UID 'user_xyz' cannot create a profile with ID 'user_abc'.
-     * @deny (get) User with UID 'user_xyz' cannot read profile 'user_abc'.
-     * @principle Enforces document ownership and prevents unauthorized access to user data.
+     * @allow (get) User with matching {userId} can read their own document.
+     * @allow (list) Never allow listing of users.
+     * @allow (create) A user can create their own document, but the {userId} must match their auth UID.
+     * @allow (update) A user can update their own document.
+     * @allow (delete) A user can delete their own document.
+     * @deny (get) User with non-matching {userId} cannot read this document.
+     * @deny (create) User with non-matching {userId} cannot create this document.
+     * @deny (update) User with non-matching {userId} cannot update this document.
+     * @deny (delete) User with non-matching {userId} cannot delete this document.
+     * @principle Enforces document ownership and prevents unauthorized modifications.
      */
     match /users/{userId} {
       function isSignedIn() {
         return request.auth != null;
       }
+
       function isOwner(userId) {
         return request.auth.uid == userId;
       }
 
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false; // Listing users is not permitted.
-      allow create: if isSignedIn() && isOwner(userId) ;
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource.data != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Enforces user-level access control for IFC models within a user's profile.
+     * @description Allows users to manage their IFC models.
      * @path /users/{userId}/ifcModels/{ifcModelId}
-     * @allow (create) User with UID 'user_abc' can create an IFC model under their profile.
-     * @allow (get) User with UID 'user_abc' can read an IFC model under their profile.
-     * @allow (update) User with UID 'user_abc' can update their IFC model.
-     * @allow (delete) User with UID 'user_abc' can delete an IFC model under their profile.
-     * @deny (create) User with UID 'user_xyz' cannot create an IFC model under user 'user_abc''s profile.
-     * @deny (get) User with UID 'user_xyz' cannot read an IFC model under user 'user_abc''s profile.
-     * @principle Enforces document ownership and prevents unauthorized access to IFC models.
+     * @allow (get) User with matching {userId} can read their own IFC models.
+     * @allow (list) User with matching {userId} can list their own IFC models.
+     * @allow (create) User with matching {userId} can create IFC models, with validated userId.
+     * @allow (update) User with matching {userId} can update their own IFC models.
+     * @allow (delete) User with matching {userId} can delete their own IFC models.
+     * @deny (get) User with non-matching {userId} cannot read this document.
+     * @deny (create) User with non-matching {userId} cannot create this document with mismatched userId.
+     * @deny (update) User with non-matching {userId} cannot update this document.
+     * @deny (delete) User with non-matching {userId} cannot delete this document.
+     * @principle Enforces document ownership and validates relational integrity.
      */
     match /users/{userId}/ifcModels/{ifcModelId} {
       function isSignedIn() {
         return request.auth != null;
       }
+
       function isOwner(userId) {
         return request.auth.uid == userId;
       }
 
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false;
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource.data != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
       allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Enforces user-level access control for analysis results within an IFC model.
+     * @description Allows users to manage analysis results for their IFC models.
      * @path /users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId}
-     * @allow (create) User with UID 'user_abc' can create an analysis result under their IFC model.
-     * @allow (get) User with UID 'user_abc' can read an analysis result under their IFC model.
-     * @allow (update) User with UID 'user_abc' can update an analysis result under their IFC model.
-     * @allow (delete) User with UID 'user_abc' can delete an analysis result under their IFC model.
-     * @deny (create) User with UID 'user_xyz' cannot create an analysis result under user 'user_abc''s IFC model.
-     * @deny (get) User with UID 'user_xyz' cannot read an analysis result under user 'user_abc''s IFC model.
-     * @principle Enforces document ownership and prevents unauthorized access to analysis results.
+     * @allow (get) User with matching {userId} can read their own analysis results.
+     * @allow (list) User with matching {userId} can list their own analysis results.
+     * @allow (create) User with matching {userId} can create analysis results with validated userId and ifcModelId.
+     * @allow (update) User with matching {userId} can update their own analysis results.
+     * @allow (delete) User with matching {userId} can delete their own analysis results.
+     * @deny (get) User with non-matching {userId} cannot read this document.
+     * @deny (create) User with non-matching {userId} cannot create this document with mismatched userId or ifcModelId.
+     * @deny (update) User with non-matching {userId} cannot update this document.
+     * @deny (delete) User with non-matching {userId} cannot delete this document.
+     * @principle Enforces document ownership and validates relational integrity across multiple levels.
      */
     match /users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId} {
       function isSignedIn() {
         return request.auth != null;
       }
+
       function isOwner(userId) {
         return request.auth.uid == userId;
       }
 
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false;
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource.data != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
       allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
-    /**
-     * @description Enforces user-level access control for chat messages within a user's profile.
+        /**
+     * @description Allows users to manage their chat messages.
      * @path /users/{userId}/messages/{messageId}
-     * @allow (create) User with UID 'user_abc' can create a chat message under their profile.
-     * @allow (get) User with UID 'user_abc' can read a chat message under their profile.
-     * @allow (update) User with UID 'user_abc' can update a chat message under their profile.
-     * @allow (delete) User with UID 'user_abc' can delete a chat message under their profile.
-     * @deny (create) User with UID 'user_xyz' cannot create a chat message under user 'user_abc''s profile.
-     * @deny (get) User with UID 'user_xyz' cannot read a chat message under user 'user_abc''s profile.
-     * @principle Enforces document ownership and prevents unauthorized access to chat messages.
+     * @allow (get) User with matching {userId} can read their own chat messages.
+     * @allow (list) User with matching {userId} can list their own chat messages.
+     * @allow (create) User with matching {userId} can create chat messages with validated userId.
+     * @allow (update) User with matching {userId} can update their own chat messages.
+     * @allow (delete) User with matching {userId} can delete their own chat messages.
+     * @deny (get) User with non-matching {userId} cannot read this document.
+     * @deny (create) User with non-matching {userId} cannot create this document with mismatched userId.
+     * @deny (update) User with non-matching {userId} cannot update this document.
+     * @deny (delete) User with non-matching {userId} cannot delete this document.
+     * @principle Enforces document ownership.
      */
     match /users/{userId}/messages/{messageId} {
       function isSignedIn() {
         return request.auth != null;
       }
+
       function isOwner(userId) {
         return request.auth.uid == userId;
       }
 
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if false;
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource.data != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
       allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
-      allow delete: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
   }
 }

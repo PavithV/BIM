@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { collection, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUploader } from '@/components/file-uploader';
 import { ModelViewer } from '@/components/model-viewer';
@@ -10,7 +11,7 @@ import { Building, Bot, BarChart3, Menu, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { getStartingPrompts, getAIChatFeedback } from '@/app/actions';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 
@@ -18,6 +19,7 @@ export type Message = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  createdAt?: any;
 };
 
 export default function Dashboard() {
@@ -25,19 +27,32 @@ export default function Dashboard() {
   const [ifcData, setIfcData] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [startingPrompts, setStartingPrompts] = useState<string[]>([]);
-  const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   
   const auth = useAuth();
+  const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
 
+  const messagesRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return collection(firestore, 'users', user.uid, 'messages');
+  }, [user, firestore]);
+
+  const messagesQuery = useMemoFirebase(() => {
+    if (!messagesRef) return null;
+    return query(messagesRef, orderBy('createdAt', 'asc'));
+  }, [messagesRef]);
+
+  const { data: activeMessages, isLoading: messagesLoading } = useCollection<Message>(messagesQuery);
 
   useEffect(() => {
     async function fetchPrompts() {
+      setIsLoading(true);
       const result = await getStartingPrompts();
       if (result.prompts) {
         setStartingPrompts(result.prompts);
       }
+      setIsLoading(false);
     }
     fetchPrompts();
   }, []);
@@ -48,18 +63,19 @@ export default function Dashboard() {
   };
 
   const handleSendMessage = async (userQuestion: string) => {
-    if (!userQuestion.trim() || !ifcData) return;
+    if (!userQuestion.trim() || !ifcData || !messagesRef) return;
 
-    const newUserMessage: Message = {
-      id: `user-${Date.now()}`,
+    const userMessage: Omit<Message, 'id'> = {
       role: 'user',
       content: userQuestion,
+      createdAt: serverTimestamp(),
     };
     
-    setActiveMessages(prev => [...prev, newUserMessage]);
     setIsLoading(true);
 
     try {
+      await addDoc(messagesRef, userMessage);
+      
       const result = await getAIChatFeedback({
         ifcModelData: ifcData,
         userQuestion: userQuestion,
@@ -67,22 +83,24 @@ export default function Dashboard() {
   
       const assistantMessageContent = result.feedback || result.error || 'Entschuldigung, ein Fehler ist aufgetreten.';
       
-      const newAssistantMessage: Message = {
-        id: `assistant-${Date.now()}`,
+      const assistantMessage: Omit<Message, 'id'> = {
         role: 'assistant',
         content: assistantMessageContent,
+        createdAt: serverTimestamp(),
       };
-
-      setActiveMessages(prev => [...prev, newAssistantMessage]);
+      
+      await addDoc(messagesRef, assistantMessage);
 
     } catch (error) {
       console.error("Error in handleSendMessage flow:", error);
-      const errorMessage: Message = {
-        id: `error-${Date.now()}`,
+       const errorMessage: Omit<Message, 'id'> = {
         role: 'assistant',
-        content: 'Ein unerwarteter Fehler ist aufgetreten.',
+        content: 'Ein unerwarteter Fehler ist aufgetreten beim Senden der Nachricht.',
+        createdAt: serverTimestamp(),
       };
-      setActiveMessages(prev => [...prev, errorMessage]);
+      if (messagesRef) {
+        await addDoc(messagesRef, errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -91,14 +109,15 @@ export default function Dashboard() {
   const handleFileUploaded = (file: File, data: string) => {
     setIfcFile(file);
     setIfcData(data);
-    setActiveMessages([]); // Reset chat when a new file is uploaded
   };
 
   const resetProject = () => {
     setIfcFile(null);
     setIfcData(null);
-    setActiveMessages([]);
   };
+  
+  const memoizedMessages = useMemo(() => activeMessages || [], [activeMessages]);
+
 
   const Header = () => (
     <header className="flex items-center justify-between p-4 border-b bg-card shadow-sm">
@@ -149,9 +168,9 @@ export default function Dashboard() {
                   </TabsContent>
                   <TabsContent value="coach" className="mt-4 h-[calc(100vh-300px)]">
                     <ChatAssistant 
-                      messages={activeMessages}
+                      messages={memoizedMessages}
                       startingPrompts={startingPrompts}
-                      isLoading={isLoading}
+                      isLoading={isLoading || messagesLoading}
                       onSendMessage={handleSendMessage}
                     />
                   </TabsContent>
@@ -208,9 +227,9 @@ export default function Dashboard() {
                 </TabsContent>
                 <TabsContent value="coach" className="flex-1 flex flex-col m-0 overflow-hidden">
                    <ChatAssistant 
-                      messages={activeMessages}
+                      messages={memoizedMessages}
                       startingPrompts={startingPrompts}
-                      isLoading={isLoading}
+                      isLoading={isLoading || messagesLoading}
                       onSendMessage={handleSendMessage}
                     />
                 </TabsContent>

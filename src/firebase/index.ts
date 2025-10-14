@@ -44,7 +44,6 @@ export * from './provider';
 export * from './client-provider';
 export * from './errors';
 export * from './error-emitter';
-// Re-exporting useCollection and useDoc is not needed when chat persistence is disabled
-// export * from './firestore/use-collection';
-// export * from './firestore/use-doc';
+export * from './firestore/use-collection';
+export * from './firestore/use-doc';
     
