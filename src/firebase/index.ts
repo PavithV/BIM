@@ -42,10 +42,9 @@ export function getSdks(firebaseApp: FirebaseApp) {
 
 export * from './provider';
 export * from './client-provider';
-// NOTE: Disabling Firestore hooks as they are not being used in the local chat state version.
-// export * from './firestore/use-collection';
-// export * from './firestore/use-doc';
-// export * from './non-blocking-updates';
+export * from './firestore/use-collection';
+export * from './firestore/use-doc';
+export * from './non-blocking-updates';
 export * from './errors';
 export * from './error-emitter';
 
