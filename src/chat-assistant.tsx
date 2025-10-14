@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from './ui/card';
-import type { Message } from './dashboard';
+import type { Message } from './components/dashboard';
 import { Skeleton } from './ui/skeleton';
 
 interface ChatAssistantProps {
@@ -147,5 +147,3 @@ export function ChatAssistant({ messages, startingPrompts, isLoading, onSendMess
     </div>
   );
 }
-
-    

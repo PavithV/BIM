@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUploader } from '@/components/file-uploader';
 import { ModelViewer } from '@/components/model-viewer';
@@ -9,7 +9,7 @@ import { ChatAssistant } from '@/components/chat-assistant';
 import { Building, Bot, BarChart3, Menu, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
-import { getStartingPrompts, getAIChatFeedback, getChatMessages, addChatMessage } from '@/app/actions';
+import { getStartingPrompts, getAIChatFeedback } from '@/app/actions';
 import { useAuth, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -18,17 +18,12 @@ export type Message = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  createdAt: { // Using a serializable object for Timestamps
-    seconds: number;
-    nanoseconds: number;
-  };
 };
 
 export default function Dashboard() {
   const [ifcFile, setIfcFile] = useState<File | null>(null);
   const [ifcData, setIfcData] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [messagesLoading, setMessagesLoading] = useState(false);
   const [startingPrompts, setStartingPrompts] = useState<string[]>([]);
   const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   
@@ -36,25 +31,6 @@ export default function Dashboard() {
   const { user } = useUser();
   const router = useRouter();
 
-  const loadMessages = useCallback(async () => {
-    if (!user) return;
-    setMessagesLoading(true);
-    try {
-      const { messages, error } = await getChatMessages();
-      if (error) {
-        console.error("Error loading messages:", error);
-        setActiveMessages([]);
-      } else if (messages) {
-        setActiveMessages(messages);
-      }
-    } finally {
-      setMessagesLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    loadMessages();
-  }, [loadMessages]);
 
   useEffect(() => {
     async function fetchPrompts() {
@@ -79,22 +55,11 @@ export default function Dashboard() {
       id: `user-${Date.now()}`,
       role: 'user',
       content: userQuestion,
-      createdAt: {
-        seconds: Math.floor(Date.now() / 1000),
-        nanoseconds: 0,
-      }
     };
     
     setActiveMessages(prev => [...prev, newUserMessage]);
     setIsLoading(true);
 
-    // Optimistically add message to DB, don't wait
-    addChatMessage({
-      role: 'user',
-      content: userQuestion,
-      createdAt: newUserMessage.createdAt,
-    });
-  
     try {
       const result = await getAIChatFeedback({
         ifcModelData: ifcData,
@@ -107,20 +72,9 @@ export default function Dashboard() {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: assistantMessageContent,
-        createdAt: {
-            seconds: Math.floor(Date.now() / 1000),
-            nanoseconds: 0,
-        },
       };
 
-      // Add assistant message to DB
-      await addChatMessage({
-        role: 'assistant',
-        content: assistantMessageContent,
-        createdAt: newAssistantMessage.createdAt
-      });
-      // reload messages to get correct IDs and order
-      loadMessages();
+      setActiveMessages(prev => [...prev, newAssistantMessage]);
 
     } catch (error) {
       console.error("Error in handleSendMessage flow:", error);
@@ -128,10 +82,6 @@ export default function Dashboard() {
         id: `error-${Date.now()}`,
         role: 'assistant',
         content: 'Ein unerwarteter Fehler ist aufgetreten.',
-        createdAt: {
-            seconds: Math.floor(Date.now() / 1000),
-            nanoseconds: 0,
-        },
       };
       setActiveMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -202,7 +152,7 @@ export default function Dashboard() {
                     <ChatAssistant 
                       messages={activeMessages}
                       startingPrompts={startingPrompts}
-                      isLoading={isLoading || messagesLoading}
+                      isLoading={isLoading}
                       onSendMessage={handleSendMessage}
                     />
                   </TabsContent>
@@ -261,7 +211,7 @@ export default function Dashboard() {
                    <ChatAssistant 
                       messages={activeMessages}
                       startingPrompts={startingPrompts}
-                      isLoading={isLoading || messagesLoading}
+                      isLoading={isLoading}
                       onSendMessage={handleSendMessage}
                     />
                 </TabsContent>

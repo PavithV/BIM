@@ -36,7 +36,8 @@ export default function LoginPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Server-side session creation failed.');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Server-side session creation failed.');
       }
 
       router.push('/');
