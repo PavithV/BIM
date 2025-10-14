@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, TrendingDown, TrendingUp, TrendingRight } from 'lucide-react';
+import { FileText, TrendingDown, TrendingUp, ArrowRight } from 'lucide-react';
 import { analysisData } from '@/lib/mock-data';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 import { ChartConfig, ChartContainer } from '@/components/ui/chart';
@@ -22,7 +22,7 @@ const RatingIcon = ({ rating }: { rating: string }) => {
     case 'high':
       return <TrendingUp className="w-5 h-5 text-destructive" />;
     case 'medium':
-      return <TrendingRight className="w-5 h-5 text-yellow-500" />;
+      return <ArrowRight className="w-5 h-5 text-yellow-500" />;
     case 'low':
       return <TrendingDown className="w-5 h-5 text-green-500" />;
     default:
