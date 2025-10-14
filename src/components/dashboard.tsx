@@ -8,7 +8,7 @@ import { AnalysisPanel } from '@/components/analysis-panel';
 import { ChatAssistant } from '@/components/chat-assistant';
 import { Building, Bot, BarChart3, Menu, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { getStartingPrompts, getAIChatFeedback } from '@/app/actions';
 import { useAuth, useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
