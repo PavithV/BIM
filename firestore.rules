@@ -1,116 +1,133 @@
+/**
+ * @fileoverview Firestore Security Rules for BIMCoach Studio.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for all data. Each user has full control over their own data tree,
+ * while access to other users' data is completely prohibited.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores user profiles, with the document ID matching the Firebase Auth UID.
+ * - /users/{userId}/ifcModels/{ifcModelId}: Stores IFC models uploaded by each user.
+ * - /users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId}: Stores analysis results for specific IFC models.
+ * - /users/{userId}/messages/{messageId}: Stores chat message history for each user.
+ *
+ * Key Security Decisions:
+ * - Users can only access their own data, preventing cross-user data access.
+ * - Listing of all users is disallowed.
+ * - Data validation is minimized to focus on authorization and relational integrity during prototyping.
+ *
+ * Denormalization for Authorization:
+ *  - The `userId` is present both in the path and within the `IFCModel`, `AnalysisResult` and `ChatMessage` documents to allow for efficient ownership checks.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user documents.  Users can only read and write their own document.
+     * @description Secure the root of the database. No direct access allowed.
+     * @path /
+     * @allow (get, list) if false;
+     * @allow (create, update, delete) if false;
+     * @deny (get, list, create, update, delete) Always. Direct access to the root is not permitted.
+     * @principle Prevents accidental access to the database root.
+     */
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+    }
+
+
+    /**
+     * @description Manages user profiles.
      * @path /users/{userId}
-     * @allow (create) - User abc can create their own user document if authenticated as abc.
-     *   `request.auth.uid == 'abc'` and `request.resource.data.id == 'abc'`
-     * @allow (get) - User abc can read their own user document if authenticated as abc.
-     *   `request.auth.uid == 'abc'`
-     * @allow (update) - User abc can update their own user document if authenticated as abc.
-     *   `request.auth.uid == 'abc'` and `resource.data.id == 'abc'`
-     * @allow (delete) - User abc can delete their own user document if authenticated as abc.
-     *   `request.auth.uid == 'abc'` and `resource.data.id == 'abc'`
-     * @deny (create) - User def cannot create a user document for abc.
-     *   `request.auth.uid == 'def'` but the path is `/users/abc`.
-     * @deny (update) - User def cannot update user abc's document.
-     *   `request.auth.uid == 'def'` but the path is `/users/abc`.
-     * @principle Enforces document ownership for all operations.
+     * @allow (get) if isOwner(userId);
+     * @allow (list) if false;
+     * @allow (create) if isOwner(userId) && request.resource.data.id == request.auth.uid;
+     * @allow (update) if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+     * @allow (delete) if isExistingOwner(userId);
+     * @deny (get) if !isSignedIn();
+     * @deny (create) if request.resource.data.id != request.auth.uid;
+     * @deny (update) if request.resource.data.id != resource.data.id;
+     * @deny (list) Always. Listing users is not permitted.
+     * @principle Enforces document ownership, validates new user IDs, and prevents ID changes.
      */
     match /users/{userId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-          return isOwner(userId) && existsAfter(/databases/$(database)/documents/users/$(userId));
-      }
-
-      allow get: if isSignedIn() && isOwner(userId);
+      allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == request.auth.uid;
-      allow update: if isSignedIn() && isExistingOwner(userId);
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == request.auth.uid;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to IFC models.  Users can only read and write models they own.
+     * @description Manages IFC models uploaded by users.
      * @path /users/{userId}/ifcModels/{ifcModelId}
-     * @allow (create) - User abc can create an IFC model under their user document if authenticated as abc.
-     *   `request.auth.uid == 'abc'` and `request.resource.data.userId == 'abc'`
-     * @allow (get) - User abc can read their own IFC model if authenticated as abc.
-     *   `request.auth.uid == 'abc'`
-     * @allow (update) - User abc can update their own IFC model if authenticated as abc.
-     *   `request.auth.uid == 'abc'` and `resource.data.userId == 'abc'`
-     * @allow (delete) - User abc can delete their own IFC model if authenticated as abc.
-     *   `request.auth.uid == 'abc'` and `resource.data.userId == 'abc'`
-     * @deny (create) - User def cannot create an IFC model under user abc's document.
-     *   `request.auth.uid == 'def'` but the path is `/users/abc/ifcModels/{ifcModelId}`.
-     * @deny (update) - User def cannot update user abc's IFC model.
-     *   `request.auth.uid == 'def'` but the path is `/users/abc/ifcModels/{ifcModelId}`.
-     * @principle Enforces document ownership for all operations.  Also validates data consistency.
+     * @allow (get) if isOwner(userId);
+     * @allow (list) if isOwner(userId);
+     * @allow (create) if isOwner(userId) && request.resource.data.userId == userId;
+     * @allow (update) if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+     * @allow (delete) if isExistingOwner(userId);
+     * @deny (create) if request.resource.data.userId != userId;
+     * @deny (update) if request.resource.data.userId != resource.data.userId;
+     * @principle Enforces document ownership and validates the userId on create and update.
      */
     match /users/{userId}/ifcModels/{ifcModelId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-        function isExistingOwner(userId) {
-          return isOwner(userId) && existsAfter(/databases/$(database)/documents/users/$(userId)/ifcModels/$(ifcModelId));
-      }
-
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isSignedIn() && isExistingOwner(userId);
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Controls access to analysis results.  Users can only read and write results for models they own.
+     * @description Manages analysis results for specific IFC models.
      * @path /users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId}
-     * @allow (create) - User abc can create an analysis result under their IFC model if authenticated as abc.
-     *   `request.auth.uid == 'abc'`
-     * @allow (get) - User abc can read their own analysis result if authenticated as abc.
-     *   `request.auth.uid == 'abc'`
-     * @allow (update) - User abc can update their own analysis result if authenticated as abc.
-     *   `request.auth.uid == 'abc'`
-     * @allow (delete) - User abc can delete their own analysis result if authenticated as abc.
-     *   `request.auth.uid == 'abc'`
-     * @deny (create) - User def cannot create an analysis result under user abc's IFC model.
-     *   `request.auth.uid == 'def'` but the path is `/users/abc/ifcModels/{ifcModelId}/analysisResults/{analysisResultId}`.
-     * @deny (update) - User def cannot update user abc's analysis result.
-     *   `request.auth.uid == 'def'` but the path is `/users/abc/ifcModels/{ifcModelId}/analysisResults/{analysisResultId}`.
-     * @principle Enforces document ownership for all operations.
+     * @allow (get) if isOwner(userId);
+     * @allow (list) if isOwner(userId);
+     * @allow (create) if isOwner(userId) && request.resource.data.userId == userId;
+     * @allow (update) if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+     * @allow (delete) if isExistingOwner(userId);
+     * @deny (create) if request.resource.data.userId != userId;
+     * @deny (update) if request.resource.data.userId != resource.data.userId;
+     * @principle Enforces document ownership and validates the userId on create and update.
      */
     match /users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner(userId);
+    }
 
-      function isOwner(userId) {
-        return request.auth.uid == userId;
-      }
-
-        function isExistingOwner(userId) {
-          return isOwner(userId) && existsAfter(/databases/$(database)/documents/users/$(userId)/ifcModels/$(ifcModelId)/analysisResults/$(analysisResultId));
-      }
-
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isExistingOwner(userId);
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+    /**
+     * @description Manages chat message history for each user.
+     * @path /users/{userId}/messages/{messageId}
+     * @allow (get) if isOwner(userId);
+     * @allow (list) if isOwner(userId);
+     * @allow (create) if isOwner(userId) && request.resource.data.userId == userId;
+     * @allow (update) if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+     * @allow (delete) if isExistingOwner(userId);
+     * @deny (create) if request.resource.data.userId != userId;
+     * @deny (update) if request.resource.data.userId != resource.data.userId;
+     * @principle Enforces document ownership and validates the userId on create and update.
+     */
+    match /users/{userId}/messages/{messageId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner(userId);
     }
   }
 }
