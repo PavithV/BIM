@@ -8,16 +8,18 @@ import { AnalysisPanel } from '@/components/analysis-panel';
 import { ChatAssistant } from '@/components/chat-assistant';
 import { Building, Bot, BarChart3, Menu, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 import { getStartingPrompts, getAIChatFeedback } from '@/app/actions';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import { addDoc, collection, query, orderBy, Timestamp } from 'firebase/firestore';
 
 export type Message = {
-  id: number;
+  id: string;
   role: 'user' | 'assistant';
   content: string;
+  createdAt: Timestamp;
 };
 
 export default function Dashboard() {
@@ -29,7 +31,27 @@ export default function Dashboard() {
   
   const auth = useAuth();
   const { user } = useUser();
+  const firestore = useFirestore();
   const router = useRouter();
+
+  const messagesRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return collection(firestore, 'users', user.uid, 'messages');
+  }, [user, firestore]);
+  
+  const messagesQuery = useMemoFirebase(() => {
+    if (!messagesRef) return null;
+    return query(messagesRef, orderBy('createdAt', 'asc'));
+  }, [messagesRef]);
+
+  const { data: chatHistory, isLoading: isHistoryLoading } = useCollection<Message>(messagesQuery);
+
+  useEffect(() => {
+    if (chatHistory) {
+      setMessages(chatHistory);
+    }
+  }, [chatHistory]);
+
 
   useEffect(() => {
     async function fetchPrompts() {
@@ -47,25 +69,59 @@ export default function Dashboard() {
   };
 
   const handleSendMessage = async (userQuestion: string) => {
-    if (!userQuestion.trim() || !ifcData) return;
+    if (!userQuestion.trim() || !ifcData || !messagesRef) return;
+  
+    const newUserMessage: Omit<Message, 'id'> = {
+      role: 'user',
+      content: userQuestion,
+      createdAt: Timestamp.now(),
+    };
+    
+    // Optimistically update UI
+    const tempId = Date.now().toString();
+    setMessages(prev => [...prev, { ...newUserMessage, id: tempId } as Message]);
 
-    const newUserMessage: Message = { id: Date.now(), role: 'user', content: userQuestion };
-    setMessages(prev => [...prev, newUserMessage]);
     setIsLoading(true);
+  
+    try {
+      // Save user message to Firestore
+      const userMessageRef = await addDoc(messagesRef, newUserMessage);
+      // Update message with actual ID from Firestore
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: userMessageRef.id } : m));
 
-    const result = await getAIChatFeedback({
-      ifcModelData: ifcData,
-      userQuestion: userQuestion,
-    });
-
-    setIsLoading(false);
-
-    if (result.feedback) {
-      const newAssistantMessage: Message = { id: Date.now() + 1, role: 'assistant', content: result.feedback };
-      setMessages(prev => [...prev, newAssistantMessage]);
-    } else {
-      const errorMessage: Message = { id: Date.now() + 1, role: 'assistant', content: result.error || 'Entschuldigung, ein Fehler ist aufgetreten.' };
-      setMessages(prev => [...prev, errorMessage]);
+      const result = await getAIChatFeedback({
+        ifcModelData: ifcData,
+        userQuestion: userQuestion,
+      });
+  
+      if (result.feedback) {
+        const newAssistantMessage: Omit<Message, 'id'> = {
+          role: 'assistant',
+          content: result.feedback,
+          createdAt: Timestamp.now(),
+        };
+        // Save assistant message to Firestore
+        await addDoc(messagesRef, newAssistantMessage);
+      } else {
+        const errorMessage: Omit<Message, 'id'> = {
+          role: 'assistant',
+          content: result.error || 'Entschuldigung, ein Fehler ist aufgetreten.',
+          createdAt: Timestamp.now(),
+        };
+        // Save error message to Firestore
+        await addDoc(messagesRef, errorMessage);
+      }
+    } catch (error) {
+      console.error("Error sending message:", error);
+      const errorMessage: Omit<Message, 'id'> = {
+        role: 'assistant',
+        content: 'Nachricht konnte nicht gesendet werden.',
+        createdAt: Timestamp.now(),
+      };
+      // We don't save this to Firestore, just show it in the UI
+      setMessages(prev => [...prev, {...errorMessage, id: 'error-' + Date.now()} as Message]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -73,13 +129,13 @@ export default function Dashboard() {
   const handleFileUploaded = (file: File, data: string) => {
     setIfcFile(file);
     setIfcData(data);
-    setMessages([]);
+    // Do not reset messages, as chat history should persist across files in a session for now
   };
 
   const resetProject = () => {
     setIfcFile(null);
     setIfcData(null);
-    setMessages([]);
+    // Keep messages
   };
 
   const Header = () => (
@@ -133,7 +189,7 @@ export default function Dashboard() {
                     <ChatAssistant 
                       messages={messages}
                       startingPrompts={startingPrompts}
-                      isLoading={isLoading}
+                      isLoading={isLoading || isHistoryLoading}
                       onSendMessage={handleSendMessage}
                     />
                   </TabsContent>
@@ -192,7 +248,7 @@ export default function Dashboard() {
                    <ChatAssistant 
                       messages={messages}
                       startingPrompts={startingPrompts}
-                      isLoading={isLoading}
+                      isLoading={isLoading || isHistoryLoading}
                       onSendMessage={handleSendMessage}
                     />
                 </TabsContent>

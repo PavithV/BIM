@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from './ui/card';
 import type { Message } from './dashboard';
+import { Skeleton } from './ui/skeleton';
 
 interface ChatAssistantProps {
   messages: Message[];
@@ -40,57 +41,67 @@ export function ChatAssistant({ messages, startingPrompts, isLoading, onSendMess
     }
   };
   
-  return (
-    <div className="flex flex-col h-full">
-      <ScrollArea className="flex-1">
-        <div className="p-4 space-y-6">
-          {messages.length === 0 && !isLoading && (
-            <Card className="bg-transparent border-none shadow-none">
-              <CardContent className="p-0">
-                  <div className="text-center p-8">
-                    <Avatar className="mx-auto mb-4 w-16 h-16">
-                      <AvatarFallback className="bg-primary/10">
-                        <Bot className="w-8 h-8 text-primary" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <h2 className="text-lg font-semibold font-headline">KI-Coach</h2>
-                    <p className="text-muted-foreground text-sm mb-6">Fragen Sie mich alles über Ihr Modell.</p>
-                    <div className="space-y-2 text-sm">
-                      <p className="text-muted-foreground font-semibold flex items-center justify-center gap-2"><Sparkles className="w-4 h-4 text-accent" /> Probieren Sie einen Vorschlag aus</p>
-                      {startingPrompts.slice(0, 3).map((prompt, index) => (
-                        <button key={index} onClick={() => handleSendMessage(prompt)} className="text-left p-3 rounded-md hover:bg-muted w-full transition-colors text-foreground/80">
-                          {prompt}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {messages.map((message) => (
-            <div key={message.id} className={cn('flex items-start gap-3', message.role === 'user' ? 'justify-end' : '')}>
-              {message.role === 'assistant' && (
-                <Avatar className="w-8 h-8">
+  const ChatContent = () => {
+    if (isLoading && messages.length === 0) {
+      return (
+        <div className="p-4 space-y-4">
+          <Skeleton className="h-16 w-2/3" />
+          <Skeleton className="h-16 w-1/2 ml-auto" />
+          <Skeleton className="h-20 w-3/4" />
+        </div>
+      );
+    }
+    
+    if (messages.length === 0) {
+      return (
+        <Card className="bg-transparent border-none shadow-none">
+          <CardContent className="p-0">
+              <div className="text-center p-8">
+                <Avatar className="mx-auto mb-4 w-16 h-16">
                   <AvatarFallback className="bg-primary/10">
-                    <Bot className="w-4 h-4 text-primary"/>
+                    <Bot className="w-8 h-8 text-primary" />
                   </AvatarFallback>
                 </Avatar>
-              )}
-              <div className={cn('max-w-[85%] rounded-lg p-3', message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                <h2 className="text-lg font-semibold font-headline">KI-Coach</h2>
+                <p className="text-muted-foreground text-sm mb-6">Fragen Sie mich alles über Ihr Modell.</p>
+                <div className="space-y-2 text-sm">
+                  <p className="text-muted-foreground font-semibold flex items-center justify-center gap-2"><Sparkles className="w-4 h-4 text-accent" /> Probieren Sie einen Vorschlag aus</p>
+                  {startingPrompts.slice(0, 3).map((prompt, index) => (
+                    <button key={index} onClick={() => handleSendMessage(prompt)} className="text-left p-3 rounded-md hover:bg-muted w-full transition-colors text-foreground/80">
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
               </div>
-              {message.role === 'user' && (
-                <Avatar className="w-8 h-8">
-                  <AvatarFallback>
-                    <User className="w-4 h-4"/>
-                  </AvatarFallback>
-                </Avatar>
-              )}
+          </CardContent>
+        </Card>
+      );
+    }
+    
+    return (
+      <div className="p-4 space-y-6">
+        {messages.map((message) => (
+          <div key={message.id} className={cn('flex items-start gap-3', message.role === 'user' ? 'justify-end' : '')}>
+            {message.role === 'assistant' && (
+              <Avatar className="w-8 h-8">
+                <AvatarFallback className="bg-primary/10">
+                  <Bot className="w-4 h-4 text-primary"/>
+                </AvatarFallback>
+              </Avatar>
+            )}
+            <div className={cn('max-w-[85%] rounded-lg p-3', message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
             </div>
-          ))}
-
-          {isLoading && (
+            {message.role === 'user' && (
+              <Avatar className="w-8 h-8">
+                <AvatarFallback>
+                  <User className="w-4 h-4"/>
+                </AvatarFallback>
+              </Avatar>
+            )}
+          </div>
+        ))}
+         {isLoading && (
             <div className="flex items-start gap-3">
               <Avatar className="w-8 h-8">
                 <AvatarFallback className="bg-primary/10">
@@ -103,8 +114,15 @@ export function ChatAssistant({ messages, startingPrompts, isLoading, onSendMess
               </div>
             </div>
           )}
-          <div ref={messagesEndRef} />
-        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <ScrollArea className="flex-1">
+        <ChatContent />
+        <div ref={messagesEndRef} />
       </ScrollArea>
       <div className="p-4 border-t bg-card">
         <div className="relative">

@@ -92,6 +92,46 @@
         "resultData",
         "analysisDate"
       ]
+    },
+    "ChatMessage": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatMessage",
+      "type": "object",
+      "description": "Represents a single message in a user's chat history with the AI coach.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ChatMessage entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who this message belongs to. (Relationship: User 1:N ChatMessage)"
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the message sender.",
+          "enum": [ "user", "assistant" ]
+        },
+        "content": {
+          "type": "string",
+          "description": "The textual content of the message."
+        },
+        "createdAt": {
+          "type": "object",
+          "description": "Timestamp when the message was created.",
+          "properties": {
+            "seconds": { "type": "number" },
+            "nanoseconds": { "type": "number" }
+          }
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "role",
+        "content",
+        "createdAt"
+      ]
     }
   },
   "auth": {
@@ -160,8 +200,28 @@
             }
           ]
         }
+      },
+      {
+        "path": "/users/{userId}/messages/{messageId}",
+        "definition": {
+          "entityName": "ChatMessage",
+          "schema": {
+            "$ref": "#/backend/entities/ChatMessage"
+          },
+          "description": "Stores the chat message history for a specific user. The path includes the userId to ensure ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Auth UID of the user who owns the chat message."
+            },
+            {
+              "name": "messageId",
+              "description": "The unique identifier of the chat message."
+            }
+          ]
+        }
       }
     ],
-    "reasoning": "The Firestore structure is designed to support the BIMCoach Studio application, focusing on user authentication, IFC model storage, analysis results, and the relationships between them. The structure prioritizes authorization independence and simplifies security rules.\n\n*   **Users:** User data is stored in a `users` collection using the user's UID as the document ID. This path-based ownership simplifies security rules for user-specific data.\n*   **IFC Models:** IFC models are stored in a subcollection `ifcModels` under each user's document (`/users/{userId}/ifcModels/{ifcModelId}`). This structure maintains a clear ownership hierarchy and enables easy retrieval of models associated with a specific user.\n*   **Analysis Results:** Analysis results are stored in a subcollection `analysisResults` under each IFC model (`/users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId}`). This nested structure maintains the relationship between users, models, and their analysis results.\n\n**Authorization Independence:** The data structure achieves authorization independence because access control is primarily based on path-based ownership. For example, access to IFC models and analysis results is controlled by the `userId` in the path.  No `get()` calls are needed in the security rules to determine ownership.\n\n**QAPs Support:** This structure enables secure list operations.  Listing IFC models is limited to the models owned by the currently authenticated user due to the path-based ownership (`/users/{userId}/ifcModels`). Similarly, listing analysis results is scoped to a specific IFC model and user."
+    "reasoning": "The Firestore structure is designed to support the BIMCoach Studio application, focusing on user authentication, IFC model storage, analysis results, and the relationships between them. The structure prioritizes authorization independence and simplifies security rules.\n\n*   **Users:** User data is stored in a `users` collection using the user's UID as the document ID. This path-based ownership simplifies security rules for user-specific data.\n*   **IFC Models:** IFC models are stored in a subcollection `ifcModels` under each user's document (`/users/{userId}/ifcModels/{ifcModelId}`). This structure maintains a clear ownership hierarchy and enables easy retrieval of models associated with a specific user.\n*   **Analysis Results:** Analysis results are stored in a subcollection `analysisResults` under each IFC model (`/users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId}`). This nested structure maintains the relationship between users, models, and their analysis results.\n*   **Chat Messages:** Chat messages are stored in a subcollection `messages` under each user's document (`/users/{userId}/messages/{messageId}`). This ensures that each user's chat history is private and linked directly to their account, simplifying data retrieval and security rules."
   }
 }
