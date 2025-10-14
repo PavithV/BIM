@@ -8,7 +8,8 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionCookie = request.cookies.get('__session')?.value;
 
-  const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route));
+  // Check for exact match on protected routes, especially for the root '/'
+  const isProtectedRoute = PROTECTED_ROUTES.includes(pathname);
   const isPublicRoute = PUBLIC_ROUTES.some(route => pathname.startsWith(route));
 
   if (!sessionCookie && isProtectedRoute) {
