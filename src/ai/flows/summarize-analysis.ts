@@ -15,13 +15,13 @@ const SummarizeAnalysisInputSchema = z.object({
   analysisData: z
     .string()
     .describe(
-      'The sustainability analysis data in JSON format, including GWP, PEnr, and resource usage.'
+      'Die Nachhaltigkeitsanalysedaten im JSON-Format, einschließlich GWP, PEnr und Ressourcenverbrauch.'
     ),
 });
 export type SummarizeAnalysisInput = z.infer<typeof SummarizeAnalysisInputSchema>;
 
 const SummarizeAnalysisOutputSchema = z.object({
-  summary: z.string().describe('A concise summary of the sustainability analysis.'),
+  summary: z.string().describe('Eine prägnante Zusammenfassung der Nachhaltigkeitsanalyse.'),
 });
 export type SummarizeAnalysisOutput = z.infer<typeof SummarizeAnalysisOutputSchema>;
 
@@ -33,11 +33,11 @@ const prompt = ai.definePrompt({
   name: 'summarizeAnalysisPrompt',
   input: {schema: SummarizeAnalysisInputSchema},
   output: {schema: SummarizeAnalysisOutputSchema},
-  prompt: `You are an expert sustainability consultant reviewing the analysis of a BIM model.
+  prompt: `Sie sind ein erfahrener Nachhaltigkeitsberater, der die Analyse eines BIM-Modells überprüft. Antworten Sie immer auf Deutsch.
 
-  Provide a concise summary of the key findings from the following sustainability analysis data.  Focus on the most critical areas for improvement. The analysis is based on EN 15978.
+  Geben Sie eine prägnante Zusammenfassung der wichtigsten Ergebnisse aus den folgenden Nachhaltigkeitsanalysedaten. Konzentrieren Sie sich auf die kritischsten Verbesserungsbereiche. Die Analyse basiert auf EN 15978.
 
-  Analysis Data: {{{analysisData}}}
+  Analysedaten: {{{analysisData}}}
   `,
 });
 

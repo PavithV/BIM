@@ -35,7 +35,7 @@ export function AnalysisPanel({ onExport }: AnalysisPanelProps) {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline text-lg">Sustainability Summary</CardTitle>
+          <CardTitle className="font-headline text-lg">Nachhaltigkeits-Zusammenfassung</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">{analysisData.summary}</p>
@@ -59,7 +59,7 @@ export function AnalysisPanel({ onExport }: AnalysisPanelProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline text-lg">Material Composition (by mass %)</CardTitle>
+          <CardTitle className="font-headline text-lg">Materialzusammensetzung (in Massen-%)</CardTitle>
         </CardHeader>
         <CardContent className="pl-0">
           <ChartContainer config={chartConfig} className="h-[250px] w-full">
@@ -82,7 +82,7 @@ export function AnalysisPanel({ onExport }: AnalysisPanelProps) {
       
       <Button onClick={onExport} className="w-full bg-primary hover:bg-primary/90">
         <FileText className="mr-2 h-4 w-4" />
-        Export Material Passport
+        Materialpass exportieren
       </Button>
     </div>
   );

@@ -11,7 +11,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const StartingPromptsOutputSchema = z.object({
-  prompts: z.array(z.string()).describe('A list of suggested prompts.'),
+  prompts: z.array(z.string()).describe('Eine Liste von vorgeschlagenen Eingabeaufforderungen.'),
 });
 export type StartingPromptsOutput = z.infer<typeof StartingPromptsOutputSchema>;
 
@@ -22,18 +22,18 @@ export async function generateStartingPrompts(): Promise<StartingPromptsOutput> 
 const prompt = ai.definePrompt({
   name: 'generateStartingPromptsPrompt',
   output: {schema: StartingPromptsOutputSchema},
-  prompt: `You are an AI assistant designed to help architecture students analyze and evaluate their building designs (IFC models). Provide a list of suggested prompts that a new user can use to quickly start interacting with the platform and exploring its capabilities. The prompts should be relevant to sustainability, energy efficiency, accessibility, and technical standards. Return them as a JSON array of strings.
+  prompt: `Sie sind ein KI-Assistent, der Architekturstudenten bei der Analyse und Bewertung ihrer Gebäudeentwürfe (IFC-Modelle) unterstützt. Stellen Sie eine Liste von vorgeschlagenen Eingabeaufforderungen auf Deutsch bereit, die ein neuer Benutzer verwenden kann, um schnell mit der Plattform zu interagieren und ihre Funktionen zu erkunden. Die Eingabeaufforderungen sollten für Nachhaltigkeit, Energieeffizienz, Barrierefreiheit und technische Standards relevant sein. Geben Sie sie als JSON-Array von Zeichenfolgen zurück.
 
-Example Prompts:
+Beispiel-Prompts:
 [
-  "What are the main sustainability issues in my building design?",
-  "How can I improve the energy efficiency of my building?",
-  "Is my building design accessible to people with disabilities?",
-  "Does my building design meet the relevant technical standards?",
-  "Generate a material passport for this project."
+  "Was sind die Hauptprobleme der Nachhaltigkeit in meinem Gebäudeentwurf?",
+  "Wie kann ich die Energieeffizienz meines Gebäudes verbessern?",
+  "Ist mein Gebäudeentwurf für Menschen mit Behinderungen zugänglich?",
+  "Erfüllt mein Gebäudeentwurf die relevanten technischen Standards?",
+  "Erstelle einen Materialpass für dieses Projekt."
 ]
 
-Output the list of suggested prompts in a JSON array:
+Geben Sie die Liste der vorgeschlagenen Eingabeaufforderungen in einem JSON-Array aus:
 `,
 });
 

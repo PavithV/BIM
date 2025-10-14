@@ -16,14 +16,14 @@ const AIChatFeedbackInputSchema = z.object({
   ifcModelData: z
     .string()
     .describe(
-      'The IFC model data as a string.'
+      'Die IFC-Modelldaten als Zeichenkette.'
     ),
-  userQuestion: z.string().describe('The user question about the IFC model.'),
+  userQuestion: z.string().describe('Die Benutzerfrage zum IFC-Modell.'),
 });
 export type AIChatFeedbackInput = z.infer<typeof AIChatFeedbackInputSchema>;
 
 const AIChatFeedbackOutputSchema = z.object({
-  feedback: z.string().describe('The AI-powered feedback on the IFC model based on the user question.'),
+  feedback: z.string().describe('Das KI-gestützte Feedback zum IFC-Modell basierend auf der Benutzerfrage.'),
 });
 export type AIChatFeedbackOutput = z.infer<typeof AIChatFeedbackOutputSchema>;
 
@@ -35,13 +35,13 @@ const prompt = ai.definePrompt({
   name: 'aiChatFeedbackPrompt',
   input: {schema: AIChatFeedbackInputSchema},
   output: {schema: AIChatFeedbackOutputSchema},
-  prompt: `You are an AI assistant providing feedback on IFC models. Use your knowledge to answer questions about the model, incorporating aspects like sustainability, energy efficiency, and accessibility.
+  prompt: `Sie sind ein KI-Assistent, der Feedback zu IFC-Modellen gibt. Antworten Sie immer auf Deutsch. Nutzen Sie Ihr Wissen, um Fragen zum Modell zu beantworten und dabei Aspekte wie Nachhaltigkeit, Energieeffizienz und Barrierefreiheit einzubeziehen.
 
-IFC Model Data: {{{ifcModelData}}}
+IFC-Modelldaten: {{{ifcModelData}}}
 
-User Question: {{{userQuestion}}}
+Benutzerfrage: {{{userQuestion}}}
 
-Provide detailed and helpful feedback based on the user's question.`, // added more context to the prompt
+Geben Sie detailliertes und hilfreiches Feedback basierend auf der Frage des Benutzers.`,
 });
 
 const aiChatFeedbackFlow = ai.defineFlow(

@@ -24,8 +24,8 @@ export function FileUploader({ onFileUploaded }: FileUploaderProps) {
             setFile(selectedFile);
         } else {
             toast({
-            title: 'Invalid File Type',
-            description: 'Please upload a valid .ifc file.',
+            title: 'Ungültiger Dateityp',
+            description: 'Bitte laden Sie eine gültige .ifc-Datei hoch.',
             variant: 'destructive',
             });
             setFile(null);
@@ -65,8 +65,8 @@ export function FileUploader({ onFileUploaded }: FileUploaderProps) {
       };
       reader.onerror = () => {
         toast({
-          title: 'Error Reading File',
-          description: 'There was an error processing your file.',
+          title: 'Fehler beim Lesen der Datei',
+          description: 'Beim Verarbeiten Ihrer Datei ist ein Fehler aufgetreten.',
           variant: 'destructive',
         });
         setIsLoading(false);
@@ -78,8 +78,8 @@ export function FileUploader({ onFileUploaded }: FileUploaderProps) {
   return (
     <Card className="w-full max-w-lg mx-auto shadow-lg">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-headline">Start a New Analysis</CardTitle>
-        <CardDescription>Upload your IFC model to begin.</CardDescription>
+        <CardTitle className="text-2xl font-headline">Neue Analyse starten</CardTitle>
+        <CardDescription>Laden Sie Ihr IFC-Modell hoch, um zu beginnen.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div
@@ -94,16 +94,16 @@ export function FileUploader({ onFileUploaded }: FileUploaderProps) {
         >
           <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center justify-center">
             <UploadCloud className="w-12 h-12 text-muted-foreground mb-4" />
-            <p className="font-semibold">Drag & drop your .ifc file here</p>
-            <p className="text-sm text-muted-foreground">or click to browse</p>
+            <p className="font-semibold">Ziehen Sie Ihre .ifc-Datei hierher</p>
+            <p className="text-sm text-muted-foreground">oder klicken Sie zum Durchsuchen</p>
             <Input id="file-upload" type="file" className="hidden" accept=".ifc" onChange={handleFileChange} disabled={isLoading}/>
           </label>
         </div>
         {file && (
           <div className="text-center space-y-4 pt-2">
-            <p>Selected file: <span className="font-semibold">{file.name}</span></p>
+            <p>Ausgewählte Datei: <span className="font-semibold">{file.name}</span></p>
             <Button className="w-full" onClick={handleSubmit} disabled={isLoading}>
-                {isLoading ? 'Analyzing...' : 'Analyze Project'}
+                {isLoading ? 'Analysiere...' : 'Projekt analysieren'}
             </Button>
           </div>
         )}

@@ -15,10 +15,10 @@ export function ModelViewer({ file }: ModelViewerProps) {
     return (
         <Card className="h-full flex flex-col items-center justify-center">
             <CardHeader>
-                <CardTitle className="font-headline">3D Model Viewer</CardTitle>
+                <CardTitle className="font-headline">3D-Modell-Ansicht</CardTitle>
             </CardHeader>
             <CardContent>
-                <p>Image placeholder not found.</p>
+                <p>Bild-Platzhalter nicht gefunden.</p>
             </CardContent>
         </Card>
     )
@@ -27,8 +27,8 @@ export function ModelViewer({ file }: ModelViewerProps) {
   return (
     <Card className="h-full flex flex-col min-h-[400px] md:min-h-0">
       <CardHeader>
-        <CardTitle className="font-headline">3D Model Viewer</CardTitle>
-        <CardDescription>Interactive view of your BIM model.</CardDescription>
+        <CardTitle className="font-headline">3D-Modell-Ansicht</CardTitle>
+        <CardDescription>Interaktive Ansicht Ihres BIM-Modells.</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 relative">
         <Image
@@ -42,15 +42,15 @@ export function ModelViewer({ file }: ModelViewerProps) {
         <div className="absolute top-2 right-2 flex flex-col gap-2">
           <Button variant="secondary" size="icon" className="bg-card/80 backdrop-blur-sm hover:bg-card">
             <ZoomIn />
-            <span className="sr-only">Zoom In</span>
+            <span className="sr-only">Vergrößern</span>
           </Button>
           <Button variant="secondary" size="icon" className="bg-card/80 backdrop-blur-sm hover:bg-card">
             <ZoomOut />
-            <span className="sr-only">Zoom Out</span>
+            <span className="sr-only">Verkleinern</span>
           </Button>
           <Button variant="secondary" size="icon" className="bg-card/80 backdrop-blur-sm hover:bg-card">
             <Expand />
-            <span className="sr-only">Expand</span>
+            <span className="sr-only">Erweitern</span>
           </Button>
         </div>
       </CardContent>

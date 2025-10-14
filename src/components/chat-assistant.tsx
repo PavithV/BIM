@@ -61,7 +61,7 @@ export function ChatAssistant({ ifcData }: ChatAssistantProps) {
       const newAssistantMessage: Message = { id: Date.now() + 1, role: 'assistant', content: result.feedback };
       setMessages(prev => [...prev, newAssistantMessage]);
     } else {
-      const errorMessage: Message = { id: Date.now() + 1, role: 'assistant', content: result.error || 'Sorry, I encountered an error.' };
+      const errorMessage: Message = { id: Date.now() + 1, role: 'assistant', content: result.error || 'Entschuldigung, ein Fehler ist aufgetreten.' };
       setMessages(prev => [...prev, errorMessage]);
     }
   };
@@ -86,10 +86,10 @@ export function ChatAssistant({ ifcData }: ChatAssistantProps) {
                         <Bot className="w-8 h-8 text-primary" />
                       </AvatarFallback>
                     </Avatar>
-                    <h2 className="text-lg font-semibold font-headline">AI Coach</h2>
-                    <p className="text-muted-foreground text-sm mb-6">Ask me anything about your model.</p>
+                    <h2 className="text-lg font-semibold font-headline">KI-Coach</h2>
+                    <p className="text-muted-foreground text-sm mb-6">Fragen Sie mich alles über Ihr Modell.</p>
                     <div className="space-y-2 text-sm">
-                      <p className="text-muted-foreground font-semibold flex items-center justify-center gap-2"><Sparkles className="w-4 h-4 text-accent" /> Try a suggestion</p>
+                      <p className="text-muted-foreground font-semibold flex items-center justify-center gap-2"><Sparkles className="w-4 h-4 text-accent" /> Probieren Sie einen Vorschlag aus</p>
                       {startingPrompts.slice(0, 3).map((prompt, index) => (
                         <button key={index} onClick={() => handleSendMessage(prompt)} className="text-left p-3 rounded-md hover:bg-muted w-full transition-colors text-foreground/80">
                           {prompt}
@@ -132,7 +132,7 @@ export function ChatAssistant({ ifcData }: ChatAssistantProps) {
               </Avatar>
               <div className="max-w-[85%] rounded-lg p-3 bg-muted flex items-center">
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                <span className="text-sm">Thinking...</span>
+                <span className="text-sm">Denke...</span>
               </div>
             </div>
           )}
@@ -145,7 +145,7 @@ export function ChatAssistant({ ifcData }: ChatAssistantProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about sustainability, accessibility, etc."
+            placeholder="Fragen zu Nachhaltigkeit, Barrierefreiheit, etc."
             className="pr-24 min-h-[50px] resize-none"
             rows={1}
             disabled={isLoading}
@@ -153,7 +153,7 @@ export function ChatAssistant({ ifcData }: ChatAssistantProps) {
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
             <Button type="submit" size="icon" onClick={() => handleSendMessage()} disabled={isLoading || !input.trim()}>
               <Send className="w-4 h-4" />
-              <span className="sr-only">Send Message</span>
+              <span className="sr-only">Nachricht senden</span>
             </Button>
             <kbd className="hidden lg:inline-flex items-center gap-1 text-xs text-muted-foreground"><CornerDownLeft className="w-3 h-3"/> Enter</kbd>
           </div>

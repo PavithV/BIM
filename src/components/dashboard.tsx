@@ -32,7 +32,7 @@ export default function Dashboard() {
       </div>
       <div className="hidden md:flex items-center gap-4">
         {ifcFile && (
-          <Button variant="outline" onClick={resetProject}>New Project</Button>
+          <Button variant="outline" onClick={resetProject}>Neues Projekt</Button>
         )}
       </div>
       <div className="md:hidden">
@@ -40,7 +40,7 @@ export default function Dashboard() {
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon">
               <Menu />
-              <span className="sr-only">Open Menu</span>
+              <span className="sr-only">Menü öffnen</span>
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-full p-0 flex flex-col">
@@ -61,11 +61,11 @@ export default function Dashboard() {
                 </div>
                 <Tabs defaultValue="analysis" className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="analysis"><BarChart3 className="w-4 h-4 mr-2" />Analysis</TabsTrigger>
-                    <TabsTrigger value="coach"><Bot className="w-4 h-4 mr-2" />AI Coach</TabsTrigger>
+                    <TabsTrigger value="analysis"><BarChart3 className="w-4 h-4 mr-2" />Analyse</TabsTrigger>
+                    <TabsTrigger value="coach"><Bot className="w-4 h-4 mr-2" />KI-Coach</TabsTrigger>
                   </TabsList>
                   <TabsContent value="analysis" className="mt-4">
-                    <AnalysisPanel onExport={() => alert('Exporting Material Passport...')} />
+                    <AnalysisPanel onExport={() => alert('Materialpass wird exportiert...')} />
                   </TabsContent>
                   <TabsContent value="coach" className="mt-4 h-[calc(100vh-300px)]">
                     <ChatAssistant ifcData={ifcData ?? ''} />
@@ -79,7 +79,7 @@ export default function Dashboard() {
               )}
             </div>
             <div className="p-4 border-t">
-                {ifcFile && <Button variant="outline" onClick={resetProject} className="w-full">New Project</Button>}
+                {ifcFile && <Button variant="outline" onClick={resetProject} className="w-full">Neues Projekt</Button>}
             </div>
           </SheetContent>
         </Sheet>
@@ -106,16 +106,16 @@ export default function Dashboard() {
                     <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="analysis">
                         <BarChart3 className="w-4 h-4 mr-2" />
-                        Analysis
+                        Analyse
                         </TabsTrigger>
                         <TabsTrigger value="coach">
                         <Bot className="w-4 h-4 mr-2" />
-                        AI Coach
+                        KI-Coach
                         </TabsTrigger>
                     </TabsList>
                 </div>
                 <TabsContent value="analysis" className="flex-1 overflow-y-auto p-4 lg:p-6">
-                  <AnalysisPanel onExport={() => alert('Exporting Material Passport...')} />
+                  <AnalysisPanel onExport={() => alert('Materialpass wird exportiert...')} />
                 </TabsContent>
                 <TabsContent value="coach" className="flex-1 flex flex-col m-0 overflow-hidden">
                   <ChatAssistant ifcData={ifcData ?? ''} />
