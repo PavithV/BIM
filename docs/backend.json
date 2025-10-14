@@ -1,0 +1,168 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user registered on the BIMCoach Studio platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the user."
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "name"
+      ]
+    },
+    "IFCModel": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "IFCModel",
+      "type": "object",
+      "description": "Represents an uploaded IFC model.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the IFCModel entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N IFCModel)"
+        },
+        "uploadDate": {
+          "type": "string",
+          "description": "Date and time when the IFC model was uploaded.",
+          "format": "date-time"
+        },
+        "fileName": {
+          "type": "string",
+          "description": "Original filename of the uploaded IFC model."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "uploadDate",
+        "fileName"
+      ]
+    },
+    "AnalysisResult": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AnalysisResult",
+      "type": "object",
+      "description": "Represents the analysis results for a given IFC model.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the AnalysisResult entity."
+        },
+        "ifcModelId": {
+          "type": "string",
+          "description": "Reference to IFCModel. (Relationship: IFCModel 1:N AnalysisResult)"
+        },
+        "analysisType": {
+          "type": "string",
+          "description": "Type of analysis performed (e.g., Sustainability, Energy Efficiency, Accessibility)."
+        },
+        "resultData": {
+          "type": "string",
+          "description": "JSON data containing the results of the analysis."
+        },
+        "analysisDate": {
+          "type": "string",
+          "description": "Date and time when the analysis was performed.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ifcModelId",
+        "analysisType",
+        "resultData",
+        "analysisDate"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user data, using the Firebase Auth UID as the document ID. This enables path-based ownership for user-specific data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Auth UID of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/ifcModels/{ifcModelId}",
+        "definition": {
+          "entityName": "IFCModel",
+          "schema": {
+            "$ref": "#/backend/entities/IFCModel"
+          },
+          "description": "Stores IFC models uploaded by a user. The path includes the userId to ensure ownership. The IFCModel entity includes userId which MUST be the same as the userId in the path.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Auth UID of the user who owns the IFC model."
+            },
+            {
+              "name": "ifcModelId",
+              "description": "The unique identifier of the IFC model."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId}",
+        "definition": {
+          "entityName": "AnalysisResult",
+          "schema": {
+            "$ref": "#/backend/entities/AnalysisResult"
+          },
+          "description": "Stores analysis results for a specific IFC model. The path includes the userId and ifcModelId to maintain the relationship and ensure correct ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Auth UID of the user who owns the IFC model and its analysis results."
+            },
+            {
+              "name": "ifcModelId",
+              "description": "The unique identifier of the IFC model associated with the analysis result."
+            },
+            {
+              "name": "analysisResultId",
+              "description": "The unique identifier of the analysis result."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support the BIMCoach Studio application, focusing on user authentication, IFC model storage, analysis results, and the relationships between them. The structure prioritizes authorization independence and simplifies security rules.\n\n*   **Users:** User data is stored in a `users` collection using the user's UID as the document ID. This path-based ownership simplifies security rules for user-specific data.\n*   **IFC Models:** IFC models are stored in a subcollection `ifcModels` under each user's document (`/users/{userId}/ifcModels/{ifcModelId}`). This structure maintains a clear ownership hierarchy and enables easy retrieval of models associated with a specific user.\n*   **Analysis Results:** Analysis results are stored in a subcollection `analysisResults` under each IFC model (`/users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId}`). This nested structure maintains the relationship between users, models, and their analysis results.\n\n**Authorization Independence:** The data structure achieves authorization independence because access control is primarily based on path-based ownership. For example, access to IFC models and analysis results is controlled by the `userId` in the path.  No `get()` calls are needed in the security rules to determine ownership.\n\n**QAPs Support:** This structure enables secure list operations.  Listing IFC models is limited to the models owned by the currently authenticated user due to the path-based ownership (`/users/{userId}/ifcModels`). Similarly, listing analysis results is scoped to a specific IFC model and user."
+  }
+}
