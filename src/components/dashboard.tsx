@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUploader } from '@/components/file-uploader';
 import { ModelViewer } from '@/components/model-viewer';
@@ -8,20 +8,67 @@ import { AnalysisPanel } from '@/components/analysis-panel';
 import { ChatAssistant } from '@/components/chat-assistant';
 import { Building, Bot, BarChart3, Menu } from 'lucide-react';
 import { Button } from './ui/button';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
+import { getStartingPrompts, getAIChatFeedback } from '@/app/actions';
+
+export type Message = {
+  id: number;
+  role: 'user' | 'assistant';
+  content: string;
+};
 
 export default function Dashboard() {
   const [ifcFile, setIfcFile] = useState<File | null>(null);
   const [ifcData, setIfcData] = useState<string | null>(null);
 
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [startingPrompts, setStartingPrompts] = useState<string[]>([]);
+  
+  useEffect(() => {
+    async function fetchPrompts() {
+      const result = await getStartingPrompts();
+      if (result.prompts) {
+        setStartingPrompts(result.prompts);
+      }
+    }
+    fetchPrompts();
+  }, []);
+
+  const handleSendMessage = async (userQuestion: string) => {
+    if (!userQuestion.trim() || !ifcData) return;
+
+    const newUserMessage: Message = { id: Date.now(), role: 'user', content: userQuestion };
+    setMessages(prev => [...prev, newUserMessage]);
+    setIsLoading(true);
+
+    const result = await getAIChatFeedback({
+      ifcModelData: ifcData,
+      userQuestion: userQuestion,
+    });
+
+    setIsLoading(false);
+
+    if (result.feedback) {
+      const newAssistantMessage: Message = { id: Date.now() + 1, role: 'assistant', content: result.feedback };
+      setMessages(prev => [...prev, newAssistantMessage]);
+    } else {
+      const errorMessage: Message = { id: Date.now() + 1, role: 'assistant', content: result.error || 'Entschuldigung, ein Fehler ist aufgetreten.' };
+      setMessages(prev => [...prev, errorMessage]);
+    }
+  };
+
+
   const handleFileUploaded = (file: File, data: string) => {
     setIfcFile(file);
     setIfcData(data);
+    setMessages([]);
   };
 
   const resetProject = () => {
     setIfcFile(null);
     setIfcData(null);
+    setMessages([]);
   };
 
   const Header = () => (
@@ -68,7 +115,12 @@ export default function Dashboard() {
                     <AnalysisPanel onExport={() => alert('Materialpass wird exportiert...')} />
                   </TabsContent>
                   <TabsContent value="coach" className="mt-4 h-[calc(100vh-300px)]">
-                    <ChatAssistant ifcData={ifcData ?? ''} />
+                    <ChatAssistant 
+                      messages={messages}
+                      startingPrompts={startingPrompts}
+                      isLoading={isLoading}
+                      onSendMessage={handleSendMessage}
+                    />
                   </TabsContent>
                 </Tabs>
                 </>
@@ -118,7 +170,12 @@ export default function Dashboard() {
                   <AnalysisPanel onExport={() => alert('Materialpass wird exportiert...')} />
                 </TabsContent>
                 <TabsContent value="coach" className="flex-1 flex flex-col m-0 overflow-hidden">
-                  <ChatAssistant ifcData={ifcData ?? ''} />
+                   <ChatAssistant 
+                      messages={messages}
+                      startingPrompts={startingPrompts}
+                      isLoading={isLoading}
+                      onSendMessage={handleSendMessage}
+                    />
                 </TabsContent>
               </Tabs>
             </div>

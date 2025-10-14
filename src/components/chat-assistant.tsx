@@ -1,69 +1,36 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { Send, Bot, User, CornerDownLeft, Sparkles, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { getStartingPrompts, getAIChatFeedback } from '@/app/actions';
+import { useEffect, useRef, useState } from 'react';
+import { Bot, CornerDownLeft, Loader2, Send, Sparkles, User } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from './ui/card';
+import type { Message } from './dashboard';
 
 interface ChatAssistantProps {
-  ifcData: string;
+  messages: Message[];
+  startingPrompts: string[];
+  isLoading: boolean;
+  onSendMessage: (message: string) => void;
 }
 
-type Message = {
-  id: number;
-  role: 'user' | 'assistant';
-  content: string;
-};
-
-export function ChatAssistant({ ifcData }: ChatAssistantProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+export function ChatAssistant({ messages, startingPrompts, isLoading, onSendMessage }: ChatAssistantProps) {
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [startingPrompts, setStartingPrompts] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    async function fetchPrompts() {
-      const result = await getStartingPrompts();
-      if (result.prompts) {
-        setStartingPrompts(result.prompts);
-      }
-    }
-    fetchPrompts();
-  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  const handleSendMessage = async (prompt?: string) => {
+
+  const handleSendMessage = (prompt?: string) => {
     const userQuestion = prompt || input;
     if (!userQuestion.trim()) return;
-
-    const newUserMessage: Message = { id: Date.now(), role: 'user', content: userQuestion };
-    setMessages(prev => [...prev, newUserMessage]);
+    onSendMessage(userQuestion);
     setInput('');
-    setIsLoading(true);
-
-    const result = await getAIChatFeedback({
-      ifcModelData: ifcData,
-      userQuestion: userQuestion,
-    });
-
-    setIsLoading(false);
-
-    if (result.feedback) {
-      const newAssistantMessage: Message = { id: Date.now() + 1, role: 'assistant', content: result.feedback };
-      setMessages(prev => [...prev, newAssistantMessage]);
-    } else {
-      const errorMessage: Message = { id: Date.now() + 1, role: 'assistant', content: result.error || 'Entschuldigung, ein Fehler ist aufgetreten.' };
-      setMessages(prev => [...prev, errorMessage]);
-    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
