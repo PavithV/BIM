@@ -48,19 +48,34 @@ export default function RegisterPage() {
         name: name,
         email: email,
       };
+      
+      // Use a try-catch for the Firestore operation and emit a contextual error
+      try {
+        await setDoc(userRef, userData);
+      } catch (firestoreError) {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+              path: userRef.path,
+              operation: 'create',
+              requestResourceData: userData
+          }));
+          // Re-throw or handle as a registration failure
+          throw firestoreError;
+      }
 
-      // No need for custom error emitter here, let the promise handle it
-      await setDoc(userRef, userData);
 
       // Create session cookie
       const idToken = await user.getIdToken();
-      await fetch('/api/auth/login', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
       });
+
+      if (!response.ok) {
+        throw new Error('Server-side session creation failed.');
+      }
 
       toast({
         title: 'Registrierung erfolgreich',

@@ -34,10 +34,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function fetchPrompts() {
+      setIsLoading(true);
       const result = await getStartingPrompts();
       if (result.prompts) {
         setStartingPrompts(result.prompts);
       }
+      setIsLoading(false);
     }
     fetchPrompts();
   }, []);
@@ -49,7 +51,7 @@ export default function Dashboard() {
   };
 
   const handleSendMessage = async (userQuestion: string) => {
-    if (!userQuestion.trim() || !ifcData || !user) return;
+    if (!userQuestion.trim() || !ifcData) return;
 
     const newUserMessage: Message = {
       id: `user-${Date.now()}`,

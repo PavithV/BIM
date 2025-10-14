@@ -37,13 +37,13 @@ export default function LoginPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Server-side session creation failed.');
+        throw new Error(errorData.error || 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.');
       }
 
       router.push('/');
     } catch (error: any) {
       console.error(error);
-      let errorMessage = 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.';
+      let errorMessage = error.message || 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.';
       if (error.code === 'auth/invalid-credential') {
         errorMessage = 'Ungültige E-Mail-Adresse oder Passwort.';
       }

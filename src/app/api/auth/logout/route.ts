@@ -1,26 +1,25 @@
 // src/app/api/auth/logout/route.ts
-import { getAdminAuth } from '@/firebase/admin';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const sessionCookie = cookies().get('__session')?.value;
-    if (sessionCookie) {
-        const decodedClaims = await getAdminAuth().verifySessionCookie(sessionCookie).catch(() => null);
-        if(decodedClaims) {
-            await getAdminAuth().revokeRefreshTokens(decodedClaims.sub);
-        }
-    }
-
+    // Clear the session cookie
     const options = {
       name: '__session',
       value: '',
       maxAge: -1,
     };
 
-    const response = NextResponse.json({success: true}, { status: 200 });
+    const response = NextResponse.json({ success: true }, { status: 200 });
     response.cookies.set(options);
+    
+    // Invalidate the session on the client side by clearing the cookie
+    const session = cookies().get('__session');
+    if (session) {
+      cookies().delete('__session');
+    }
+
     return response;
   } catch (error) {
     console.error('Logout error:', error);
