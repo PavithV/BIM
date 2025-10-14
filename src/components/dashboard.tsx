@@ -10,10 +10,10 @@ import { Building, Bot, BarChart3, Menu, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { getStartingPrompts, getAIChatFeedback } from '@/app/actions';
-import { useAuth, useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useAuth, useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { addDoc, collection, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
 
 export type Message = {
   id: string;
@@ -71,23 +71,19 @@ export default function Dashboard() {
   const handleSendMessage = async (userQuestion: string) => {
     if (!userQuestion.trim() || !ifcData || !messagesRef) return;
   
-    const newUserMessage: Omit<Message, 'id'> = {
+    const newUserMessage: Omit<Message, 'id' | 'createdAt'> & { createdAt: Timestamp } = {
       role: 'user',
       content: userQuestion,
       createdAt: Timestamp.now(),
     };
     
-    // Optimistically update UI
     const tempId = Date.now().toString();
-    setMessages(prev => [...prev, { ...newUserMessage, id: tempId } as Message]);
+    setMessages(prev => [...prev, { ...newUserMessage, id: tempId }]);
 
     setIsLoading(true);
   
     try {
-      // Save user message to Firestore
-      const userMessageRef = await addDoc(messagesRef, newUserMessage);
-      // Update message with actual ID from Firestore
-      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: userMessageRef.id } : m));
+      await addDocumentNonBlocking(messagesRef, newUserMessage);
 
       const result = await getAIChatFeedback({
         ifcModelData: ifcData,
@@ -95,31 +91,31 @@ export default function Dashboard() {
       });
   
       if (result.feedback) {
-        const newAssistantMessage: Omit<Message, 'id'> = {
-          role: 'assistant',
+        const newAssistantMessage = {
+          role: 'assistant' as const,
           content: result.feedback,
           createdAt: Timestamp.now(),
         };
-        // Save assistant message to Firestore
-        await addDoc(messagesRef, newAssistantMessage);
+        addDocumentNonBlocking(messagesRef, newAssistantMessage);
       } else {
-        const errorMessage: Omit<Message, 'id'> = {
-          role: 'assistant',
+        const errorMessage = {
+          role: 'assistant' as const,
           content: result.error || 'Entschuldigung, ein Fehler ist aufgetreten.',
           createdAt: Timestamp.now(),
         };
-        // Save error message to Firestore
-        await addDoc(messagesRef, errorMessage);
+        addDocumentNonBlocking(messagesRef, errorMessage);
       }
     } catch (error) {
-      console.error("Error sending message:", error);
-      const errorMessage: Omit<Message, 'id'> = {
-        role: 'assistant',
-        content: 'Nachricht konnte nicht gesendet werden.',
+      // This catch block is for errors outside of Firestore writes, e.g., getAIChatFeedback call.
+      // Firestore permission errors are handled by the non-blocking functions.
+      console.error("Error in handleSendMessage flow:", error);
+      const errorMessage = {
+        id: 'error-' + Date.now(),
+        role: 'assistant' as const,
+        content: 'Ein unerwarteter Fehler ist aufgetreten.',
         createdAt: Timestamp.now(),
       };
-      // We don't save this to Firestore, just show it in the UI
-      setMessages(prev => [...prev, {...errorMessage, id: 'error-' + Date.now()} as Message]);
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
