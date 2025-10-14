@@ -29,7 +29,7 @@ export default function LoginPage() {
     } catch (error: any) {
       console.error(error);
       let errorMessage = 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.';
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      if (error.code === 'auth/invalid-credential') {
         errorMessage = 'Ungültige E-Mail-Adresse oder Passwort.';
       }
       toast({
