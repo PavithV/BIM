@@ -10,10 +10,10 @@ import { Building, Bot, BarChart3, Menu, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { getStartingPrompts, getAIChatFeedback } from '@/app/actions';
-import { useAuth, useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
+import { useAuth, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { collection, query, orderBy, Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
 
 export type Message = {
   id: string;
@@ -31,27 +31,7 @@ export default function Dashboard() {
   
   const auth = useAuth();
   const { user } = useUser();
-  const firestore = useFirestore();
   const router = useRouter();
-
-  const messagesRef = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return collection(firestore, 'users', user.uid, 'messages');
-  }, [user, firestore]);
-  
-  const messagesQuery = useMemoFirebase(() => {
-    if (!messagesRef) return null;
-    return query(messagesRef, orderBy('createdAt', 'asc'));
-  }, [messagesRef]);
-
-  const { data: chatHistory, isLoading: isHistoryLoading } = useCollection<Message>(messagesQuery);
-
-  useEffect(() => {
-    if (chatHistory) {
-      setMessages(chatHistory);
-    }
-  }, [chatHistory]);
-
 
   useEffect(() => {
     async function fetchPrompts() {
@@ -69,47 +49,44 @@ export default function Dashboard() {
   };
 
   const handleSendMessage = async (userQuestion: string) => {
-    if (!userQuestion.trim() || !ifcData || !messagesRef) return;
+    if (!userQuestion.trim() || !ifcData) return;
   
-    const newUserMessage: Omit<Message, 'id' | 'createdAt'> & { createdAt: Timestamp } = {
+    const newUserMessage: Message = {
+      id: 'user-' + Date.now(),
       role: 'user',
       content: userQuestion,
       createdAt: Timestamp.now(),
     };
     
-    const tempId = Date.now().toString();
-    setMessages(prev => [...prev, { ...newUserMessage, id: tempId }]);
-
+    setMessages(prev => [...prev, newUserMessage]);
     setIsLoading(true);
   
     try {
-      await addDocumentNonBlocking(messagesRef, newUserMessage);
-
       const result = await getAIChatFeedback({
         ifcModelData: ifcData,
         userQuestion: userQuestion,
       });
   
       if (result.feedback) {
-        const newAssistantMessage = {
+        const newAssistantMessage: Message = {
+          id: 'assistant-' + Date.now(),
           role: 'assistant' as const,
           content: result.feedback,
           createdAt: Timestamp.now(),
         };
-        addDocumentNonBlocking(messagesRef, newAssistantMessage);
+        setMessages(prev => [...prev, newAssistantMessage]);
       } else {
-        const errorMessage = {
+        const errorMessage: Message = {
+          id: 'error-' + Date.now(),
           role: 'assistant' as const,
           content: result.error || 'Entschuldigung, ein Fehler ist aufgetreten.',
           createdAt: Timestamp.now(),
         };
-        addDocumentNonBlocking(messagesRef, errorMessage);
+        setMessages(prev => [...prev, errorMessage]);
       }
     } catch (error) {
-      // This catch block is for errors outside of Firestore writes, e.g., getAIChatFeedback call.
-      // Firestore permission errors are handled by the non-blocking functions.
       console.error("Error in handleSendMessage flow:", error);
-      const errorMessage = {
+      const errorMessage: Message = {
         id: 'error-' + Date.now(),
         role: 'assistant' as const,
         content: 'Ein unerwarteter Fehler ist aufgetreten.',
@@ -125,13 +102,13 @@ export default function Dashboard() {
   const handleFileUploaded = (file: File, data: string) => {
     setIfcFile(file);
     setIfcData(data);
-    // Do not reset messages, as chat history should persist across files in a session for now
+    setMessages([]); // Reset chat when a new file is uploaded
   };
 
   const resetProject = () => {
     setIfcFile(null);
     setIfcData(null);
-    // Keep messages
+    setMessages([]);
   };
 
   const Header = () => (
@@ -185,7 +162,7 @@ export default function Dashboard() {
                     <ChatAssistant 
                       messages={messages}
                       startingPrompts={startingPrompts}
-                      isLoading={isLoading || isHistoryLoading}
+                      isLoading={isLoading}
                       onSendMessage={handleSendMessage}
                     />
                   </TabsContent>
@@ -244,7 +221,7 @@ export default function Dashboard() {
                    <ChatAssistant 
                       messages={messages}
                       startingPrompts={startingPrompts}
-                      isLoading={isLoading || isHistoryLoading}
+                      isLoading={isLoading}
                       onSendMessage={handleSendMessage}
                     />
                 </TabsContent>
@@ -260,3 +237,5 @@ export default function Dashboard() {
     </div>
   );
 }
+
+    
