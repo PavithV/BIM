@@ -1,122 +1,160 @@
 /**
- * @file Overview
- * This ruleset enforces a strict user-ownership model for all data within the BIMCoach Studio application.
+ * @fileoverview Firestore Security Rules for BIMCoach Studio.
  *
- * Data Structure:
- * All data is nested under `/users/{userId}`, ensuring that each user's data is isolated.
- * - /users/{userId}: Stores user profiles.
- * - /users/{userId}/ifcModels/{ifcModelId}: Stores IFC models uploaded by each user.
- * - /users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId}: Stores analysis results for each IFC model.
- * - /users/{userId}/messages/{messageId}: Stores chat messages for each user.
+ * Core Philosophy: This ruleset enforces a strict user-ownership model. Each user
+ * has full control over their own data, and no other user can access it.
+ *
+ * Data Structure: All data is nested under /users/{userId}, ensuring that all
+ * data is private to the user who owns it. This includes IFC models, analysis
+ * results, and chat messages.
  *
  * Key Security Decisions:
- * - No public listing of user documents is allowed to protect user privacy.
- * - All write operations (create, update, delete) are restricted to the owner (the user whose UID matches the userId in the path).
- * - Data consistency between the path and document data is enforced on create and update to prevent privilege escalation.
- *
- * Denormalization for Authorization:
- * The data structure itself is designed to denormalize authorization data into the path.
- * For example, the rule `isOwner(userId)` can be efficiently evaluated based on the path `/users/{userId}/...` without requiring additional reads.
+ * - User listing is disallowed.
+ * - All writes are validated against the authenticated user's ID.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Enforces user-ownership for user profiles. Only the user can read or write their own profile.
+     * @description Secure access to user documents. Users can only read and write their own data.
      * @path /users/{userId}
-     * @allow (create) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can create their profile if request.auth.uid == userId.
-     * @allow (get) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can read their profile if request.auth.uid == userId.
-     * @allow (update) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can update their profile if request.auth.uid == userId.
-     * @allow (delete) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can delete their profile if request.auth.uid == userId.
-     * @deny (create) - User otherUser cannot create a profile for jHP0RxEA58SbgARTuWtiRfyNISb2 because request.auth.uid != userId.
-     * @principle Enforces document ownership for writes.
+     * @allow (create) User with ID 'user123' can create their own document.
+     *          Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "user123", "email": "test@example.com", "name": "Test User" } } }
+     * @allow (get) User with ID 'user123' can read their own document.
+     *          Request: { "auth": { "uid": "user123" } }
+     * @allow (update) User with ID 'user123' can update their own document.
+     *          Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "user123", "email": "new@example.com", "name": "Updated User" } } }
+     * @allow (delete) User with ID 'user123' can delete their own document.
+     *          Request: { "auth": { "uid": "user123" } }
+     * @deny (create) User with ID 'user123' cannot create a document with a different ID.
+     *          Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "user456", "email": "test@example.com", "name": "Test User" } } }
+     * @deny (get) User with ID 'user123' cannot read another user's document.
+     *          Request: { "auth": { "uid": "user456" } }
+     * @deny (update) User with ID 'user123' cannot update another user's document.
+     *          Request: { "auth": { "uid": "user456" }, "resource": { "data": { "id": "user123", "email": "new@example.com", "name": "Updated User" } } }
+     * @deny (delete) User with ID 'user123' cannot delete another user's document.
+     *          Request: { "auth": { "uid": "user456" } }
+     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
      */
     match /users/{userId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-
+      // Read rules
       allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow list: if false; // User listing is not allowed.
+
+      // Write rules
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Enforces user-ownership for IFC models. Only the user can read or write their own IFC models.
+     * @description Secure access to IFC model documents. Users can only read and write their own IFC models.
      * @path /users/{userId}/ifcModels/{ifcModelId}
-     * @allow (create) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can create an IFC model under their profile if request.auth.uid == userId and request.resource.data.userId == userId.
-     * @allow (get) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can read an IFC model under their profile if request.auth.uid == userId.
-     * @allow (update) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can update an IFC model under their profile if request.auth.uid == userId and resource != null and request.resource.data.userId == resource.data.userId.
-     * @allow (delete) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can delete an IFC model under their profile if request.auth.uid == userId and resource != null.
-     * @deny (create) - User otherUser cannot create an IFC model for jHP0RxEA58SbgARTuWtiRfyNISb2 because request.auth.uid != userId.
-     * @principle Enforces document ownership for writes and validates relational integrity.
+     * @allow (create) User with ID 'user123' can create an IFC model under their user document.
+     *          Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "ifc123", "userId": "user123", "uploadDate": "2024-01-01T00:00:00Z", "fileName": "model.ifc" } } }
+     * @allow (get) User with ID 'user123' can read their own IFC model.
+     *          Request: { "auth": { "uid": "user123" } }
+     * @allow (update) User with ID 'user123' can update their own IFC model.
+     *          Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "ifc123", "userId": "user123", "uploadDate": "2024-01-02T00:00:00Z", "fileName": "model_updated.ifc" } } }
+     * @allow (delete) User with ID 'user123' can delete their own IFC model.
+     *          Request: { "auth": { "uid": "user123" } }
+     * @deny (create) User with ID 'user123' cannot create an IFC model under another user's document.
+     *          Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "ifc123", "userId": "user456", "uploadDate": "2024-01-01T00:00:00Z", "fileName": "model.ifc" } } }
+     * @deny (get) User with ID 'user123' cannot read another user's IFC model.
+     *          Request: { "auth": { "uid": "user456" } }
+     * @deny (update) User with ID 'user123' cannot update another user's IFC model.
+     *          Request: { "auth": { "uid": "user456" }, "resource": { "data": { "id": "ifc123", "userId": "user123", "uploadDate": "2024-01-02T00:00:00Z", "fileName": "model_updated.ifc" } } }
+     * @deny (delete) User with ID 'user123' cannot delete another user's IFC model.
+     *          Request: { "auth": { "uid": "user456" } }
+     * @principle Enforces document ownership for writes and restricts access to a user's own data tree. Validates relational integrity between documents.
      */
     match /users/{userId}/ifcModels/{ifcModelId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
+      // Read rules
       allow get: if isOwner(userId);
       allow list: if isOwner(userId);
+
+      // Write rules
       allow create: if isOwner(userId) && request.resource.data.userId == userId;
       allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Enforces user-ownership for analysis results. Only the user can read or write their own analysis results.
+     * @description Secure access to analysis result documents. Users can only read and write their own analysis results.
      * @path /users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId}
-     * @allow (create) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can create an analysis result under their IFC model if request.auth.uid == userId.
-     * @allow (get) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can read an analysis result under their IFC model if request.auth.uid == userId.
-     * @allow (update) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can update an analysis result under their IFC model if request.auth.uid == userId and resource != null.
-     * @allow (delete) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can delete an analysis result under their IFC model if request.auth.uid == userId and resource != null.
-     * @deny (create) - User otherUser cannot create an analysis result for jHP0RxEA58SbgARTuWtiRfyNISb2 because request.auth.uid != userId.
-     * @principle Enforces document ownership for writes.
+     * @allow (create) User with ID 'user123' can create an analysis result under their IFC model.
+     *          Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "result123", "ifcModelId": "ifc123", "analysisType": "Sustainability", "resultData": "{...}", "analysisDate": "2024-01-03T00:00:00Z" } } }
+     * @allow (get) User with ID 'user123' can read their own analysis result.
+     *          Request: { "auth": { "uid": "user123" } }
+     * @allow (update) User with ID 'user123' can update their own analysis result.
+     *          Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "result123", "ifcModelId": "ifc123", "analysisType": "Energy Efficiency", "resultData": "{...}", "analysisDate": "2024-01-04T00:00:00Z" } } }
+     * @allow (delete) User with ID 'user123' can delete their own analysis result.
+     *          Request: { "auth": { "uid": "user123" } }
+     * @deny (create) User with ID 'user123' cannot create an analysis result under another user's IFC model.
+     *          Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "result123", "ifcModelId": "ifc456", "analysisType": "Sustainability", "resultData": "{...}", "analysisDate": "2024-01-03T00:00:00Z" } } }
+     * @deny (get) User with ID 'user123' cannot read another user's analysis result.
+     *          Request: { "auth": { "uid": "user456" } }
+     * @deny (update) User with ID 'user123' cannot update another user's analysis result.
+     *          Request: { "auth": { "uid": "user456" }, "resource": { "data": { "id": "result123", "ifcModelId": "ifc123", "analysisType": "Energy Efficiency", "resultData": "{...}", "analysisDate": "2024-01-04T00:00:00Z" } } }
+     * @deny (delete) User with ID 'user123' cannot delete another user's analysis result.
+     *          Request: { "auth": { "uid": "user456" } }
+     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
      */
     match /users/{userId}/ifcModels/{ifcModelId}/analysisResults/{analysisResultId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
+      // Read rules
       allow get: if isOwner(userId);
       allow list: if isOwner(userId);
+
+      // Write rules
       allow create: if isOwner(userId);
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Enforces user-ownership for chat messages. Only the user can read or write their own chat messages.
+     * @description Secure access to chat message documents. Users can only read and write their own chat messages.
      * @path /users/{userId}/messages/{messageId}
-     * @allow (create) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can create a message under their profile if request.auth.uid == userId and request.resource.data.userId == userId.
-     * @allow (get) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can read a message under their profile if request.auth.uid == userId.
-     * @allow (update) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can update a message under their profile if request.auth.uid == userId and resource != null and request.resource.data.userId == resource.data.userId.
-     * @allow (delete) - User jHP0RxEA58SbgARTuWtiRfyNISb2 can delete a message under their profile if request.auth.uid == userId and resource != null.
-     * @deny (create) - User otherUser cannot create a message for jHP0RxEA58SbgARTuWtiRfyNISb2 because request.auth.uid != userId.
-     * @principle Enforces document ownership for writes.
+     * @allow (create) User with ID 'user123' can create a chat message under their user document.
+     *          Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "msg123", "userId": "user123", "role": "user", "content": "Hello", "createdAt": { "seconds": 1672531200, "nanoseconds": 0 } } } }
+     * @allow (get) User with ID 'user123' can read their own chat message.
+     *          Request: { "auth": { "uid": "user123" } }
+     * @allow (update) User with ID 'user123' can update their own chat message.
+     *          Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "msg123", "userId": "user123", "role": "assistant", "content": "Hi there!", "createdAt": { "seconds": 1672531260, "nanoseconds": 0 } } } }
+     * @allow (delete) User with ID 'user123' can delete their own chat message.
+     *          Request: { "auth": { "uid": "user123" } }
+     * @deny (create) User with ID 'user123' cannot create a chat message under another user's document.
+     *          Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "msg123", "userId": "user456", "role": "user", "content": "Hello", "createdAt": { "seconds": 1672531200, "nanoseconds": 0 } } } }
+     * @deny (get) User with ID 'user123' cannot read another user's chat message.
+     *          Request: { "auth": { "uid": "user456" } }
+     * @deny (update) User with ID 'user123' cannot update another user's chat message.
+     *          Request: { "auth": { "uid": "user456" }, "resource": { "data": { "id": "msg123", "userId": "user123", "role": "assistant", "content": "Hi there!", "createdAt": { "seconds": 1672531260, "nanoseconds": 0 } } } }
+     * @deny (delete) User with ID 'user123' cannot delete another user's chat message.
+     *          Request: { "auth": { "uid": "user456" } }
+     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
      */
     match /users/{userId}/messages/{messageId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
+      // Read rules
       allow get: if isOwner(userId);
       allow list: if isOwner(userId);
+
+      // Write rules
       allow create: if isOwner(userId) && request.resource.data.userId == userId;
       allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
       allow delete: if isExistingOwner(userId);
     }
+  }
+
+  // Helper functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isOwner(userId) {
+    return isSignedIn() && request.auth.uid == userId;
+  }
+
+  function isExistingOwner(userId) {
+    return isOwner(userId) && resource != null;
   }
 }
