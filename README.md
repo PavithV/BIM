@@ -8,7 +8,7 @@ Um die Anwendung lokal auszuführen, werfen Sie einen Blick auf `src/app/page.ts
 
 ---
 
-## Veröffentlichung Ihrer Anwendung (Deployment)
+## Veröffentlichung und Hosting
 
 ### Wie stelle ich die App online?
 
@@ -16,9 +16,26 @@ Ihre Anwendung ist für **Firebase App Hosting** vorkonfiguriert. Der Veröffent
 
 Sie müssen sich nicht um manuelle Build-Schritte oder das Hochladen von Dateien kümmern.
 
-### Kann ich einen externen Hoster verwenden?
+### Kann ich einen externen Hoster (z. B. Host Europe) verwenden?
 
-Obwohl es technisch möglich ist, die Anwendung auf Plattformen wie Vercel oder Netlify zu hosten, **wird dies nicht empfohlen**. Die Anwendung ist tief in das Firebase-Ökosystem integriert (Authentifizierung, Datenbank, AI-Funktionen). Eine Migration zu einem externen Hoster würde eine komplexe manuelle Konfiguration von Umgebungsvariablen und Build-Prozessen erfordern und die Vorteile der nahtlosen Integration zunichtemachen.
+**Das wird nicht empfohlen.** Obwohl es technisch möglich ist, eine Next.js-Anwendung auf anderen Servern zu betreiben, ist dies mit erheblichem Aufwand und technischen Hürden verbunden:
+
+*   **Komplexe Server-Anforderungen:** Ihre App ist keine simple, statische Webseite. Sie benötigt eine Node.js-Umgebung, die auf Standard-Webhosting-Paketen oft nicht verfügbar oder stark eingeschränkt ist. Man müsste einen teuren virtuellen oder dedizierten Server manuell konfigurieren.
+*   **Verlust der Integration:** Die Anwendung ist tief in das Firebase-Ökosystem integriert (Authentifizierung, Datenbank, AI-Funktionen). Eine Migration zu einem externen Hoster würde eine komplexe manuelle Konfiguration von Umgebungsvariablen und Build-Prozessen erfordern und die Vorteile der nahtlosen Integration zunichtemachen.
+
+**Fazit:** Bleiben Sie bei Firebase App Hosting. Es ist einfacher, stabiler und speziell für Anwendungen wie Ihre konzipiert.
+
+### Wie kann ich meine eigene Domain (z. B. von Host Europe) verwenden?
+
+**Ja, das ist der empfohlene Weg!** Sie können Ihre App auf Firebase hosten und Ihre bei einem externen Anbieter wie Host Europe registrierte Domain damit verknüpfen.
+
+Der Prozess ist einfach:
+
+1.  **App auf Firebase veröffentlichen:** Nutzen Sie den "Publish"-Button. Ihre App ist dann sofort unter einer technischen Firebase-Adresse verfügbar.
+2.  **Benutzerdefinierte Domain in Firebase hinzufügen:** Gehen Sie in die Firebase Console zu "App Hosting" > "Benutzerdefinierte Domain hinzufügen".
+3.  **Domain verbinden:** Firebase leitet Sie durch einen Prozess, bei dem Sie in der Regel zwei A-Einträge in den DNS-Einstellungen Ihres Domain-Anbieters (z. B. im Kunden-Menü von Host Europe) auf die von Firebase bereitgestellten IP-Adressen ändern.
+
+Nachdem die DNS-Änderungen weltweit verbreitet sind (dauert oft nur wenige Minuten bis Stunden), ist Ihre Anwendung unter Ihrer eigenen, professionellen Domain erreichbar.
 
 ### Firebase-Kosten & Abrechnungskonto
 
