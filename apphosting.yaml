@@ -3,8 +3,8 @@
 
 # Specifies the build process for your Next.js application.
 build:
-  # This command installs the required dependencies from your package.json file.
-  - command: npm install
+  # This command installs the required dependencies from your package-lock.json file for consistency.
+  - command: npm ci
   # This command builds the production version of your Next.js app.
   - command: npm run build
 
@@ -12,3 +12,6 @@ build:
 runConfig:
   # Increase this value to automatically spin up more instances in response to traffic.
   maxInstances: 1
+
+# Specifies the required version of the App Hosting platform.
+framework: nextjs
