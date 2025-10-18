@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
 import { FileUploader } from './file-uploader';
-import { Building, FilePlus, Loader2, Trash2 } from 'lucide-react';
+import { Building, FilePlus, Loader2, Trash2, CheckCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import type { IFCModel } from '@/lib/types';
@@ -21,14 +21,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
+import { cn } from '@/lib/utils';
 
 interface ProjectSelectorProps {
   onSelectProject: (project: IFCModel) => void;
   onUploadNew: (file: File, fileContent: string) => void;
+  activeProjectId?: string | null;
 }
 
-export function ProjectSelector({ onSelectProject, onUploadNew }: ProjectSelectorProps) {
+export function ProjectSelector({ onSelectProject, onUploadNew, activeProjectId }: ProjectSelectorProps) {
   const { user } = useUser();
   const firestore = useFirestore();
   const [projects, setProjects] = useState<IFCModel[]>([]);
@@ -86,75 +88,76 @@ export function ProjectSelector({ onSelectProject, onUploadNew }: ProjectSelecto
   if (isLoading) {
     return (
         <div className="flex flex-col items-center justify-center h-full text-center p-4">
-            <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
-            <p className="text-muted-foreground">Lade Projekte...</p>
+            <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground text-sm">Lade Projekte...</p>
         </div>
     );
   }
 
-  if (showUploader) {
-    return <FileUploader onFileUploaded={onUploadNew} />;
+  if (showUploader || projects.length === 0) {
+    return <div className="p-2"><FileUploader onFileUploaded={onUploadNew} /></div>;
   }
 
   return (
-    <Card className="w-full max-w-2xl mx-auto shadow-lg">
-      <CardHeader>
-        <CardTitle className="text-2xl font-headline">Projekte</CardTitle>
-        <CardDescription>Wählen Sie ein bestehendes Projekt aus oder starten Sie eine neue Analyse.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ScrollArea className="h-64 mb-4 pr-4">
-          <div className="space-y-3">
-            {projects.map(project => (
-              <div
-                key={project.id}
-                className="w-full text-left p-4 rounded-lg border flex items-center justify-between"
-              >
-                <button
-                    onClick={() => onSelectProject(project)}
-                    className="flex-grow text-left"
-                >
-                  <div className="flex items-center gap-4">
-                    <Building className="w-5 h-5 text-muted-foreground hidden sm:block" />
-                    <div>
-                        <p className="font-semibold">{project.fileName}</p>
-                        <p className="text-sm text-muted-foreground">
-                        Hochgeladen vor {formatDistanceToNow(project.uploadDate.toDate(), { locale: de })}
-                        </p>
-                    </div>
-                  </div>
-                </button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-destructive">
-                      <Trash2 className="w-4 h-4" />
-                      <span className="sr-only">Projekt löschen</span>
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Sind Sie sicher?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Diese Aktion kann nicht rückgängig gemacht werden. Dadurch werden das Projekt '{project.fileName}' und alle zugehörigen Chat-Nachrichten endgültig gelöscht.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleDeleteProject(project.id)} className="bg-destructive hover:bg-destructive/90">
-                        Löschen
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+    <div className="flex flex-col h-full">
+      <div className="space-y-2 flex-1 overflow-y-auto px-2">
+        {projects.map(project => (
+          <div
+            key={project.id}
+            className={cn(
+              "w-full text-left p-3 rounded-lg border flex items-center justify-between transition-all cursor-pointer",
+              activeProjectId === project.id ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
+            )}
+          >
+            <div
+                onClick={() => onSelectProject(project)}
+                className="flex-grow flex items-center gap-3"
+            >
+              <div className="flex-shrink-0">
+                {activeProjectId === project.id ? (
+                    <CheckCircle className="w-5 h-5 text-primary" />
+                ) : (
+                    <Building className="w-5 h-5 text-muted-foreground" />
+                )}
               </div>
-            ))}
+              <div className="flex-grow overflow-hidden">
+                  <p className="font-medium text-sm truncate">{project.fileName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    vor {formatDistanceToNow(project.uploadDate.toDate(), { locale: de })}
+                  </p>
+              </div>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-destructive w-7 h-7">
+                  <Trash2 className="w-4 h-4" />
+                  <span className="sr-only">Projekt löschen</span>
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Sind Sie sicher?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Diese Aktion kann nicht rückgängig gemacht werden. Dadurch werden das Projekt '{project.fileName}' und alle zugehörigen Chat-Nachrichten endgültig gelöscht.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handleDeleteProject(project.id)} className="bg-destructive hover:bg-destructive/90">
+                    Löschen
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
-        </ScrollArea>
-        <Button className="w-full" onClick={() => setShowUploader(true)}>
+        ))}
+      </div>
+      <div className="mt-4 px-2">
+        <Button className="w-full" variant="outline" onClick={() => setShowUploader(true)}>
           <FilePlus className="mr-2 h-4 w-4" />
           Neues Projekt starten
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

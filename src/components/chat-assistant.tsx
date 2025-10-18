@@ -54,20 +54,20 @@ export function ChatAssistant({ messages, startingPrompts, isLoading, onSendMess
     
     if (messages.length === 0) {
       return (
-        <Card className="bg-transparent border-none shadow-none">
+        <Card className="bg-transparent border-none shadow-none h-full flex flex-col justify-center">
           <CardContent className="p-0">
               <div className="text-center p-8">
-                <Avatar className="mx-auto mb-4 w-16 h-16">
-                  <AvatarFallback className="bg-primary/10">
-                    <Bot className="w-8 h-8 text-primary" />
+                <Avatar className="mx-auto mb-4 w-16 h-16 bg-muted rounded-full">
+                  <AvatarFallback className="bg-transparent">
+                    <Bot className="w-8 h-8 text-foreground/80" />
                   </AvatarFallback>
                 </Avatar>
                 <h2 className="text-lg font-semibold font-headline">KI-Coach</h2>
                 <p className="text-muted-foreground text-sm mb-6">Fragen Sie mich alles über Ihr Modell.</p>
                 <div className="space-y-2 text-sm">
-                  <p className="text-muted-foreground font-semibold flex items-center justify-center gap-2"><Sparkles className="w-4 h-4 text-accent" /> Probieren Sie einen Vorschlag aus</p>
+                  <p className="text-muted-foreground font-semibold flex items-center justify-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Probieren Sie einen Vorschlag aus</p>
                   {startingPrompts.slice(0, 3).map((prompt, index) => (
-                    <button key={index} onClick={() => handleSendMessage(prompt)} className="text-left p-3 rounded-md hover:bg-muted w-full transition-colors text-foreground/80">
+                    <button key={index} onClick={() => handleSendMessage(prompt)} className="text-left p-3 rounded-md bg-muted/50 hover:bg-muted w-full transition-colors text-foreground/80">
                       {prompt}
                     </button>
                   ))}
@@ -80,17 +80,17 @@ export function ChatAssistant({ messages, startingPrompts, isLoading, onSendMess
     
     return (
       <div className="p-4 space-y-6">
-        {messages.map((message) => (
-          <div key={message.id} className={cn('flex items-start gap-3', message.role === 'user' ? 'justify-end' : '')}>
+        {messages.map((message, index) => (
+          <div key={message.id || index} className={cn('flex items-start gap-3', message.role === 'user' ? 'justify-end' : '')}>
             {message.role === 'assistant' && (
               <Avatar className="w-8 h-8">
-                <AvatarFallback className="bg-primary/10">
-                  <Bot className="w-4 h-4 text-primary"/>
+                <AvatarFallback className="bg-muted">
+                  <Bot className="w-4 h-4 text-foreground/80"/>
                 </AvatarFallback>
               </Avatar>
             )}
-            <div className={cn('max-w-[85%] rounded-lg p-3', message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            <div className={cn('max-w-[85%] rounded-lg px-4 py-3', message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+              <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
             </div>
             {message.role === 'user' && (
               <Avatar className="w-8 h-8">
@@ -104,11 +104,11 @@ export function ChatAssistant({ messages, startingPrompts, isLoading, onSendMess
          {isLoading && (
             <div className="flex items-start gap-3">
               <Avatar className="w-8 h-8">
-                <AvatarFallback className="bg-primary/10">
-                  <Bot className="w-4 h-4 text-primary"/>
+                <AvatarFallback className="bg-muted">
+                  <Bot className="w-4 h-4 text-foreground/80"/>
                 </AvatarFallback>
               </Avatar>
-              <div className="max-w-[85%] rounded-lg p-3 bg-muted flex items-center">
+              <div className="max-w-[85%] rounded-lg px-4 py-3 bg-muted flex items-center">
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 <span className="text-sm">Denke...</span>
               </div>

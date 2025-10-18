@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type DragEvent, type ChangeEvent } from 'react';
-import { UploadCloud } from 'lucide-react';
+import { UploadCloud, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -76,9 +76,9 @@ export function FileUploader({ onFileUploaded }: FileUploaderProps) {
   };
 
   return (
-    <Card className="w-full max-w-lg mx-auto shadow-lg">
+    <Card className="w-full max-w-lg mx-auto bg-card/80 backdrop-blur-sm border-dashed shadow-none">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-headline">Neue Analyse starten</CardTitle>
+        <CardTitle className="text-xl font-headline">Neue Analyse starten</CardTitle>
         <CardDescription>Laden Sie Ihr IFC-Modell hoch, um zu beginnen.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -89,21 +89,26 @@ export function FileUploader({ onFileUploaded }: FileUploaderProps) {
           onDragOver={handleDragEvents}
           className={cn(
             'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
-            isDragging ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'
+            isDragging ? 'border-primary bg-primary/10' : 'border-muted hover:border-primary/50'
           )}
         >
           <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center justify-center">
-            <UploadCloud className="w-12 h-12 text-muted-foreground mb-4" />
-            <p className="font-semibold">Ziehen Sie Ihre .ifc-Datei hierher</p>
-            <p className="text-sm text-muted-foreground">oder klicken Sie zum Durchsuchen</p>
+            <UploadCloud className="w-10 h-10 text-muted-foreground mb-3" />
+            <p className="font-semibold text-sm">Ziehen Sie Ihre .ifc-Datei hierher</p>
+            <p className="text-xs text-muted-foreground mt-1">oder klicken Sie zum Durchsuchen</p>
             <Input id="file-upload" type="file" className="hidden" accept=".ifc" onChange={handleFileChange} disabled={isLoading}/>
           </label>
         </div>
         {file && (
           <div className="text-center space-y-4 pt-2">
-            <p>Ausgewählte Datei: <span className="font-semibold">{file.name}</span></p>
+            <p className="text-sm">Ausgewählt: <span className="font-semibold">{file.name}</span></p>
             <Button className="w-full" onClick={handleSubmit} disabled={isLoading}>
-                {isLoading ? 'Analysiere...' : 'Projekt analysieren'}
+                {isLoading ? (
+                    <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Analysiere...
+                    </>
+                ) : 'Projekt analysieren'}
             </Button>
           </div>
         )}

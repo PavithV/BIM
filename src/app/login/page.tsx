@@ -43,12 +43,12 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-muted/40 p-4">
        <div className="absolute top-8 left-8 flex items-center gap-3">
-        <Building className="w-8 h-8 text-primary" />
-        <h1 className="text-xl md:text-2xl font-bold font-headline text-primary">BIMCoach Studio</h1>
+        <Building className="w-8 h-8 text-foreground" />
+        <h1 className="text-xl md:text-2xl font-bold font-headline text-foreground">BIMCoach Studio</h1>
       </div>
-      <Card className="w-full max-w-sm">
+      <Card className="w-full max-w-sm border-0 shadow-xl shadow-black/5">
         <CardHeader>
           <CardTitle className="text-2xl">Anmelden</CardTitle>
           <CardDescription>Geben Sie Ihre E-Mail-Adresse unten ein, um sich bei Ihrem Konto anzumelden.</CardDescription>
@@ -85,7 +85,7 @@ export default function LoginPage() {
           </form>
           <div className="mt-4 text-center text-sm">
             Noch kein Konto?{' '}
-            <Link href="/register" className="underline">
+            <Link href="/register" className="underline text-primary">
               Registrieren
             </Link>
           </div>
