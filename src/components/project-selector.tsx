@@ -1,16 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, writeBatch, deleteDoc } from 'firebase/firestore';
 import { useUser, useFirestore } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
 import { FileUploader } from './file-uploader';
-import { Building, FilePlus, Loader2 } from 'lucide-react';
+import { Building, FilePlus, Loader2, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import type { IFCModel } from '@/lib/types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface ProjectSelectorProps {
   onSelectProject: (project: IFCModel) => void;
@@ -47,6 +58,31 @@ export function ProjectSelector({ onSelectProject, onUploadNew }: ProjectSelecto
     fetchProjects();
   }, [user, firestore]);
 
+  const handleDeleteProject = async (projectId: string) => {
+    if (!user || !firestore) return;
+
+    try {
+      // Delete all messages in the subcollection
+      const messagesRef = collection(firestore, 'users', user.uid, 'ifcModels', projectId, 'messages');
+      const messagesSnapshot = await getDocs(messagesRef);
+      const batch = writeBatch(firestore);
+      messagesSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+
+      // Delete the project document itself
+      const projectRef = doc(firestore, 'users', user.uid, 'ifcModels', projectId);
+      await deleteDoc(projectRef);
+
+      // Update the local state
+      setProjects(projects.filter(p => p.id !== projectId));
+
+    } catch (error) {
+      console.error("Error deleting project:", error);
+    }
+  };
+
   if (isLoading) {
     return (
         <div className="flex flex-col items-center justify-center h-full text-center p-4">
@@ -70,19 +106,47 @@ export function ProjectSelector({ onSelectProject, onUploadNew }: ProjectSelecto
         <ScrollArea className="h-64 mb-4 pr-4">
           <div className="space-y-3">
             {projects.map(project => (
-              <button
+              <div
                 key={project.id}
-                onClick={() => onSelectProject(project)}
-                className="w-full text-left p-4 rounded-lg border hover:bg-accent transition-colors flex items-center justify-between"
+                className="w-full text-left p-4 rounded-lg border flex items-center justify-between"
               >
-                <div>
-                  <p className="font-semibold">{project.fileName}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Hochgeladen vor {formatDistanceToNow(project.uploadDate.toDate(), { locale: de })}
-                  </p>
-                </div>
-                <Building className="w-5 h-5 text-muted-foreground" />
-              </button>
+                <button
+                    onClick={() => onSelectProject(project)}
+                    className="flex-grow text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <Building className="w-5 h-5 text-muted-foreground hidden sm:block" />
+                    <div>
+                        <p className="font-semibold">{project.fileName}</p>
+                        <p className="text-sm text-muted-foreground">
+                        Hochgeladen vor {formatDistanceToNow(project.uploadDate.toDate(), { locale: de })}
+                        </p>
+                    </div>
+                  </div>
+                </button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-destructive">
+                      <Trash2 className="w-4 h-4" />
+                      <span className="sr-only">Projekt löschen</span>
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Sind Sie sicher?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Diese Aktion kann nicht rückgängig gemacht werden. Dadurch werden das Projekt '{project.fileName}' und alle zugehörigen Chat-Nachrichten endgültig gelöscht.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDeleteProject(project.id)} className="bg-destructive hover:bg-destructive/90">
+                        Löschen
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             ))}
           </div>
         </ScrollArea>
