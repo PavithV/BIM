@@ -16,7 +16,8 @@ import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { ProjectSelector } from './project-selector';
 import type { IFCModel } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { cn, downloadCsv } from '@/lib/utils';
+import { analysisData } from '@/lib/mock-data';
 
 
 export type Message = {
@@ -149,6 +150,21 @@ export default function Dashboard() {
     }
   };
 
+  const handleExportMaterialPass = () => {
+    if (!activeProject) return;
+
+    const headers = ["Kategorie", "Name", "Wert", "Einheit/Info"];
+    
+    const indicatorRows = analysisData.indicators.map(item => ["Indikator", item.name, item.value, `${item.unit} (${item.a})`]);
+    const materialRows = analysisData.materialComposition.map(item => ["Material", item.name, item.value.toString(), "%"]);
+    
+    const allRows = [headers, ...indicatorRows, ...materialRows];
+    
+    const fileName = `Materialpass_${activeProject.fileName.replace('.ifc', '')}.csv`;
+    
+    downloadCsv(allRows, fileName);
+  };
+
   const resetProject = () => {
     setActiveProject(null);
   };
@@ -218,7 +234,7 @@ export default function Dashboard() {
                         </TabsList>
                     </div>
                     <TabsContent value="analysis" className="flex-1 overflow-y-auto p-4">
-                      <AnalysisPanel onExport={() => alert('Materialpass wird exportiert...')} />
+                      <AnalysisPanel onExport={handleExportMaterialPass} />
                     </TabsContent>
                     <TabsContent value="coach" className="m-0 flex-1 flex flex-col min-h-0">
                        <ChatAssistant 
