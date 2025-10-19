@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils';
 
 interface ProjectSelectorProps {
   onSelectProject: (project: IFCModel) => void;
-  onUploadNew: (file: File, fileContent: string) => void;
+  onUploadNew: (file: File, fileContent: string) => Promise<void>;
   activeProjectId?: string | null;
 }
 
@@ -37,26 +37,26 @@ export function ProjectSelector({ onSelectProject, onUploadNew, activeProjectId 
   const [isLoading, setIsLoading] = useState(true);
   const [showUploader, setShowUploader] = useState(false);
 
-  useEffect(() => {
-    const fetchProjects = async () => {
-      if (!user || !firestore) return;
-      setIsLoading(true);
-      try {
-        const projectsRef = collection(firestore, 'users', user.uid, 'ifcModels');
-        const q = query(projectsRef, orderBy('uploadDate', 'desc'));
-        const querySnapshot = await getDocs(q);
-        const userProjects = querySnapshot.docs.map(doc => doc.data() as IFCModel);
-        setProjects(userProjects);
-        if (userProjects.length === 0) {
-          setShowUploader(true);
-        }
-      } catch (error) {
-        console.error("Error fetching projects: ", error);
-      } finally {
-        setIsLoading(false);
+  const fetchProjects = async () => {
+    if (!user || !firestore) return;
+    setIsLoading(true);
+    try {
+      const projectsRef = collection(firestore, 'users', user.uid, 'ifcModels');
+      const q = query(projectsRef, orderBy('uploadDate', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const userProjects = querySnapshot.docs.map(doc => doc.data() as IFCModel);
+      setProjects(userProjects);
+      if (userProjects.length === 0 && !showUploader) {
+        setShowUploader(true);
       }
-    };
+    } catch (error) {
+      console.error("Error fetching projects: ", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchProjects();
   }, [user, firestore]);
 
@@ -84,6 +84,12 @@ export function ProjectSelector({ onSelectProject, onUploadNew, activeProjectId 
       console.error("Error deleting project:", error);
     }
   };
+  
+  const handleFileUploaded = async (file: File, fileContent: string) => {
+    await onUploadNew(file, fileContent);
+    await fetchProjects(); // Refetch projects to include the new one
+    setShowUploader(false); // Go back to the project list
+  };
 
   if (isLoading) {
     return (
@@ -94,8 +100,8 @@ export function ProjectSelector({ onSelectProject, onUploadNew, activeProjectId 
     );
   }
 
-  if (showUploader || projects.length === 0) {
-    return <div className="p-2"><FileUploader onFileUploaded={onUploadNew} /></div>;
+  if (showUploader) {
+    return <div className="p-2"><FileUploader onFileUploaded={handleFileUploaded} /></div>;
   }
 
   return (
