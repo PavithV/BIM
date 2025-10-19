@@ -147,3 +147,5 @@ export function ChatAssistant({ messages, startingPrompts, isLoading, onSendMess
     </div>
   );
 }
+
+    
