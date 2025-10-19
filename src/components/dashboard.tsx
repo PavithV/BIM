@@ -210,7 +210,7 @@ export default function Dashboard() {
                     <h2 className="font-semibold font-headline truncate" title={activeProject.fileName}>{activeProject.fileName}</h2>
                     <p className="text-sm text-muted-foreground">{(activeProject.fileSize / 1024 / 1024).toFixed(2)} MB</p>
                  </div>
-                 <Tabs defaultValue="coach" className="flex-1 flex flex-col overflow-hidden">
+                 <Tabs defaultValue="coach" className="flex-1 flex flex-col min-h-0">
                     <div className="px-4 pt-4">
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="analysis"><BarChart3 className="w-4 h-4 mr-2" />Analyse</TabsTrigger>

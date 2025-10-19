@@ -20,10 +20,15 @@ interface ChatAssistantProps {
 
 export function ChatAssistant({ messages, startingPrompts, isLoading, onSendMessage }: ChatAssistantProps) {
   const [input, setInput] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (scrollAreaRef.current) {
+        const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+        if (viewport) {
+            viewport.scrollTop = viewport.scrollHeight;
+        }
+    }
   }, [messages, isLoading]);
 
 
@@ -120,9 +125,8 @@ export function ChatAssistant({ messages, startingPrompts, isLoading, onSendMess
 
   return (
     <div className="flex flex-col h-full">
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1" ref={scrollAreaRef}>
         <ChatContent />
-        <div ref={messagesEndRef} />
       </ScrollArea>
       <div className="p-4 border-t bg-card">
         <div className="relative">
