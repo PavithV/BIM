@@ -205,7 +205,7 @@ export default function Dashboard() {
               <div className="lg:col-span-2 h-full min-h-[400px] lg:min-h-0">
                 <ModelViewer ifcModel={activeProject} />
               </div>
-              <div className="lg:col-span-1 flex flex-col h-full bg-card rounded-lg border">
+              <div className="lg:col-span-1 flex flex-col bg-card rounded-lg border">
                  <div className="p-4 border-b">
                     <h2 className="font-semibold font-headline truncate" title={activeProject.fileName}>{activeProject.fileName}</h2>
                     <p className="text-sm text-muted-foreground">{(activeProject.fileSize / 1024 / 1024).toFixed(2)} MB</p>
@@ -220,7 +220,7 @@ export default function Dashboard() {
                     <TabsContent value="analysis" className="flex-1 overflow-y-auto p-4">
                       <AnalysisPanel onExport={() => alert('Materialpass wird exportiert...')} />
                     </TabsContent>
-                    <TabsContent value="coach" className="m-0 flex-1 flex flex-col overflow-hidden">
+                    <TabsContent value="coach" className="m-0 flex-1 flex flex-col min-h-0">
                        <ChatAssistant 
                           messages={memoizedMessages}
                           startingPrompts={startingPrompts}
