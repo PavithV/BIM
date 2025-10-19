@@ -80,10 +80,10 @@ export default function Dashboard() {
       await addDoc(messagesRef, userMessage);
       
       const result = await getAIChatFeedback({
-        ifcModelData: activeProject.fileContent.substring(0, 300000),
+        ifcModelData: activeProject.fileContent,
         userQuestion: userQuestion,
       });
-  
+
       const assistantMessageContent = result.feedback || result.error || 'Entschuldigung, ein Fehler ist aufgetreten.';
       
       const assistantMessage: Omit<Message, 'id'> = {
@@ -96,13 +96,14 @@ export default function Dashboard() {
 
     } catch (error: any) {
         console.error("Error in handleSendMessage flow:", error);
-        let errorMessageContent = 'Ein unerwarteter Fehler ist aufgetreten beim Senden der Nachricht.';
+        
+        let errorMessageContent = 'Das KI-Feedback konnte nicht abgerufen werden. Der API-Schlüssel könnte ungültig sein oder das Modell ist überlastet. Bitte versuchen Sie es später erneut.';
 
-        if (typeof error.message === 'string') {
-            if (error.message.includes("API key not valid")) {
-                errorMessageContent = "Das KI-Feedback konnte nicht abgerufen werden. Der API-Schlüssel ist ungültig. Bitte überprüfen Sie Ihren API-Schlüssel in der Google AI Studio Konsole.";
+        if (error.message) {
+            if (error.message.includes("API key not valid") || error.message.includes("permission denied")) {
+                errorMessageContent = "Das KI-Feedback konnte nicht abgerufen werden. Ihr API-Schlüssel ist ungültig. Bitte überprüfen Sie Ihren Schlüssel im .env File und in der Google AI Studio Konsole.";
             } else if (error.message.includes("Billing account")) {
-                errorMessageContent = "Das KI-Feedback konnte nicht abgerufen werden. Für Ihr Google Cloud Projekt ist kein Abrechnungskonto aktiviert. Bitte fügen Sie eines in der Google Cloud Console hinzu.";
+                errorMessageContent = "Das KI-Feedback konnte nicht abgerufen werden. Für Ihr Google Cloud Projekt ist kein Abrechnungskonto aktiviert. Bitte fügen Sie eines in der Google Cloud Console hinzu, um die KI-Dienste zu nutzen.";
             } else if (error.message.includes("API not enabled")) {
                 errorMessageContent = "Das KI-Feedback konnte nicht abgerufen werden. Die 'Generative Language API' ist für Ihr Projekt nicht aktiviert. Bitte aktivieren Sie sie in der Google Cloud Console.";
             } else if (error.message.includes("Content creation is blocked")) {
@@ -202,7 +203,7 @@ export default function Dashboard() {
           {activeProject ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
               <div className="lg:col-span-2 h-full min-h-[400px] lg:min-h-0">
-                <ModelViewer file={new File([], activeProject.fileName)} />
+                <ModelViewer ifcModel={activeProject} />
               </div>
               <div className="lg:col-span-1 flex flex-col h-full bg-card rounded-lg border">
                  <div className="p-4 border-b">

@@ -1,28 +1,70 @@
-import Image from 'next/image';
+'use client';
+
+import { useEffect, useRef } from 'react';
+import { IfcViewerAPI } from 'web-ifc-viewer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ZoomIn, ZoomOut, Expand } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { Loader2 } from 'lucide-react';
+import { IFCModel } from '@/lib/types';
 
 interface ModelViewerProps {
-  file: File;
+  ifcModel: IFCModel;
 }
 
-export function ModelViewer({ file }: ModelViewerProps) {
-  const viewerImage = PlaceHolderImages.find(p => p.id === 'model-viewer-placeholder');
+export function ModelViewer({ ifcModel }: ModelViewerProps) {
+  const viewerContainerRef = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<IfcViewerAPI | null>(null);
 
-  if (!viewerImage) {
-    return (
-        <Card className="h-full flex flex-col items-center justify-center">
-            <CardHeader>
-                <CardTitle className="font-headline">3D-Modell-Ansicht</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <p>Bild-Platzhalter nicht gefunden.</p>
-            </CardContent>
-        </Card>
-    )
-  }
+  useEffect(() => {
+    if (viewerContainerRef.current && !viewerRef.current) {
+      const container = viewerContainerRef.current;
+      const viewer = new IfcViewerAPI({
+        container,
+        backgroundColor: '#E5E7EB', // bg-muted-light
+      });
+
+      viewer.axes.setAxes();
+      viewer.grid.setGrid();
+      
+      // Path to the .wasm files from the public folder
+      viewer.IFC.setWasmPath('/');
+
+      viewerRef.current = viewer;
+    }
+  }, []);
+
+  useEffect(() => {
+    const loadModel = async () => {
+      const viewer = viewerRef.current;
+      if (viewer && ifcModel?.fileContent) {
+        // Clear any previous model
+        await viewer.IFC.dispose();
+
+        const modelData = new Uint8Array(
+            [...ifcModel.fileContent].map((char) => char.charCodeAt(0))
+        );
+
+        try {
+            const model = await viewer.IFC.loadIfc(modelData, true);
+            viewer.shadows.castShadows = true;
+            if (model.geometry.boundingBox) {
+                viewer.context.fitToBoundingBox(model.geometry.boundingBox, true);
+            }
+        } catch (error) {
+            console.error("Fehler beim Laden des IFC-Modells:", error);
+        }
+      }
+    };
+    loadModel();
+  }, [ifcModel]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    return () => {
+      viewer?.dispose();
+      viewerRef.current = null;
+    };
+  }, []);
 
   return (
     <Card className="h-full flex flex-col min-h-[400px] md:min-h-0">
@@ -31,28 +73,13 @@ export function ModelViewer({ file }: ModelViewerProps) {
         <CardDescription>Interaktive Ansicht Ihres BIM-Modells.</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 relative">
-        <Image
-          src={viewerImage.imageUrl}
-          alt={viewerImage.description}
-          data-ai-hint={viewerImage.imageHint}
-          fill
-          className="object-cover rounded-md"
-          priority
-        />
-        <div className="absolute top-2 right-2 flex flex-col gap-2">
-          <Button variant="secondary" size="icon" className="bg-card/80 backdrop-blur-sm hover:bg-card">
-            <ZoomIn />
-            <span className="sr-only">Vergrößern</span>
-          </Button>
-          <Button variant="secondary" size="icon" className="bg-card/80 backdrop-blur-sm hover:bg-card">
-            <ZoomOut />
-            <span className="sr-only">Verkleinern</span>
-          </Button>
-          <Button variant="secondary" size="icon" className="bg-card/80 backdrop-blur-sm hover:bg-card">
-            <Expand />
-            <span className="sr-only">Erweitern</span>
-          </Button>
-        </div>
+        <div ref={viewerContainerRef} className="w-full h-full rounded-md" />
+        {!ifcModel && (
+          <div className="absolute inset-0 flex items-center justify-center bg-card/50">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="ml-2">Lade Modell...</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
