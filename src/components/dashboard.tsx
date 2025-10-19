@@ -220,7 +220,7 @@ export default function Dashboard() {
                     <TabsContent value="analysis" className="flex-1 overflow-y-auto p-4">
                       <AnalysisPanel onExport={() => alert('Materialpass wird exportiert...')} />
                     </TabsContent>
-                    <TabsContent value="coach" className="flex-1 flex flex-col m-0 overflow-hidden">
+                    <TabsContent value="coach" className="m-0 flex-1 flex flex-col overflow-hidden">
                        <ChatAssistant 
                           messages={memoizedMessages}
                           startingPrompts={startingPrompts}
@@ -247,5 +247,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
-    
