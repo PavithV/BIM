@@ -23,9 +23,8 @@ function getDetailedErrorMessage(error: any): string {
         return "Der KI-Dienst ist derzeit überlastet. Bitte versuchen Sie es später erneut.";
     }
     
-    return 'Failed to get AI feedback.';
+    return 'Bei der Analyse der IFC-Daten ist ein unerwarteter Fehler aufgetreten. Bitte versuchen Sie es später erneut.';
 }
-
 
 export async function getStartingPrompts() {
   try {
