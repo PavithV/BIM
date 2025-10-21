@@ -19,16 +19,21 @@ export function ModelViewer({ ifcModel }: ModelViewerProps) {
       const container = viewerContainerRef.current;
       const viewer = new IfcViewerAPI({
         container,
-        backgroundColor: '#E5E7EB', // bg-muted-light
+        backgroundColor: '#E9E9EA', // Corresponds to light gray --background
       });
 
       viewer.axes.setAxes();
       viewer.grid.setGrid();
       
-      // Path to the .wasm files from the public folder
       viewer.IFC.setWasmPath('/');
 
       viewerRef.current = viewer;
+    }
+
+    // Cleanup on component unmount
+    return () => {
+        viewerRef.current?.dispose();
+        viewerRef.current = null;
     }
   }, []);
 
@@ -36,35 +41,30 @@ export function ModelViewer({ ifcModel }: ModelViewerProps) {
     const loadModel = async () => {
       const viewer = viewerRef.current;
       if (viewer && ifcModel?.fileContent) {
-        // Clear any previous model
         await viewer.IFC.dispose();
 
-        const modelData = new Uint8Array(
-            [...ifcModel.fileContent].map((char) => char.charCodeAt(0))
-        );
-
+        let objectURL: string | null = null;
         try {
-            const model = await viewer.IFC.loadIfc(modelData, true);
+            const blob = new Blob([ifcModel.fileContent], { type: 'application/octet-stream' });
+            objectURL = URL.createObjectURL(blob);
+            
+            const model = await viewer.IFC.loadIfc(objectURL, true);
             viewer.shadows.castShadows = true;
             if (model.geometry.boundingBox) {
                 viewer.context.fitToBoundingBox(model.geometry.boundingBox, true);
             }
         } catch (error) {
             console.error("Fehler beim Laden des IFC-Modells:", error);
+        } finally {
+            if (objectURL) {
+                URL.revokeObjectURL(objectURL);
+            }
         }
       }
     };
     loadModel();
   }, [ifcModel]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    return () => {
-      viewer?.dispose();
-      viewerRef.current = null;
-    };
-  }, []);
 
   return (
     <Card className="h-full flex flex-col min-h-[400px] md:min-h-0">
