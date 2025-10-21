@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { collection, addDoc, serverTimestamp, query, orderBy, doc, getDocs, setDoc, getDoc } from 'firebase/firestore';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { collection, addDoc, serverTimestamp, query, orderBy, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUploader } from '@/components/file-uploader';
 import { ModelViewer } from '@/components/model-viewer';
@@ -15,9 +15,9 @@ import { useAuth, useUser, useFirestore, useCollection, useMemoFirebase } from '
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { ProjectSelector } from './project-selector';
-import type { IFCModel } from '@/lib/types';
+import type { IFCModel, AnalysisResult } from '@/lib/types';
 import { cn, downloadCsv } from '@/lib/utils';
-import { analysisData } from '@/lib/mock-data';
+import { useToast } from '@/hooks/use-toast';
 
 
 export type Message = {
@@ -32,11 +32,13 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [startingPrompts, setStartingPrompts] = useState<string[]>([]);
   const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const auth = useAuth();
   const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
 
   const messagesRef = useMemoFirebase(() => {
     if (!user || !firestore || !activeProject) return null;
@@ -67,7 +69,7 @@ export default function Dashboard() {
   };
 
   const handleSendMessage = async (userQuestion: string) => {
-    if (!userQuestion.trim() || !activeProject?.fileContent || !messagesRef) return;
+    if (!userQuestion.trim() || !activeProject || !messagesRef) return;
 
     const userMessage: Omit<Message, 'id'> = {
       role: 'user',
@@ -81,7 +83,7 @@ export default function Dashboard() {
       await addDoc(messagesRef, userMessage);
       
       const result = await getAIChatFeedback({
-        ifcModelData: activeProject.fileContent,
+        ifcModelData: activeProject.fileContent || '',
         userQuestion: userQuestion,
       });
 
@@ -98,21 +100,7 @@ export default function Dashboard() {
     } catch (error: any) {
         console.error("Error in handleSendMessage flow:", error);
         
-        let errorMessageContent = 'Das KI-Feedback konnte nicht abgerufen werden. Der API-Schlüssel könnte ungültig sein oder das Modell ist überlastet. Bitte versuchen Sie es später erneut.';
-
-        if (error.message) {
-            if (error.message.includes("API key not valid") || error.message.includes("permission denied")) {
-                errorMessageContent = "Das KI-Feedback konnte nicht abgerufen werden. Ihr API-Schlüssel ist ungültig. Bitte überprüfen Sie Ihren Schlüssel im .env File und in der Google AI Studio Konsole.";
-            } else if (error.message.includes("Billing account")) {
-                errorMessageContent = "Das KI-Feedback konnte nicht abgerufen werden. Für Ihr Google Cloud Projekt ist kein Abrechnungskonto aktiviert. Bitte fügen Sie eines in der Google Cloud Console hinzu, um die KI-Dienste zu nutzen.";
-            } else if (error.message.includes("API not enabled")) {
-                errorMessageContent = "Das KI-Feedback konnte nicht abgerufen werden. Die 'Generative Language API' ist für Ihr Projekt nicht aktiviert. Bitte aktivieren Sie sie in der Google Cloud Console.";
-            } else if (error.message.includes("Content creation is blocked")) {
-                errorMessageContent = 'Ihre Anfrage wurde aufgrund unserer Sicherheitsrichtlinien blockiert. Bitte versuchen Sie es mit einer anderen Anfrage.';
-            } else if (error.message.includes("model is overloaded")) {
-                 errorMessageContent = "Der KI-Dienst ist derzeit überlastet. Bitte versuchen Sie es später erneut.";
-            }
-        }
+        let errorMessageContent = 'Das KI-Feedback konnte nicht abgerufen werden. Bitte versuchen Sie es später erneut.';
 
        const errorMessage: Omit<Message, 'id'> = {
         role: 'assistant',
@@ -126,7 +114,7 @@ export default function Dashboard() {
       setIsLoading(false);
     }
   };
-
+  
   const handleFileUploaded = async (file: File, fileContent: string) => {
     if (!user || !firestore) return;
     
@@ -140,33 +128,35 @@ export default function Dashboard() {
             fileSize: file.size,
             fileContent: fileContent,
             uploadDate: serverTimestamp(),
+            analysisData: null,
         }
         await setDoc(newProjectRef, newProject);
         setActiveProject(newProject);
     } catch(error) {
         console.error("Error saving new project:", error);
+        toast({
+          title: "Fehler beim Upload",
+          description: "Das neue Projekt konnte nicht gespeichert werden.",
+          variant: "destructive",
+        })
     } finally {
         setIsLoading(false);
     }
   };
 
   const handleExportMaterialPass = () => {
-    if (!activeProject) return;
+    if (!activeProject || !activeProject.analysisData) return;
 
     const headers = ["Kategorie", "Name", "Wert", "Einheit/Info"];
     
-    const indicatorRows = analysisData.indicators.map(item => ["Indikator", item.name, item.value, `${item.unit} (${item.a})`]);
-    const materialRows = analysisData.materialComposition.map(item => ["Material", item.name, item.value.toString(), "%"]);
+    const indicatorRows = activeProject.analysisData.indicators.map(item => ["Indikator", item.name, item.value, `${item.unit} (${item.a})`]);
+    const materialRows = activeProject.analysisData.materialComposition.map(item => ["Material", item.name, item.value.toString(), "%"]);
     
     const allRows = [headers, ...indicatorRows, ...materialRows];
     
     const fileName = `Materialpass_${activeProject.fileName.replace('.ifc', '')}.csv`;
     
     downloadCsv(allRows, fileName);
-  };
-
-  const resetProject = () => {
-    setActiveProject(null);
   };
   
   const memoizedMessages = useMemo(() => activeMessages || [], [activeMessages]);
@@ -234,7 +224,11 @@ export default function Dashboard() {
                         </TabsList>
                     </div>
                     <TabsContent value="analysis" className="flex-1 overflow-y-auto p-4">
-                      <AnalysisPanel onExport={handleExportMaterialPass} />
+                      <AnalysisPanel 
+                        analysisData={activeProject.analysisData} 
+                        isAnalyzing={isAnalyzing}
+                        onExport={handleExportMaterialPass} 
+                      />
                     </TabsContent>
                     <TabsContent value="coach" className="m-0 flex-1 flex flex-col min-h-0">
                        <ChatAssistant 
