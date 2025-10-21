@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 interface ProjectSelectorProps {
   projects: IFCModel[];
   isLoading: boolean;
-  onSelectProject: (project: IFCModel) => void;
+  onSelectProject: (project: IFCModel | null) => void;
   onUploadNew: (file: File, fileContent: string) => Promise<void>;
   onDeleteProject: () => Promise<void>;
   activeProjectId?: string | null;
@@ -41,6 +41,11 @@ export function ProjectSelector({ projects, isLoading, onSelectProject, onUpload
     if (!user || !firestore) return;
 
     try {
+      // If the deleted project is the active one, clear the view
+      if (activeProjectId === projectId) {
+        onSelectProject(null);
+      }
+
       // Delete all messages in the subcollection
       const messagesRef = collection(firestore, 'users', user.uid, 'ifcModels', projectId, 'messages');
       const messagesSnapshot = await getDocs(messagesRef);
@@ -65,6 +70,7 @@ export function ProjectSelector({ projects, isLoading, onSelectProject, onUpload
   const handleFileUploaded = async (file: File, fileContent: string) => {
     setIsUploading(true);
     await onUploadNew(file, fileContent);
+    // The dashboard will handle setting the new active project
     setShowUploader(false);
     setIsUploading(false);
   };

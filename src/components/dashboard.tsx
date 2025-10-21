@@ -66,6 +66,8 @@ export default function Dashboard() {
       setProjects(userProjects);
       if (userProjects.length > 0 && !activeProject) {
         setActiveProject(userProjects[0]);
+      } else if (userProjects.length === 0) {
+        setActiveProject(null);
       }
     } catch (error) {
       console.error("Error fetching projects: ", error);
@@ -84,7 +86,7 @@ export default function Dashboard() {
   }, [fetchProjects]);
 
   useEffect(() => {
-    if (activeProject?.fileContent) {
+    if (activeProject?.fileContent && activeProject.analysisData) {
         const blob = new Blob([activeProject.fileContent], { type: 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
         setModelUrl(url);
@@ -253,6 +255,13 @@ export default function Dashboard() {
     
     downloadCsv(allRows, fileName);
   };
+
+  const handleSelectProject = (project: IFCModel | null) => {
+    setActiveProject(project);
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
+  };
   
   const memoizedMessages = useMemo(() => activeMessages || [], [activeMessages]);
 
@@ -290,7 +299,7 @@ export default function Dashboard() {
                 <ProjectSelector 
                     projects={projects}
                     isLoading={isProjectsLoading}
-                    onSelectProject={(p) => { setActiveProject(p); if (window.innerWidth < 768) setSidebarOpen(false); }} 
+                    onSelectProject={handleSelectProject} 
                     onUploadNew={handleFileUploaded} 
                     activeProjectId={activeProject?.id}
                     onDeleteProject={fetchProjects} 
@@ -311,7 +320,7 @@ export default function Dashboard() {
           {activeProject ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
               <div className="lg:col-span-2 h-full min-h-[400px] lg:min-h-0">
-                 <ModelViewer modelUrl={activeProject.analysisData ? modelUrl : null} />
+                 <ModelViewer modelUrl={modelUrl} />
               </div>
               <div className="lg:col-span-1 flex flex-col bg-card rounded-lg border min-h-0">
                  <div className="p-4 border-b">
