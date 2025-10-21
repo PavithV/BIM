@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { collection, addDoc, serverTimestamp, query, orderBy, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, doc, setDoc, getDoc, updateDoc, getDocs } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUploader } from '@/components/file-uploader';
 import { ModelViewer } from '@/components/model-viewer';
@@ -61,8 +61,11 @@ export default function Dashboard() {
       const projectsRef = collection(firestore, 'users', user.uid, 'ifcModels');
       const q = query(projectsRef, orderBy('uploadDate', 'desc'));
       const querySnapshot = await getDocs(q);
-      const userProjects = querySnapshot.docs.map(doc => doc.data() as IFCModel);
+      const userProjects = querySnapshot.docs.map(doc => ({...doc.data(), id: doc.id}) as IFCModel);
       setProjects(userProjects);
+      if (!activeProject && userProjects.length > 0) {
+        setActiveProject(userProjects[0]);
+      }
     } catch (error) {
       console.error("Error fetching projects: ", error);
       toast({
@@ -73,7 +76,7 @@ export default function Dashboard() {
     } finally {
       setIsProjectsLoading(false);
     }
-  }, [user, firestore, toast]);
+  }, [user, firestore, toast, activeProject]);
 
   useEffect(() => {
     fetchProjects();
@@ -100,8 +103,10 @@ export default function Dashboard() {
         const projectRef = doc(firestore, 'users', user.uid, 'ifcModels', project.id);
         await updateDoc(projectRef, { analysisData: result.analysis });
         
-        setActiveProject(prev => prev && prev.id === project.id ? { ...prev, analysisData: result.analysis } : prev);
-        setProjects(prev => prev.map(p => p.id === project.id ? { ...p, analysisData: result.analysis } : p));
+        const updatedProject = { ...project, analysisData: result.analysis };
+        
+        setActiveProject(updatedProject);
+        setProjects(prev => prev.map(p => p.id === project.id ? updatedProject : p));
 
         toast({
           title: "Analyse abgeschlossen",
@@ -183,11 +188,10 @@ export default function Dashboard() {
   const handleFileUploaded = async (file: File, fileContent: string) => {
     if (!user || !firestore) return;
     
-    setIsAnalyzing(true); // Use isAnalyzing to show global loading state
+    setIsAnalyzing(true);
     try {
         const newProjectRef = doc(collection(firestore, 'users', user.uid, 'ifcModels'));
-        const newProject: IFCModel = {
-            id: newProjectRef.id,
+        const newProjectData: Omit<IFCModel, 'id'> = {
             userId: user.uid,
             fileName: file.name,
             fileSize: file.size,
@@ -195,13 +199,13 @@ export default function Dashboard() {
             uploadDate: serverTimestamp(),
             analysisData: null,
         }
-        await setDoc(newProjectRef, newProject);
+        await setDoc(newProjectRef, newProjectData);
         
-        // Immediately set the new project as active
-        setActiveProject(newProject);
-        setProjects(prev => [newProject, ...prev]);
+        const newProject: IFCModel = { ...newProjectData, id: newProjectRef.id, uploadDate: new Date() };
 
-        // Automatically run analysis for the new project
+        setProjects(prev => [newProject, ...prev]);
+        setActiveProject(newProject);
+        
         await runAnalysis(newProject);
 
     } catch(error) {
