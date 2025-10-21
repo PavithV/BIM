@@ -35,6 +35,7 @@ export default function Dashboard() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [projects, setProjects] = useState<IFCModel[]>([]);
   const [isProjectsLoading, setIsProjectsLoading] = useState(true);
+  const [modelUrl, setModelUrl] = useState<string | null>(null);
 
   const auth = useAuth();
   const firestore = useFirestore();
@@ -63,7 +64,7 @@ export default function Dashboard() {
       const querySnapshot = await getDocs(q);
       const userProjects = querySnapshot.docs.map(doc => ({...doc.data(), id: doc.id}) as IFCModel);
       setProjects(userProjects);
-      if (!activeProject && userProjects.length > 0) {
+      if (userProjects.length > 0 && !activeProject) {
         setActiveProject(userProjects[0]);
       }
     } catch (error) {
@@ -81,6 +82,22 @@ export default function Dashboard() {
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
+
+  useEffect(() => {
+    if (activeProject?.fileContent) {
+        const blob = new Blob([activeProject.fileContent], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        setModelUrl(url);
+
+        return () => {
+            if (url) {
+                URL.revokeObjectURL(url);
+            }
+        };
+    } else {
+        setModelUrl(null);
+    }
+  }, [activeProject]);
   
   useEffect(() => {
     async function fetchPrompts() {
@@ -189,6 +206,8 @@ export default function Dashboard() {
     if (!user || !firestore) return;
     
     setIsAnalyzing(true);
+    // Set active project to null to show loading state in viewer
+    setActiveProject(null);
     try {
         const newProjectRef = doc(collection(firestore, 'users', user.uid, 'ifcModels'));
         const newProjectData: Omit<IFCModel, 'id'> = {
@@ -203,10 +222,11 @@ export default function Dashboard() {
         
         const newProject: IFCModel = { ...newProjectData, id: newProjectRef.id, uploadDate: new Date() };
 
-        setProjects(prev => [newProject, ...prev]);
-        setActiveProject(newProject);
-        
+        // We will run analysis, and `runAnalysis` will set the active project
+        // and update the projects list.
         await runAnalysis(newProject);
+        // After analysis, fetch all projects again to ensure list is up-to-date
+        await fetchProjects();
 
     } catch(error) {
         console.error("Error saving new project:", error);
@@ -215,8 +235,7 @@ export default function Dashboard() {
           description: "Das neue Projekt konnte nicht gespeichert werden.",
           variant: "destructive",
         })
-    } finally {
-        setIsAnalyzing(false);
+        setIsAnalyzing(false); // Reset analyzing state on error
     }
   };
 
@@ -292,7 +311,7 @@ export default function Dashboard() {
           {activeProject ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
               <div className="lg:col-span-2 h-full min-h-[400px] lg:min-h-0">
-                <ModelViewer ifcModel={activeProject} />
+                 <ModelViewer modelUrl={activeProject.analysisData ? modelUrl : null} />
               </div>
               <div className="lg:col-span-1 flex flex-col bg-card rounded-lg border min-h-0">
                  <div className="p-4 border-b">
@@ -325,11 +344,11 @@ export default function Dashboard() {
                   </Tabs>
               </div>
             </div>
-          ) : isProjectsLoading ? (
+          ) : isProjectsLoading || isAnalyzing ? (
             <div className="flex items-center justify-center h-full">
               <div className="flex flex-col items-center gap-2 text-muted-foreground">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <p>Lade Projekte...</p>
+                <p>{isAnalyzing ? 'Analysiere neues Projekt...' : 'Lade Projekte...'}</p>
               </div>
             </div>
           ) : (

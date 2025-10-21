@@ -116,7 +116,7 @@ export function ProjectSelector({ projects, isLoading, onSelectProject, onUpload
               <div className="flex-grow overflow-hidden">
                   <p className="font-medium text-sm truncate">{project.fileName}</p>
                   <p className="text-xs text-muted-foreground">
-                    vor {formatDistanceToNow(project.uploadDate.toDate(), { locale: de })}
+                    vor {formatDistanceToNow(project.uploadDate.toDate ? project.uploadDate.toDate() : new Date(), { locale: de })}
                   </p>
               </div>
             </div>

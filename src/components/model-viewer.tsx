@@ -4,13 +4,12 @@ import { useEffect, useRef } from 'react';
 import { IfcViewerAPI } from 'web-ifc-viewer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
-import { IFCModel } from '@/lib/types';
 
 interface ModelViewerProps {
-  ifcModel: IFCModel;
+  modelUrl: string | null;
 }
 
-export function ModelViewer({ ifcModel }: ModelViewerProps) {
+export function ModelViewer({ modelUrl }: ModelViewerProps) {
   const viewerContainerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<IfcViewerAPI | null>(null);
 
@@ -40,30 +39,23 @@ export function ModelViewer({ ifcModel }: ModelViewerProps) {
   useEffect(() => {
     const loadModel = async () => {
       const viewer = viewerRef.current;
-      if (viewer && ifcModel?.fileContent) {
-        await viewer.IFC.dispose();
-
-        let objectURL: string | null = null;
-        try {
-            const blob = new Blob([ifcModel.fileContent], { type: 'application/octet-stream' });
-            objectURL = URL.createObjectURL(blob);
-            
-            const model = await viewer.IFC.loadIfc(objectURL, true);
+      if (viewer) {
+        await viewer.IFC.dispose(); // Clear previous model
+        if (modelUrl) {
+          try {
+            const model = await viewer.IFC.loadIfc(modelUrl, true);
             viewer.shadows.castShadows = true;
             if (model.geometry.boundingBox) {
                 viewer.context.fitToBoundingBox(model.geometry.boundingBox, true);
             }
-        } catch (error) {
-            console.error("Fehler beim Laden des IFC-Modells:", error);
-        } finally {
-            if (objectURL) {
-                URL.revokeObjectURL(objectURL);
-            }
+          } catch (error) {
+              console.error("Fehler beim Laden des IFC-Modells:", error);
+          }
         }
       }
     };
     loadModel();
-  }, [ifcModel]);
+  }, [modelUrl]);
 
 
   return (
@@ -74,10 +66,10 @@ export function ModelViewer({ ifcModel }: ModelViewerProps) {
       </CardHeader>
       <CardContent className="flex-1 relative">
         <div ref={viewerContainerRef} className="w-full h-full rounded-md" />
-        {!ifcModel && (
-          <div className="absolute inset-0 flex items-center justify-center bg-card/50">
+        {!modelUrl && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/50">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <p className="ml-2">Lade Modell...</p>
+            <p className="ml-2 mt-2 text-muted-foreground">Lade Modell nach Analyse...</p>
           </div>
         )}
       </CardContent>
