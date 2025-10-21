@@ -10,12 +10,13 @@ import { cn } from '@/lib/utils';
 
 interface FileUploaderProps {
   onFileUploaded: (file: File, data: string) => void;
+  isUploading: boolean;
 }
 
-export function FileUploader({ onFileUploaded }: FileUploaderProps) {
+export function FileUploader({ onFileUploaded, isUploading }: FileUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingFile, setIsLoadingFile] = useState(false);
   const { toast } = useToast();
 
   const handleFileSelect = (selectedFile: File | null) => {
@@ -56,12 +57,13 @@ export function FileUploader({ onFileUploaded }: FileUploaderProps) {
 
   const handleSubmit = () => {
     if (file) {
-      setIsLoading(true);
+      setIsLoadingFile(true);
       const reader = new FileReader();
       reader.onload = (e) => {
         const fileContent = e.target?.result as string;
         onFileUploaded(file, fileContent);
-        setIsLoading(false);
+        // isUploading state is now managed by parent
+        setIsLoadingFile(false);
       };
       reader.onerror = () => {
         toast({
@@ -69,11 +71,13 @@ export function FileUploader({ onFileUploaded }: FileUploaderProps) {
           description: 'Beim Verarbeiten Ihrer Datei ist ein Fehler aufgetreten.',
           variant: 'destructive',
         });
-        setIsLoading(false);
+        setIsLoadingFile(false);
       }
       reader.readAsText(file);
     }
   };
+  
+  const totalIsLoading = isUploading || isLoadingFile;
 
   return (
     <Card className="w-full max-w-lg mx-auto bg-card/80 backdrop-blur-sm border-dashed shadow-none">
@@ -96,14 +100,14 @@ export function FileUploader({ onFileUploaded }: FileUploaderProps) {
             <UploadCloud className="w-10 h-10 text-muted-foreground mb-3" />
             <p className="font-semibold text-sm">Ziehen Sie Ihre .ifc-Datei hierher</p>
             <p className="text-xs text-muted-foreground mt-1">oder klicken Sie zum Durchsuchen</p>
-            <Input id="file-upload" type="file" className="hidden" accept=".ifc" onChange={handleFileChange} disabled={isLoading}/>
+            <Input id="file-upload" type="file" className="hidden" accept=".ifc" onChange={handleFileChange} disabled={totalIsLoading}/>
           </label>
         </div>
         {file && (
           <div className="text-center space-y-4 pt-2">
             <p className="text-sm">Ausgewählt: <span className="font-semibold">{file.name}</span></p>
-            <Button className="w-full" onClick={handleSubmit} disabled={isLoading}>
-                {isLoading ? (
+            <Button className="w-full" onClick={handleSubmit} disabled={totalIsLoading}>
+                {totalIsLoading ? (
                     <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Analysiere...

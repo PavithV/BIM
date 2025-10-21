@@ -2,6 +2,8 @@
 
 import { aiChatFeedback, type AIChatFeedbackInput } from '@/ai/flows/ai-chat-feedback';
 import { generateStartingPrompts } from '@/ai/flows/generate-starting-prompts';
+import { generateAnalysisFromIfc } from '@/ai/flows/generate-analysis-from-ifc';
+import type { AnalysisResult, GenerateAnalysisFromIfcInput } from '@/lib/types';
 import { ZodError } from 'zod';
 
 function getDetailedErrorMessage(error: any): string {
@@ -44,6 +46,19 @@ export async function getAIChatFeedback(input: AIChatFeedbackInput) {
     console.error('Error in getAIChatFeedback:', error);
     if (error instanceof ZodError) {
       return { error: 'Invalid input for AI chat feedback.' };
+    }
+    return { error: getDetailedErrorMessage(error) };
+  }
+}
+
+export async function getIfcAnalysis(input: GenerateAnalysisFromIfcInput): Promise<{ analysis?: AnalysisResult; error?: string }> {
+  try {
+    const result = await generateAnalysisFromIfc(input);
+    return { analysis: result };
+  } catch (error: any) {
+    console.error('Error in getIfcAnalysis:', error);
+    if (error instanceof ZodError) {
+      return { error: 'Invalid input for IFC analysis.' };
     }
     return { error: getDetailedErrorMessage(error) };
   }

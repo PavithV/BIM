@@ -7,10 +7,10 @@ import { FileUploader } from '@/components/file-uploader';
 import { ModelViewer } from '@/components/model-viewer';
 import { AnalysisPanel } from '@/components/analysis-panel';
 import { ChatAssistant } from '@/components/chat-assistant';
-import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft } from 'lucide-react';
+import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
-import { getStartingPrompts, getAIChatFeedback } from '@/app/actions';
+import { getStartingPrompts, getAIChatFeedback, getIfcAnalysis } from '@/app/actions';
 import { useAuth, useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -33,6 +33,8 @@ export default function Dashboard() {
   const [startingPrompts, setStartingPrompts] = useState<string[]>([]);
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [projects, setProjects] = useState<IFCModel[]>([]);
+  const [isProjectsLoading, setIsProjectsLoading] = useState(true);
 
   const auth = useAuth();
   const firestore = useFirestore();
@@ -52,6 +54,31 @@ export default function Dashboard() {
 
   const { data: activeMessages, isLoading: messagesLoading } = useCollection<Message>(messagesQuery);
   
+  const fetchProjects = useCallback(async () => {
+    if (!user || !firestore) return;
+    setIsProjectsLoading(true);
+    try {
+      const projectsRef = collection(firestore, 'users', user.uid, 'ifcModels');
+      const q = query(projectsRef, orderBy('uploadDate', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const userProjects = querySnapshot.docs.map(doc => doc.data() as IFCModel);
+      setProjects(userProjects);
+    } catch (error) {
+      console.error("Error fetching projects: ", error);
+      toast({
+        title: "Fehler beim Laden der Projekte",
+        description: "Ihre Projekte konnten nicht geladen werden.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProjectsLoading(false);
+    }
+  }, [user, firestore, toast]);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
+  
   useEffect(() => {
     async function fetchPrompts() {
       const result = await getStartingPrompts();
@@ -61,6 +88,44 @@ export default function Dashboard() {
     }
     fetchPrompts();
   }, []);
+
+  const runAnalysis = useCallback(async (project: IFCModel) => {
+    if (!project || !user || !firestore) return;
+
+    setIsAnalyzing(true);
+    try {
+      const result = await getIfcAnalysis({ ifcFileContent: project.fileContent });
+      
+      if (result.analysis) {
+        const projectRef = doc(firestore, 'users', user.uid, 'ifcModels', project.id);
+        await updateDoc(projectRef, { analysisData: result.analysis });
+        
+        setActiveProject(prev => prev && prev.id === project.id ? { ...prev, analysisData: result.analysis } : prev);
+        setProjects(prev => prev.map(p => p.id === project.id ? { ...p, analysisData: result.analysis } : p));
+
+        toast({
+          title: "Analyse abgeschlossen",
+          description: "Die Nachhaltigkeitsanalyse wurde erfolgreich erstellt.",
+        });
+      } else {
+        toast({
+          title: "Analyse Fehlgeschlagen",
+          description: result?.error || "Ein unbekannter Fehler ist aufgetreten.",
+          variant: "destructive",
+          duration: 9000,
+        });
+      }
+    } catch (error) {
+      console.error("Error running analysis:", error);
+      toast({
+        title: "Analyse Fehlgeschlagen",
+        description: "Ein unerwarteter Fehler ist aufgetreten.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [user, firestore, toast]);
 
   const handleSignOut = async () => {
     await signOut(auth);
@@ -118,7 +183,7 @@ export default function Dashboard() {
   const handleFileUploaded = async (file: File, fileContent: string) => {
     if (!user || !firestore) return;
     
-    setIsLoading(true);
+    setIsAnalyzing(true); // Use isAnalyzing to show global loading state
     try {
         const newProjectRef = doc(collection(firestore, 'users', user.uid, 'ifcModels'));
         const newProject: IFCModel = {
@@ -131,7 +196,14 @@ export default function Dashboard() {
             analysisData: null,
         }
         await setDoc(newProjectRef, newProject);
+        
+        // Immediately set the new project as active
         setActiveProject(newProject);
+        setProjects(prev => [newProject, ...prev]);
+
+        // Automatically run analysis for the new project
+        await runAnalysis(newProject);
+
     } catch(error) {
         console.error("Error saving new project:", error);
         toast({
@@ -140,7 +212,7 @@ export default function Dashboard() {
           variant: "destructive",
         })
     } finally {
-        setIsLoading(false);
+        setIsAnalyzing(false);
     }
   };
 
@@ -192,7 +264,14 @@ export default function Dashboard() {
                 <p className="text-sm text-muted-foreground">Wählen oder erstellen Sie ein Projekt.</p>
               </div>
               <div className="flex-1 overflow-y-auto">
-                <ProjectSelector onSelectProject={(p) => { setActiveProject(p); if (window.innerWidth < 768) setSidebarOpen(false); }} onUploadNew={handleFileUploaded} activeProjectId={activeProject?.id} />
+                <ProjectSelector 
+                    projects={projects}
+                    isLoading={isProjectsLoading}
+                    onSelectProject={(p) => { setActiveProject(p); if (window.innerWidth < 768) setSidebarOpen(false); }} 
+                    onUploadNew={handleFileUploaded} 
+                    activeProjectId={activeProject?.id}
+                    onDeleteProject={fetchProjects} 
+                />
               </div>
               <div className="mt-4">
                   <Button variant="ghost" onClick={handleSignOut} className="w-full justify-start">
@@ -227,6 +306,7 @@ export default function Dashboard() {
                       <AnalysisPanel 
                         analysisData={activeProject.analysisData} 
                         isAnalyzing={isAnalyzing}
+                        onRunAnalysis={() => runAnalysis(activeProject)}
                         onExport={handleExportMaterialPass} 
                       />
                     </TabsContent>
@@ -239,6 +319,13 @@ export default function Dashboard() {
                         />
                     </TabsContent>
                   </Tabs>
+              </div>
+            </div>
+          ) : isProjectsLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <p>Lade Projekte...</p>
               </div>
             </div>
           ) : (

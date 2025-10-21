@@ -60,6 +60,40 @@
             "seconds": { "type": "number" },
             "nanoseconds": { "type": "number" }
           }
+        },
+        "analysisData": {
+            "type": "object",
+            "description": "Stores the AI-generated sustainability analysis result.",
+            "properties": {
+                "summary": { "type": "string" },
+                "indicators": { 
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": { "type": "string" },
+                            "value": { "type": "string" },
+                            "unit": { "type": "string" },
+                            "a": { "type": "string" },
+                            "rating": { "type": "string", "enum": ["low", "medium", "high"] }
+                        },
+                        "required": ["name", "value", "unit", "a", "rating"]
+                    }
+                },
+                "materialComposition": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": { "type": "string" },
+                            "value": { "type": "number" },
+                            "fill": { "type": "string" }
+                        },
+                        "required": ["name", "value", "fill"]
+                    }
+                }
+            },
+            "required": ["summary", "indicators", "materialComposition"]
         }
       },
       "required": [

@@ -2,20 +2,17 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, TrendingDown, TrendingUp, ArrowRight } from 'lucide-react';
-import { analysisData } from '@/lib/mock-data';
+import { FileText, TrendingDown, TrendingUp, ArrowRight, BarChart3, Loader2 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 import { ChartConfig, ChartContainer } from '@/components/ui/chart';
+import type { AnalysisResult } from '@/lib/types';
 
 interface AnalysisPanelProps {
+  analysisData: AnalysisResult | null | undefined;
+  isAnalyzing: boolean;
+  onRunAnalysis: () => void;
   onExport: () => void;
 }
-
-const chartConfig = analysisData.materialComposition.reduce((acc, cur) => {
-    acc[cur.name] = { label: cur.name, color: cur.fill };
-    return acc;
-}, {} as ChartConfig);
-
 
 const RatingIcon = ({ rating }: { rating: string }) => {
   switch (rating) {
@@ -30,7 +27,37 @@ const RatingIcon = ({ rating }: { rating: string }) => {
   }
 };
 
-export function AnalysisPanel({ onExport }: AnalysisPanelProps) {
+export function AnalysisPanel({ analysisData, isAnalyzing, onRunAnalysis, onExport }: AnalysisPanelProps) {
+  
+  if (isAnalyzing) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center p-8">
+        <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+        <p className="font-semibold">Modell wird analysiert...</p>
+        <p className="text-muted-foreground text-sm">Dies kann einen Moment dauern.</p>
+      </div>
+    );
+  }
+
+  if (!analysisData) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center p-8">
+        <BarChart3 className="w-12 h-12 text-muted-foreground/50 mb-4" />
+        <h3 className="font-semibold text-lg">Analyse bereit</h3>
+        <p className="text-muted-foreground text-sm mb-4">Starten Sie die KI-gestützte Analyse für dieses Modell.</p>
+        <Button onClick={onRunAnalysis} disabled={isAnalyzing}>
+          {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+          Analyse starten
+        </Button>
+      </div>
+    );
+  }
+
+  const chartConfig = analysisData.materialComposition.reduce((acc, cur) => {
+    acc[cur.name] = { label: cur.name, color: cur.fill };
+    return acc;
+  }, {} as ChartConfig);
+
   return (
     <div className="space-y-6">
       <Card>

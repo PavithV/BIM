@@ -1,11 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { collection, query, orderBy, getDocs, doc, writeBatch, deleteDoc } from 'firebase/firestore';
 import { useUser, useFirestore } from '@/firebase';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { ScrollArea } from './ui/scroll-area';
 import { FileUploader } from './file-uploader';
 import { Building, FilePlus, Loader2, Trash2, CheckCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -25,40 +23,19 @@ import {
 import { cn } from '@/lib/utils';
 
 interface ProjectSelectorProps {
+  projects: IFCModel[];
+  isLoading: boolean;
   onSelectProject: (project: IFCModel) => void;
   onUploadNew: (file: File, fileContent: string) => Promise<void>;
+  onDeleteProject: () => Promise<void>;
   activeProjectId?: string | null;
 }
 
-export function ProjectSelector({ onSelectProject, onUploadNew, activeProjectId }: ProjectSelectorProps) {
+export function ProjectSelector({ projects, isLoading, onSelectProject, onUploadNew, onDeleteProject, activeProjectId }: ProjectSelectorProps) {
   const { user } = useUser();
   const firestore = useFirestore();
-  const [projects, setProjects] = useState<IFCModel[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [showUploader, setShowUploader] = useState(false);
-
-  const fetchProjects = async () => {
-    if (!user || !firestore) return;
-    setIsLoading(true);
-    try {
-      const projectsRef = collection(firestore, 'users', user.uid, 'ifcModels');
-      const q = query(projectsRef, orderBy('uploadDate', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const userProjects = querySnapshot.docs.map(doc => doc.data() as IFCModel);
-      setProjects(userProjects);
-      if (userProjects.length === 0 && !showUploader) {
-        setShowUploader(true);
-      }
-    } catch (error) {
-      console.error("Error fetching projects: ", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProjects();
-  }, [user, firestore]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleDeleteProject = async (projectId: string) => {
     if (!user || !firestore) return;
@@ -77,8 +54,8 @@ export function ProjectSelector({ onSelectProject, onUploadNew, activeProjectId 
       const projectRef = doc(firestore, 'users', user.uid, 'ifcModels', projectId);
       await deleteDoc(projectRef);
 
-      // Update the local state
-      setProjects(projects.filter(p => p.id !== projectId));
+      // Trigger a refetch in the parent component
+      await onDeleteProject();
 
     } catch (error) {
       console.error("Error deleting project:", error);
@@ -86,9 +63,10 @@ export function ProjectSelector({ onSelectProject, onUploadNew, activeProjectId 
   };
   
   const handleFileUploaded = async (file: File, fileContent: string) => {
+    setIsUploading(true);
     await onUploadNew(file, fileContent);
-    await fetchProjects(); // Refetch projects to include the new one
-    setShowUploader(false); // Go back to the project list
+    setShowUploader(false);
+    setIsUploading(false);
   };
 
   if (isLoading) {
@@ -100,8 +78,8 @@ export function ProjectSelector({ onSelectProject, onUploadNew, activeProjectId 
     );
   }
 
-  if (showUploader) {
-    return <div className="p-2"><FileUploader onFileUploaded={handleFileUploaded} /></div>;
+  if (showUploader || projects.length === 0) {
+    return <div className="p-2"><FileUploader onFileUploaded={handleFileUploaded} isUploading={isUploading} /></div>;
   }
 
   return (
@@ -117,7 +95,7 @@ export function ProjectSelector({ onSelectProject, onUploadNew, activeProjectId 
           >
             <div
                 onClick={() => onSelectProject(project)}
-                className="flex-grow flex items-center gap-3"
+                className="flex-grow flex items-center gap-3 overflow-hidden"
             >
               <div className="flex-shrink-0">
                 {activeProjectId === project.id ? (
