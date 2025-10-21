@@ -66,6 +66,15 @@ export default function Dashboard() {
       setProjects(userProjects);
       if (userProjects.length > 0 && !activeProject) {
         setActiveProject(userProjects[0]);
+      } else if (activeProject) {
+        // If there's an active project, find its latest version in the fetched projects
+        const updatedActiveProject = userProjects.find(p => p.id === activeProject.id);
+        if (updatedActiveProject) {
+          setActiveProject(updatedActiveProject);
+        } else {
+          // The active project was deleted, select the first one if available
+          setActiveProject(userProjects.length > 0 ? userProjects[0] : null);
+        }
       } else if (userProjects.length === 0) {
         setActiveProject(null);
       }
@@ -83,10 +92,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchProjects();
-  }, [fetchProjects]);
+  }, [user]); // Only run when user object is available.
 
   useEffect(() => {
-    if (activeProject?.fileContent && activeProject.analysisData) {
+    if (activeProject?.fileContent) { // analysisData is not required here
         const blob = new Blob([activeProject.fileContent], { type: 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
         setModelUrl(url);
@@ -122,11 +131,9 @@ export default function Dashboard() {
         const projectRef = doc(firestore, 'users', user.uid, 'ifcModels', project.id);
         await updateDoc(projectRef, { analysisData: result.analysis });
         
-        const updatedProject = { ...project, analysisData: result.analysis };
+        // Refresh the project data from Firestore to ensure consistency
+        await fetchProjects();
         
-        setActiveProject(updatedProject);
-        setProjects(prev => prev.map(p => p.id === project.id ? updatedProject : p));
-
         toast({
           title: "Analyse abgeschlossen",
           description: "Die Nachhaltigkeitsanalyse wurde erfolgreich erstellt.",
@@ -149,7 +156,7 @@ export default function Dashboard() {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [user, firestore, toast]);
+  }, [user, firestore, toast, fetchProjects]);
 
   const handleSignOut = async () => {
     await signOut(auth);
@@ -206,10 +213,10 @@ export default function Dashboard() {
   
   const handleFileUploaded = async (file: File, fileContent: string) => {
     if (!user || !firestore) return;
-    
-    setIsAnalyzing(true);
-    // Set active project to null to show loading state in viewer
+
+    setIsProjectsLoading(true);
     setActiveProject(null);
+    setModelUrl(null);
     try {
         const newProjectRef = doc(collection(firestore, 'users', user.uid, 'ifcModels'));
         const newProjectData: Omit<IFCModel, 'id'> = {
@@ -222,12 +229,8 @@ export default function Dashboard() {
         }
         await setDoc(newProjectRef, newProjectData);
         
-        const newProject: IFCModel = { ...newProjectData, id: newProjectRef.id, uploadDate: new Date() };
-
-        // We will run analysis, and `runAnalysis` will set the active project
-        // and update the projects list.
-        await runAnalysis(newProject);
-        // After analysis, fetch all projects again to ensure list is up-to-date
+        // After saving, refetch all projects. This will automatically
+        // update the list and set the new project as active.
         await fetchProjects();
 
     } catch(error) {
@@ -237,9 +240,10 @@ export default function Dashboard() {
           description: "Das neue Projekt konnte nicht gespeichert werden.",
           variant: "destructive",
         })
-        setIsAnalyzing(false); // Reset analyzing state on error
+        setIsProjectsLoading(false); // Reset loading state on error
     }
   };
+
 
   const handleExportMaterialPass = () => {
     if (!activeProject || !activeProject.analysisData) return;
@@ -357,7 +361,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-center h-full">
               <div className="flex flex-col items-center gap-2 text-muted-foreground">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <p>{isAnalyzing ? 'Analysiere neues Projekt...' : 'Lade Projekte...'}</p>
+                <p>{isProjectsLoading ? 'Lade Projekte...' : 'Speichere neues Projekt...'}</p>
               </div>
             </div>
           ) : (
