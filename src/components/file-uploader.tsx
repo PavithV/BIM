@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type DragEvent, type ChangeEvent } from 'react';
-import { UploadCloud, Loader2 } from 'lucide-react';
+import { UploadCloud, Loader2, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,11 @@ import { cn } from '@/lib/utils';
 interface FileUploaderProps {
   onFileUploaded: (file: File, data: string) => void;
   isUploading: boolean;
+  onCancel?: () => void;
+  showCancelButton?: boolean;
 }
 
-export function FileUploader({ onFileUploaded, isUploading }: FileUploaderProps) {
+export function FileUploader({ onFileUploaded, isUploading, onCancel, showCancelButton = false }: FileUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoadingFile, setIsLoadingFile] = useState(false);
@@ -115,6 +117,12 @@ export function FileUploader({ onFileUploaded, isUploading }: FileUploaderProps)
                 ) : 'Projekt analysieren'}
             </Button>
           </div>
+        )}
+         {showCancelButton && onCancel && (
+          <Button variant="ghost" className="w-full" onClick={onCancel} disabled={totalIsLoading}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Zurück zur Projektliste
+          </Button>
         )}
       </CardContent>
     </Card>

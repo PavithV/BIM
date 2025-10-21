@@ -79,7 +79,16 @@ export function ProjectSelector({ projects, isLoading, onSelectProject, onUpload
   }
 
   if (showUploader || projects.length === 0) {
-    return <div className="p-2"><FileUploader onFileUploaded={handleFileUploaded} isUploading={isUploading} /></div>;
+    return (
+      <div className="p-2">
+        <FileUploader 
+          onFileUploaded={handleFileUploaded} 
+          isUploading={isUploading}
+          onCancel={() => setShowUploader(false)}
+          showCancelButton={projects.length > 0}
+        />
+      </div>
+    );
   }
 
   return (
