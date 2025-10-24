@@ -45,8 +45,12 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
       });
       
       await viewer.IFC.setWasmPath('/');
+      
+      // Initialize grid and axes after the main viewer setup
+      await viewer.init();
       viewer.grid.setGrid();
       viewer.axes.setAxes();
+
 
       // Store viewer instance in ref
       viewerRef.current = viewer;
