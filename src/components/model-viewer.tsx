@@ -43,7 +43,7 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
         await viewer.IFC.dispose(); // Clear previous model
         if (modelUrl) {
           try {
-            const model = await viewer.IFC.loadIfc(modelUrl, true);
+            const model = await viewer.IFC.loadIfcUrl(modelUrl, true);
             viewer.shadows.castShadows = true;
             if (model.geometry.boundingBox) {
                 viewer.context.fitToBoundingBox(model.geometry.boundingBox, true);
