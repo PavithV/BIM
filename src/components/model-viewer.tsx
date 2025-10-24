@@ -2,14 +2,6 @@
 
 import { useEffect, useRef } from 'react';
 import { IfcViewerAPI } from 'web-ifc-viewer';
-import {
-  IFCBUILDING,
-  IFCBUILDINGSTOREY,
-  IFCDOOR,
-  IFCFURNISHINGELEMENT,
-  IFCWALL,
-  IFCWINDOW,
-} from 'web-ifc';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { Color } from 'three';
@@ -47,11 +39,9 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
       
       await viewer.IFC.setWasmPath('/');
 
-      // Use pre-pick to initialize grid and axes
-      viewer.clipper.active = true;
-
       container.onclick = () => {
         if (!isGridAndAxesInitialized) {
+          // These components are initialized here on first click to ensure the viewer is ready
           viewer?.grid.setGrid();
           viewer?.axes.setAxes();
           isGridAndAxesInitialized = true;
