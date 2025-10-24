@@ -82,15 +82,10 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
           const model = await viewer.IFC.loadIfcUrl(modelUrl, true);
 
           viewer.shadows.castShadows = true;
-          if(viewer.context.renderer.postProduction) {
-            viewer.context.renderer.postProduction.active = true;
-          }
+          viewer.context.renderer.postProduction.active = true;
 
-          if (model.geometry?.boundingBox) {
-            viewer.context.fitToBoundingBox(model.geometry.boundingBox, true);
-          } else {
-            viewer.context.fitToFrame();
-          }
+          // Kamera zuverlässig auf das Modell zentrieren
+          viewer.context.ifcCamera.fitModelToFrame();
 
         } catch (error) {
           console.error("❌ Fehler beim Laden des IFC-Modells:", error);
