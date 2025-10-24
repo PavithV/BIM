@@ -12,6 +12,8 @@ import {
 } from 'web-ifc';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
+import { Color } from 'three';
+
 
 interface ModelViewerProps {
   modelUrl: string | null;
@@ -39,10 +41,12 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
       // Initialize the viewer
       viewer = new IfcViewerAPI({
         container,
-        backgroundColor: '#E9E9EA',
+        backgroundColor: new Color(0xe9e9ea),
       });
       
       await viewer.IFC.setWasmPath('/');
+      viewer.grid.setGrid();
+      viewer.axes.setAxes();
 
       // Store viewer instance in ref
       viewerRef.current = viewer;
