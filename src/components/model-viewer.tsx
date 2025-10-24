@@ -2,6 +2,14 @@
 
 import { useEffect, useRef } from 'react';
 import { IfcViewerAPI } from 'web-ifc-viewer';
+import {
+  IFCBUILDING,
+  IFCBUILDINGSTOREY,
+  IFCDOOR,
+  IFCFURNISHINGELEMENT,
+  IFCWALL,
+  IFCWINDOW,
+} from 'web-ifc';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 
@@ -13,48 +21,72 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
   const viewerContainerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<IfcViewerAPI | null>(null);
 
-  useEffect(() => {
-    if (viewerContainerRef.current && !viewerRef.current) {
-      const container = viewerContainerRef.current;
-      const viewer = new IfcViewerAPI({
-        container,
-        backgroundColor: '#E9E9EA', // Corresponds to light gray --background
-      });
-
-      viewer.axes.setAxes();
-      viewer.grid.setGrid();
-      
-      viewer.IFC.setWasmPath('/');
-
-      viewerRef.current = viewer;
+  // Function to safely clear models from the scene
+  const clearScene = () => {
+    const viewer = viewerRef.current;
+    if (viewer) {
+      viewer.IFC.dispose();
     }
+  };
+
+  useEffect(() => {
+    let viewer: IfcViewerAPI | null = null;
+    const container = viewerContainerRef.current;
+
+    const initializeViewer = async () => {
+      if (!container) return;
+      
+      // Initialize the viewer
+      viewer = new IfcViewerAPI({
+        container,
+        backgroundColor: '#E9E9EA',
+      });
+      
+      await viewer.IFC.setWasmPath('/');
+
+      // Store viewer instance in ref
+      viewerRef.current = viewer;
+    };
+    
+    initializeViewer();
 
     // Cleanup on component unmount
     return () => {
-        viewerRef.current?.dispose();
-        viewerRef.current = null;
-    }
+      viewer?.dispose();
+      viewerRef.current = null;
+    };
   }, []);
 
   useEffect(() => {
     const loadModel = async () => {
       const viewer = viewerRef.current;
-      if (viewer) {
-        await viewer.IFC.dispose(); // Clear previous model
-        if (modelUrl) {
-          try {
-            const model = await viewer.IFC.loadIfcUrl(modelUrl, true);
-            viewer.shadows.castShadows = true;
-            if (model.geometry.boundingBox) {
-                viewer.context.fitToBoundingBox(model.geometry.boundingBox, true);
-            }
-          } catch (error) {
-              console.error("Fehler beim Laden des IFC-Modells:", error);
+      if (!viewer || !viewer.IFC.wasmModule) {
+        // Wait until wasm is ready
+        setTimeout(loadModel, 100);
+        return;
+      }
+      
+      // Clear previous models before loading a new one
+      clearScene();
+
+      if (modelUrl) {
+        try {
+          const model = await viewer.IFC.loadIfcUrl(modelUrl, true);
+
+          // Optional: Add shadows and fit to bounding box
+          viewer.shadows.castShadows = true;
+          if (model.geometry.boundingBox) {
+            viewer.context.fitToBoundingBox(model.geometry.boundingBox, true);
           }
+
+        } catch (error) {
+          console.error("Fehler beim Laden des IFC-Modells:", error);
         }
       }
     };
+    
     loadModel();
+
   }, [modelUrl]);
 
 
