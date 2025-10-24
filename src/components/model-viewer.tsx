@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Loader2 } from 'lucide-react';
 import { Color } from 'three';
 
-
 interface ModelViewerProps {
   modelUrl: string | null;
 }
@@ -15,53 +14,52 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
   const viewerContainerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<IfcViewerAPI | null>(null);
 
-  // Function to safely clear models from the scene
   const clearScene = () => {
     const viewer = viewerRef.current;
     if (viewer) {
-      viewer.IFC.dispose();
+      try {
+        viewer.IFC.loader.ifcManager.dispose();
+      } catch (err) {
+        console.warn("⚠️ Fehler beim Leeren der Szene:", err);
+      }
     }
   };
 
   useEffect(() => {
     let viewer: IfcViewerAPI | null = null;
-    let isGridAndAxesInitialized = false;
     const container = viewerContainerRef.current;
+    if (!container) return;
 
     const initializeViewer = async () => {
-      if (!container) return;
-      
-      // Initialize the viewer
+      // 1️⃣ Viewer initialisieren
       viewer = new IfcViewerAPI({
         container,
-        backgroundColor: new Color(0xe9e9ea),
+        backgroundColor: new Color(0xf3f4f6),
       });
-      
-      await viewer.IFC.setWasmPath('/');
-      
-      container.onclick = () => {
-        if (!isGridAndAxesInitialized) {
-            viewer?.grid.setGrid();
-            viewer?.axes.setAxes();
-            isGridAndAxesInitialized = true;
-        }
-        viewer?.IFC.selector.pickIfcItem(true);
-      };
 
-      // Store viewer instance in ref
+      // 2️⃣ WASM Pfad korrekt setzen
+      await viewer.IFC.setWasmPath('/wasm/');
+
+      // 3️⃣ Kurze Verzögerung, bis Unterkomponenten (grid, axes) fertig geladen sind
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      // 4️⃣ Jetzt sicher grid und axes aktivieren
+      if (viewer.grid && viewer.axes) {
+        viewer.grid.setGrid();
+        viewer.axes.setAxes();
+      } else {
+        console.warn("⚠️ grid oder axes sind noch nicht bereit");
+      }
+
+      // 5️⃣ Speichern
       viewerRef.current = viewer;
-
-      // Initialize grid and axes for the initial view
-      viewer.grid.setGrid();
-      viewer.axes.setAxes();
-      isGridAndAxesInitialized = true;
     };
-    
+
     initializeViewer();
 
-    // Cleanup on component unmount
+    // Cleanup bei Komponentenausbau
     return () => {
-      viewer?.dispose();
+      viewer?.dispose?.();
       viewerRef.current = null;
     };
   }, []);
@@ -69,35 +67,39 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
   useEffect(() => {
     const loadModel = async () => {
       const viewer = viewerRef.current;
-      if (!viewer || !viewer.IFC.wasmModule) {
-        // Wait until wasm is ready
+      if (!viewer) return;
+
+      // Warten, bis IFC Modul bereit ist
+      if (!viewer.IFC.wasmModule) {
         setTimeout(loadModel, 100);
         return;
       }
-      
-      // Clear previous models before loading a new one
+
       clearScene();
 
       if (modelUrl) {
         try {
           const model = await viewer.IFC.loadIfcUrl(modelUrl, true);
 
-          // Optional: Add shadows and fit to bounding box
           viewer.shadows.castShadows = true;
-          if (model.geometry.boundingBox) {
+          if(viewer.context.renderer.postProduction) {
+            viewer.context.renderer.postProduction.active = true;
+          }
+
+          if (model.geometry?.boundingBox) {
             viewer.context.fitToBoundingBox(model.geometry.boundingBox, true);
+          } else {
+            viewer.context.fitToFrame();
           }
 
         } catch (error) {
-          console.error("Fehler beim Laden des IFC-Modells:", error);
+          console.error("❌ Fehler beim Laden des IFC-Modells:", error);
         }
       }
     };
-    
+
     loadModel();
-
   }, [modelUrl]);
-
 
   return (
     <Card className="h-full flex flex-col min-h-[400px] md:min-h-0">
