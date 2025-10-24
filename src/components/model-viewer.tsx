@@ -25,6 +25,7 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
 
   useEffect(() => {
     let viewer: IfcViewerAPI | null = null;
+    let isGridAndAxesInitialized = false;
     const container = viewerContainerRef.current;
 
     const initializeViewer = async () => {
@@ -37,17 +38,23 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
       });
       
       await viewer.IFC.setWasmPath('/');
-
-      // These components are initialized here on first click to ensure the viewer is ready
-      viewer.grid.setGrid();
-      viewer.axes.setAxes();
-
+      
       container.onclick = () => {
+        if (!isGridAndAxesInitialized) {
+            viewer?.grid.setGrid();
+            viewer?.axes.setAxes();
+            isGridAndAxesInitialized = true;
+        }
         viewer?.IFC.selector.pickIfcItem(true);
       };
 
       // Store viewer instance in ref
       viewerRef.current = viewer;
+
+      // Initialize grid and axes for the initial view
+      viewer.grid.setGrid();
+      viewer.axes.setAxes();
+      isGridAndAxesInitialized = true;
     };
     
     initializeViewer();
