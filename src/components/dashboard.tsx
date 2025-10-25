@@ -7,15 +7,15 @@ import { FileUploader } from '@/components/file-uploader';
 import { ModelViewer } from '@/components/model-viewer';
 import { AnalysisPanel } from '@/components/analysis-panel';
 import { ChatAssistant } from '@/components/chat-assistant';
-import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2 } from 'lucide-react';
+import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2, Euro } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
-import { getStartingPrompts, getAIChatFeedback, getIfcAnalysis } from '@/app/actions';
+import { getStartingPrompts, getAIChatFeedback, getIfcAnalysis, getCostEstimation } from '@/app/actions';
 import { useAuth, useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { ProjectSelector } from './project-selector';
-import type { IFCModel, AnalysisResult } from '@/lib/types';
+import type { IFCModel, AnalysisResult, CostEstimationResult } from '@/lib/types';
 import { cn, downloadCsv } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -32,7 +32,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [startingPrompts, setStartingPrompts] = useState<string[]>([]);
   const [isSidebarOpen, setSidebarOpen] = useState(true);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false); // Combined state for analysis and cost estimation
   const [projects, setProjects] = useState<IFCModel[]>([]);
   const [isProjectsLoading, setIsProjectsLoading] = useState(true);
   const [modelUrl, setModelUrl] = useState<string | null>(null);
@@ -67,12 +67,10 @@ export default function Dashboard() {
       if (userProjects.length > 0 && !activeProject) {
         setActiveProject(userProjects[0]);
       } else if (activeProject) {
-        // If there's an active project, find its latest version in the fetched projects
         const updatedActiveProject = userProjects.find(p => p.id === activeProject.id);
         if (updatedActiveProject) {
           setActiveProject(updatedActiveProject);
         } else {
-          // The active project was deleted, select the first one if available
           setActiveProject(userProjects.length > 0 ? userProjects[0] : null);
         }
       } else if (userProjects.length === 0) {
@@ -88,23 +86,34 @@ export default function Dashboard() {
     } finally {
       setIsProjectsLoading(false);
     }
-  }, [user, firestore, toast, activeProject]);
+  }, [user, firestore, toast, activeProject?.id]);
 
   useEffect(() => {
     fetchProjects();
-  }, [user]); // Only run when user object is available.
+  }, [user, fetchProjects]);
 
   useEffect(() => {
-    if (activeProject?.fileContent) { // analysisData is not required here
-        const blob = new Blob([activeProject.fileContent], { type: 'application/octet-stream' });
-        const url = URL.createObjectURL(blob);
-        setModelUrl(url);
-
-        return () => {
-            if (url) {
-                URL.revokeObjectURL(url);
+    if (activeProject?.fileContent) {
+        try {
+            const byteCharacters = atob(activeProject.fileContent);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
             }
-        };
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            setModelUrl(url);
+
+            return () => {
+                if (url) {
+                    URL.revokeObjectURL(url);
+                }
+            };
+        } catch (e) {
+            console.error("Failed to decode base64 content or create URL:", e);
+            setModelUrl(null);
+        }
     } else {
         setModelUrl(null);
     }
@@ -119,42 +128,91 @@ export default function Dashboard() {
     }
     fetchPrompts();
   }, []);
+  
+  const runCostEstimation = useCallback(async (project: IFCModel) => {
+    if (!project?.analysisData?.materialComposition || !user || !firestore) {
+        toast({ title: "Fehler", description: "Materialdaten für Kostenschätzung nicht verfügbar.", variant: "destructive" });
+        return;
+    }
+    setIsProcessing(true);
+    try {
+        const input = {
+            materials: project.analysisData.materialComposition.map(({ name, value }) => ({ name, value })),
+            // Assuming a default building area if not available, which is a big assumption.
+            // In a real app, this should be extracted from IFC or asked from the user.
+            totalBuildingArea: 5000, 
+        };
 
-  const runAnalysis = useCallback(async (project: IFCModel) => {
+        const result = await getCostEstimation(input);
+
+        if (result.costs) {
+            const projectRef = doc(firestore, 'users', user.uid, 'ifcModels', project.id);
+            await updateDoc(projectRef, { costEstimationData: result.costs });
+            await fetchProjects();
+            toast({ title: "Kostenschätzung abgeschlossen", description: "Die Kostenschätzung wurde erfolgreich erstellt." });
+        } else {
+            toast({ title: "Kostenschätzung Fehlgeschlagen", description: result.error || "Ein unbekannter Fehler ist aufgetreten.", variant: "destructive", duration: 9000 });
+        }
+
+    } catch (error) {
+        console.error("Error running cost estimation:", error);
+        toast({ title: "Kostenschätzung Fehlgeschlagen", description: "Ein unerwarteter Fehler ist aufgetreten.", variant: "destructive" });
+    } finally {
+        setIsProcessing(false);
+    }
+}, [user, firestore, toast, fetchProjects]);
+
+
+  const runAnalysisAndCosts = useCallback(async (project: IFCModel) => {
     if (!project || !user || !firestore) return;
 
-    setIsAnalyzing(true);
+    setIsProcessing(true);
     try {
-      const result = await getIfcAnalysis({ ifcFileContent: project.fileContent });
+      // Step 1: Run Sustainability Analysis
+      const analysisResult = await getIfcAnalysis({ ifcFileContent: project.fileContent });
       
-      if (result.analysis) {
+      if (analysisResult.analysis) {
         const projectRef = doc(firestore, 'users', user.uid, 'ifcModels', project.id);
-        await updateDoc(projectRef, { analysisData: result.analysis });
-        
-        // Refresh the project data from Firestore to ensure consistency
-        await fetchProjects();
+        await updateDoc(projectRef, { analysisData: analysisResult.analysis });
         
         toast({
           title: "Analyse abgeschlossen",
-          description: "Die Nachhaltigkeitsanalyse wurde erfolgreich erstellt.",
+          description: "Nachhaltigkeitsanalyse erfolgreich. Starte Kostenschätzung...",
         });
+
+        // Step 2: Run Cost Estimation
+        const costInput = {
+            materials: analysisResult.analysis.materialComposition.map(({ name, value }) => ({ name, value })),
+            totalBuildingArea: 5000, // Placeholder BGF
+        };
+        const costResult = await getCostEstimation(costInput);
+
+        if (costResult.costs) {
+            await updateDoc(projectRef, { costEstimationData: costResult.costs });
+            toast({ title: "Kostenschätzung abgeschlossen", description: "Alle Analysen sind fertig." });
+        } else {
+            toast({ title: "Kostenschätzung fehlgeschlagen", description: costResult.error || "Konnte Kosten nicht schätzen.", variant: "destructive", duration: 9000 });
+        }
+
+        await fetchProjects();
+
       } else {
         toast({
           title: "Analyse Fehlgeschlagen",
-          description: result?.error || "Ein unbekannter Fehler ist aufgetreten.",
+          description: analysisResult?.error || "Ein unbekannter Fehler ist aufgetreten.",
           variant: "destructive",
           duration: 9000,
         });
       }
     } catch (error) {
-      console.error("Error running analysis:", error);
+      console.error("Error running analysis pipeline:", error);
       toast({
-        title: "Analyse Fehlgeschlagen",
+        title: "Analyse-Pipeline Fehlgeschlagen",
         description: "Ein unerwarteter Fehler ist aufgetreten.",
         variant: "destructive",
       });
     } finally {
-      setIsAnalyzing(false);
+      setIsProcessing(false);
     }
   }, [user, firestore, toast, fetchProjects]);
 
@@ -223,14 +281,12 @@ export default function Dashboard() {
             userId: user.uid,
             fileName: file.name,
             fileSize: file.size,
-            fileContent: fileContent,
+            fileContent: fileContent.split(',')[1], // Save only base64 part
             uploadDate: serverTimestamp(),
             analysisData: null,
+            costEstimationData: null,
         }
         await setDoc(newProjectRef, newProjectData);
-        
-        // After saving, refetch all projects. This will automatically
-        // update the list and set the new project as active.
         await fetchProjects();
 
     } catch(error) {
@@ -240,7 +296,8 @@ export default function Dashboard() {
           description: "Das neue Projekt konnte nicht gespeichert werden.",
           variant: "destructive",
         })
-        setIsProjectsLoading(false); // Reset loading state on error
+    } finally {
+        setIsProjectsLoading(false);
     }
   };
 
@@ -340,9 +397,10 @@ export default function Dashboard() {
                     </div>
                     <TabsContent value="analysis" className="flex-1 overflow-y-auto p-4">
                       <AnalysisPanel 
-                        analysisData={activeProject.analysisData} 
-                        isAnalyzing={isAnalyzing}
-                        onRunAnalysis={() => runAnalysis(activeProject)}
+                        project={activeProject} 
+                        isProcessing={isProcessing}
+                        onRunAnalysis={() => runAnalysisAndCosts(activeProject)}
+                        onRunCostEstimation={() => runCostEstimation(activeProject)}
                         onExport={handleExportMaterialPass} 
                       />
                     </TabsContent>
@@ -357,11 +415,11 @@ export default function Dashboard() {
                   </Tabs>
               </div>
             </div>
-          ) : isProjectsLoading || isAnalyzing ? (
+          ) : isProjectsLoading || isProcessing ? (
             <div className="flex items-center justify-center h-full">
               <div className="flex flex-col items-center gap-2 text-muted-foreground">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <p>{isProjectsLoading ? 'Lade Projekte...' : 'Speichere neues Projekt...'}</p>
+                <p>{isProjectsLoading ? 'Lade Projekte...' : 'Verarbeite Daten...'}</p>
               </div>
             </div>
           ) : (

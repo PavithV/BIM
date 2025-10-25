@@ -1,29 +1,30 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { IfcViewerAPI } from 'web-ifc-viewer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
-import { Color } from 'three';
+import { Loader2, AlertTriangle } from 'lucide-react';
+import { Color, Group, Box3, Vector3, Mesh, MeshLambertMaterial } from 'three';
 
 interface ModelViewerProps {
   modelUrl: string | null;
 }
 
+function base64ToUint8Array(base64: string) {
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
 export function ModelViewer({ modelUrl }: ModelViewerProps) {
   const viewerContainerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<IfcViewerAPI | null>(null);
-
-  const clearScene = () => {
-    const viewer = viewerRef.current;
-    if (viewer) {
-      try {
-        viewer.IFC.loader.ifcManager.dispose();
-      } catch (err) {
-        console.warn("⚠️ Fehler beim Leeren der Szene:", err);
-      }
-    }
-  };
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let viewer: IfcViewerAPI | null = null;
@@ -31,35 +32,27 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
     if (!container) return;
 
     const initializeViewer = async () => {
-      // 1️⃣ Viewer initialisieren
-      viewer = new IfcViewerAPI({
-        container,
-        backgroundColor: new Color(0xf3f4f6),
-      });
-
-      // 2️⃣ WASM Pfad korrekt setzen
-      await viewer.IFC.setWasmPath('/wasm/');
-
-      // 3️⃣ Kurze Verzögerung, bis Unterkomponenten (grid, axes) fertig geladen sind
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // 4️⃣ Jetzt sicher grid und axes aktivieren
-      if (viewer.grid && viewer.axes) {
-        viewer.grid.setGrid();
-        viewer.axes.setAxes();
-      } else {
-        console.warn("⚠️ grid oder axes sind noch nicht bereit");
+      try {
+        viewer = new IfcViewerAPI({
+          container,
+          backgroundColor: new Color(0xf3f4f6),
+        });
+        await viewer.IFC.setWasmPath('/wasm/');
+        await viewer.IFC.loader.getIfcManager().applyWebIfcConfig({
+            COORDINATE_TO_ORIGIN: true,
+            USE_FAST_BOOLS: false
+        });
+        viewerRef.current = viewer;
+      } catch (err) {
+        console.error("Fehler bei der Initialisierung des Viewers:", err);
+        setError("Der 3D-Viewer konnte nicht initialisiert werden.");
       }
-
-      // 5️⃣ Speichern
-      viewerRef.current = viewer;
     };
 
     initializeViewer();
 
-    // Cleanup bei Komponentenausbau
     return () => {
-      viewer?.dispose?.();
+      viewer?.dispose();
       viewerRef.current = null;
     };
   }, []);
@@ -67,29 +60,31 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
   useEffect(() => {
     const loadModel = async () => {
       const viewer = viewerRef.current;
-      if (!viewer) return;
-
-      // Warten, bis IFC Modul bereit ist
-      if (!viewer.IFC.wasmModule) {
-        setTimeout(loadModel, 100);
-        return;
+      if (!viewer || !modelUrl) {
+          setIsLoading(!modelUrl);
+          return;
       }
+      
+      setError(null);
+      setIsLoading(true);
 
-      clearScene();
+      try {
+        const response = await fetch(modelUrl);
+        const ifcBytes = await response.arrayBuffer();
+        const model = await viewer.IFC.loadIfc(new Uint8Array(ifcBytes));
 
-      if (modelUrl) {
-        try {
-          const model = await viewer.IFC.loadIfcUrl(modelUrl, true);
-
-          viewer.shadows.castShadows = true;
-          viewer.context.renderer.postProduction.active = true;
-
-          // Kamera zuverlässig auf das Modell zentrieren
-          viewer.context.ifcCamera.fitModelToFrame();
-
-        } catch (error) {
-          console.error("❌ Fehler beim Laden des IFC-Modells:", error);
+        if (model.mesh.geometry.attributes.position.count === 0) {
+            setError("Das Modell wurde geladen, enthält aber keine sichtbaren geometrischen Elemente.");
+        } else {
+            viewer.shadows.castShadows = true;
+            viewer.context.renderer.postProduction.active = true;
         }
+
+      } catch (err) {
+        console.error("Fehler beim Laden des IFC-Modells:", err);
+        setError("Das IFC-Modell konnte nicht geladen werden.");
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -104,10 +99,20 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
       </CardHeader>
       <CardContent className="flex-1 relative">
         <div ref={viewerContainerRef} className="w-full h-full rounded-md" />
-        {!modelUrl && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/50">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <p className="ml-2 mt-2 text-muted-foreground">Lade Modell nach Analyse...</p>
+        {(isLoading || error) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/80 backdrop-blur-sm rounded-md">
+            {isLoading ? (
+              <>
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <p className="ml-2 mt-2 text-muted-foreground">Lade Modell...</p>
+              </>
+            ) : error ? (
+              <div className="text-center p-4">
+                  <AlertTriangle className="w-8 h-8 mx-auto text-destructive mb-2" />
+                  <p className="font-semibold">Ein Fehler ist aufgetreten</p>
+                  <p className="text-sm text-muted-foreground">{error}</p>
+              </div>
+            ) : null}
           </div>
         )}
       </CardContent>

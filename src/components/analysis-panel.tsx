@@ -2,15 +2,17 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, TrendingDown, TrendingUp, ArrowRight, BarChart3, Loader2 } from 'lucide-react';
+import { FileText, TrendingDown, TrendingUp, ArrowRight, BarChart3, Loader2, Euro } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 import { ChartConfig, ChartContainer } from '@/components/ui/chart';
-import type { AnalysisResult } from '@/lib/types';
+import type { IFCModel } from '@/lib/types';
+import { Separator } from './ui/separator';
 
 interface AnalysisPanelProps {
-  analysisData: AnalysisResult | null | undefined;
-  isAnalyzing: boolean;
+  project: IFCModel | null;
+  isProcessing: boolean;
   onRunAnalysis: () => void;
+  onRunCostEstimation: () => void;
   onExport: () => void;
 }
 
@@ -27,31 +29,33 @@ const RatingIcon = ({ rating }: { rating: string }) => {
   }
 };
 
-export function AnalysisPanel({ analysisData, isAnalyzing, onRunAnalysis, onExport }: AnalysisPanelProps) {
+export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostEstimation, onExport }: AnalysisPanelProps) {
   
-  if (isAnalyzing) {
+  if (isProcessing) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
         <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-        <p className="font-semibold">Modell wird analysiert...</p>
+        <p className="font-semibold">Modell wird verarbeitet...</p>
         <p className="text-muted-foreground text-sm">Dies kann einen Moment dauern.</p>
       </div>
     );
   }
 
-  if (!analysisData) {
+  if (!project?.analysisData) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
         <BarChart3 className="w-12 h-12 text-muted-foreground/50 mb-4" />
         <h3 className="font-semibold text-lg">Analyse bereit</h3>
-        <p className="text-muted-foreground text-sm mb-4">Starten Sie die KI-gestützte Analyse für dieses Modell.</p>
-        <Button onClick={onRunAnalysis} disabled={isAnalyzing}>
-          {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-          Analyse starten
+        <p className="text-muted-foreground text-sm mb-4">Starten Sie die KI-Analyse für dieses Modell.</p>
+        <Button onClick={onRunAnalysis} disabled={isProcessing}>
+          {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+          Analyse & Schätzung starten
         </Button>
       </div>
     );
   }
+
+  const { analysisData, costEstimationData } = project;
 
   const chartConfig = analysisData.materialComposition.reduce((acc, cur) => {
     acc[cur.name] = { label: cur.name, color: cur.fill };
@@ -104,6 +108,44 @@ export function AnalysisPanel({ analysisData, isAnalyzing, onRunAnalysis, onExpo
               </BarChart>
             </ResponsiveContainer>
           </ChartContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline text-lg">Kostenschätzung</CardTitle>
+          {costEstimationData && <CardDescription>Grobe Schätzung basierend auf der Materialanalyse.</CardDescription>}
+        </CardHeader>
+        <CardContent>
+          {costEstimationData ? (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Geschätzte Gesamtkosten</p>
+                <p className="text-2xl font-bold">{costEstimationData.totalEstimatedCost}</p>
+              </div>
+              <Separator />
+              <div className="space-y-3">
+                 <h4 className="text-sm font-medium">Kosten nach Material</h4>
+                 {costEstimationData.materials.map((mat, idx) => (
+                    <div key={idx}>
+                        <div className="flex justify-between items-baseline">
+                            <p className="font-medium text-sm">{mat.name} ({mat.percentage}%)</p>
+                            <p className="font-semibold text-sm">{mat.estimatedCost}</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{mat.explanation}</p>
+                    </div>
+                 ))}
+              </div>
+            </div>
+          ) : (
+             <div className="text-center text-sm text-muted-foreground space-y-3">
+                <p>Für dieses Projekt liegt noch keine Kostenschätzung vor.</p>
+                 <Button onClick={onRunCostEstimation} disabled={isProcessing} size="sm">
+                    <Euro className="mr-2 h-4 w-4" />
+                    Kostenschätzung starten
+                 </Button>
+             </div>
+          )}
         </CardContent>
       </Card>
       

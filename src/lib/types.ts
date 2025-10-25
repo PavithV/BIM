@@ -1,5 +1,20 @@
 import { z } from 'zod';
 
+// Cost Estimation Schemas
+export const EstimatedCostSchema = z.object({
+  name: z.string().describe('Der Name des Materials.'),
+  percentage: z.number().describe('Der prozentuale Anteil am Gesamtvolumen.'),
+  estimatedCost: z.string().describe('Die geschätzten Kosten für dieses Material als formatierter String (z.B. "€1,200,000").'),
+  explanation: z.string().describe('Eine kurze Erklärung, wie die Kosten geschätzt wurden.'),
+});
+
+export const CostEstimationResultSchema = z.object({
+  totalEstimatedCost: z.string().describe('Die geschätzten Gesamtkosten als formatierter String.'),
+  materials: z.array(EstimatedCostSchema),
+});
+
+export type CostEstimationResult = z.infer<typeof CostEstimationResultSchema>;
+
 export type IFCModel = {
   id: string;
   userId: string;
@@ -8,6 +23,7 @@ export type IFCModel = {
   fileContent: string;
   uploadDate: any;
   analysisData?: AnalysisResult | null;
+  costEstimationData?: CostEstimationResult | null; // New field for cost data
 };
 
 // Zod Schema for validation

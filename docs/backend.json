@@ -94,6 +94,27 @@
                 }
             },
             "required": ["summary", "indicators", "materialComposition"]
+        },
+        "costEstimationData": {
+          "type": "object",
+          "description": "Stores the AI-generated cost estimation result.",
+          "properties": {
+            "totalEstimatedCost": { "type": "string" },
+            "materials": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "percentage": { "type": "number" },
+                  "estimatedCost": { "type": "string" },
+                  "explanation": { "type": "string" }
+                },
+                "required": ["name", "percentage", "estimatedCost", "explanation"]
+              }
+            }
+          },
+          "required": ["totalEstimatedCost", "materials"]
         }
       },
       "required": [
