@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -95,7 +96,8 @@ export default function Dashboard() {
   useEffect(() => {
     if (activeProject?.fileContent) {
         try {
-            const byteCharacters = atob(activeProject.fileContent);
+            const pureBase64 = activeProject.fileContent.split(',')[1] || activeProject.fileContent;
+            const byteCharacters = atob(pureBase64);
             const byteNumbers = new Array(byteCharacters.length);
             for (let i = 0; i < byteCharacters.length; i++) {
                 byteNumbers[i] = byteCharacters.charCodeAt(i);
@@ -281,7 +283,7 @@ export default function Dashboard() {
             userId: user.uid,
             fileName: file.name,
             fileSize: file.size,
-            fileContent: fileContent.split(',')[1], // Save only base64 part
+            fileContent: fileContent,
             uploadDate: serverTimestamp(),
             analysisData: null,
             costEstimationData: null,

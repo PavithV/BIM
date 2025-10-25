@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, type DragEvent, type ChangeEvent } from 'react';
@@ -75,7 +76,7 @@ export function FileUploader({ onFileUploaded, isUploading, onCancel, showCancel
         });
         setIsLoadingFile(false);
       }
-      reader.readAsText(file);
+      reader.readAsDataURL(file);
     }
   };
   

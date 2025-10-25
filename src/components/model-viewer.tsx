@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -11,13 +12,16 @@ interface ModelViewerProps {
 }
 
 function base64ToUint8Array(base64: string) {
-  const binaryString = window.atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
+    const base64Marker = 'base64,';
+    const base64Index = base64.indexOf(base64Marker) + base64Marker.length;
+    const pureBase64 = base64.substring(base64Index);
+    const binaryString = window.atob(pureBase64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
 }
 
 export function ModelViewer({ modelUrl }: ModelViewerProps) {
