@@ -13,6 +13,16 @@ export const CostEstimationResultSchema = z.object({
   materials: z.array(EstimatedCostSchema),
 });
 
+export const MaterialCompositionInputSchema = z.object({
+    materials: z.array(z.object({
+      name: z.string(),
+      value: z.number().describe('Der prozentuale Anteil des Materials.'),
+    })),
+    totalBuildingArea: z.number().describe('Die Bruttogeschossfläche (BGF) des Gebäudes in Quadratmetern.')
+  });
+  
+export type MaterialCompositionInput = z.infer<typeof MaterialCompositionInputSchema>;
+
 export type CostEstimationResult = z.infer<typeof CostEstimationResultSchema>;
 
 export type IFCModel = {

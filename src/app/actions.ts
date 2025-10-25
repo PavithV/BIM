@@ -3,8 +3,8 @@
 import { aiChatFeedback, type AIChatFeedbackInput } from '@/ai/flows/ai-chat-feedback';
 import { generateStartingPrompts } from '@/ai/flows/generate-starting-prompts';
 import { generateAnalysisFromIfc } from '@/ai/flows/generate-analysis-from-ifc';
-import { estimateCostsFromMaterials, type MaterialCompositionInput } from '@/ai/flows/estimate-costs-from-materials';
-import type { AnalysisResult, CostEstimationResult, GenerateAnalysisFromIfcInput } from '@/lib/types';
+import { estimateCostsFromMaterials } from '@/ai/flows/estimate-costs-from-materials';
+import type { AnalysisResult, CostEstimationResult, GenerateAnalysisFromIfcInput, MaterialCompositionInput } from '@/lib/types';
 import { ZodError } from 'zod';
 
 function getDetailedErrorMessage(error: any): string {

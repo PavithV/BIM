@@ -9,17 +9,8 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { CostEstimationResultSchema } from '@/lib/types';
+import { CostEstimationResultSchema, MaterialCompositionInputSchema, type MaterialCompositionInput } from '@/lib/types';
 
-export const MaterialCompositionInputSchema = z.object({
-  materials: z.array(z.object({
-    name: z.string(),
-    value: z.number().describe('Der prozentuale Anteil des Materials.'),
-  })),
-  totalBuildingArea: z.number().describe('Die Bruttogeschossfläche (BGF) des Gebäudes in Quadratmetern.')
-});
-
-export type MaterialCompositionInput = z.infer<typeof MaterialCompositionInputSchema>;
 
 export async function estimateCostsFromMaterials(input: MaterialCompositionInput): Promise<z.infer<typeof CostEstimationResultSchema>> {
   const { output } = await costEstimationPrompt(input);
