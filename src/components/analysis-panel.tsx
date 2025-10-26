@@ -52,6 +52,7 @@ const CostEstimationDialog = ({ onRunCostEstimation, isProcessing }: { onRunCost
     if (!isNaN(totalArea) && totalArea > 0) {
       onRunCostEstimation(totalArea);
       setIsOpen(false);
+      setArea('');
     }
   };
 
@@ -102,7 +103,7 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
         <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-        <p className="font-semibold">Modell wird verarbeitet...</p>
+        <p className="font-semibold">Analyse wird durchgeführt...</p>
         <p className="text-muted-foreground text-sm">Dies kann einen Moment dauern.</p>
       </div>
     );
@@ -115,8 +116,8 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
         <h3 className="font-semibold text-lg">Analyse bereit</h3>
         <p className="text-muted-foreground text-sm mb-4">Starten Sie die KI-Analyse für dieses Modell.</p>
         <Button onClick={onRunAnalysis} disabled={isProcessing}>
-          {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-          Analyse & Schätzung starten
+          {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Leaf className="mr-2 h-4 w-4" />}
+          Nachhaltigkeitsanalyse starten
         </Button>
       </div>
     );
@@ -223,6 +224,10 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
                           <p className="text-xs text-muted-foreground">{mat.explanation}</p>
                       </div>
                    ))}
+                </div>
+                <Separator />
+                <div className="pt-2">
+                   <CostEstimationDialog onRunCostEstimation={onRunCostEstimation} isProcessing={isProcessing} />
                 </div>
               </div>
             ) : (

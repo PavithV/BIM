@@ -8,7 +8,7 @@ import { FileUploader } from '@/components/file-uploader';
 import { ModelViewer } from '@/components/model-viewer';
 import { AnalysisPanel } from '@/components/analysis-panel';
 import { ChatAssistant } from '@/components/chat-assistant';
-import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2, Euro } from 'lucide-react';
+import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2, Euro, Leaf } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { getStartingPrompts, getAIChatFeedback, getIfcAnalysis, getCostEstimation } from '@/app/actions';
@@ -164,38 +164,23 @@ const runCostEstimation = useCallback(async (totalArea: number) => {
 }, [user, firestore, toast, fetchProjects, activeProject]);
 
 
-  const runAnalysisAndCosts = useCallback(async (project: IFCModel) => {
+  const runAnalysis = useCallback(async (project: IFCModel) => {
     if (!project || !user || !firestore) return;
 
     setIsProcessing(true);
     try {
-      // Step 1: Run Sustainability Analysis
       const analysisResult = await getIfcAnalysis({ ifcFileContent: project.fileContent });
       
       if (analysisResult.analysis) {
         const projectRef = doc(firestore, 'users', user.uid, 'ifcModels', project.id);
-        await updateDoc(projectRef, { analysisData: analysisResult.analysis });
+        await updateDoc(projectRef, { analysisData: analysisResult.analysis, costEstimationData: null });
         
+        await fetchProjects();
+
         toast({
           title: "Analyse abgeschlossen",
-          description: "Nachhaltigkeitsanalyse erfolgreich. Starte Kostenschätzung...",
+          description: "Nachhaltigkeitsanalyse erfolgreich. Sie können nun eine Kostenschätzung durchführen.",
         });
-
-        // Step 2: Run Cost Estimation with placeholder area, user can re-run later
-        const costInput = {
-            materials: analysisResult.analysis.materialComposition.map(({ name, value }) => ({ name, value })),
-            totalBuildingArea: 5000, 
-        };
-        const costResult = await getCostEstimation(costInput);
-
-        if (costResult.costs) {
-            await updateDoc(projectRef, { costEstimationData: costResult.costs });
-            toast({ title: "Kostenschätzung abgeschlossen", description: "Alle Analysen sind fertig. Sie können die Schätzung mit einer exakten BGF erneut durchführen." });
-        } else {
-            toast({ title: "Kostenschätzung fehlgeschlagen", description: costResult.error || "Konnte Kosten nicht schätzen.", variant: "destructive", duration: 9000 });
-        }
-
-        await fetchProjects();
 
       } else {
         toast({
@@ -206,9 +191,9 @@ const runCostEstimation = useCallback(async (totalArea: number) => {
         });
       }
     } catch (error) {
-      console.error("Error running analysis pipeline:", error);
+      console.error("Error running analysis:", error);
       toast({
-        title: "Analyse-Pipeline Fehlgeschlagen",
+        title: "Analyse Fehlgeschlagen",
         description: "Ein unerwarteter Fehler ist aufgetreten.",
         variant: "destructive",
       });
@@ -400,7 +385,7 @@ const runCostEstimation = useCallback(async (totalArea: number) => {
                       <AnalysisPanel 
                         project={activeProject} 
                         isProcessing={isProcessing}
-                        onRunAnalysis={() => runAnalysisAndCosts(activeProject)}
+                        onRunAnalysis={() => runAnalysis(activeProject)}
                         onRunCostEstimation={runCostEstimation}
                         onExport={handleExportMaterialPass} 
                       />
