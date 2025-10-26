@@ -131,7 +131,8 @@ export default function Dashboard() {
     fetchPrompts();
   }, []);
   
-  const runCostEstimation = useCallback(async (project: IFCModel) => {
+const runCostEstimation = useCallback(async (totalArea: number) => {
+    const project = activeProject;
     if (!project?.analysisData?.materialComposition || !user || !firestore) {
         toast({ title: "Fehler", description: "Materialdaten für Kostenschätzung nicht verfügbar.", variant: "destructive" });
         return;
@@ -140,9 +141,7 @@ export default function Dashboard() {
     try {
         const input = {
             materials: project.analysisData.materialComposition.map(({ name, value }) => ({ name, value })),
-            // Assuming a default building area if not available, which is a big assumption.
-            // In a real app, this should be extracted from IFC or asked from the user.
-            totalBuildingArea: 5000, 
+            totalBuildingArea: totalArea, 
         };
 
         const result = await getCostEstimation(input);
@@ -162,7 +161,7 @@ export default function Dashboard() {
     } finally {
         setIsProcessing(false);
     }
-}, [user, firestore, toast, fetchProjects]);
+}, [user, firestore, toast, fetchProjects, activeProject]);
 
 
   const runAnalysisAndCosts = useCallback(async (project: IFCModel) => {
@@ -182,16 +181,16 @@ export default function Dashboard() {
           description: "Nachhaltigkeitsanalyse erfolgreich. Starte Kostenschätzung...",
         });
 
-        // Step 2: Run Cost Estimation
+        // Step 2: Run Cost Estimation with placeholder area, user can re-run later
         const costInput = {
             materials: analysisResult.analysis.materialComposition.map(({ name, value }) => ({ name, value })),
-            totalBuildingArea: 5000, // Placeholder BGF
+            totalBuildingArea: 5000, 
         };
         const costResult = await getCostEstimation(costInput);
 
         if (costResult.costs) {
             await updateDoc(projectRef, { costEstimationData: costResult.costs });
-            toast({ title: "Kostenschätzung abgeschlossen", description: "Alle Analysen sind fertig." });
+            toast({ title: "Kostenschätzung abgeschlossen", description: "Alle Analysen sind fertig. Sie können die Schätzung mit einer exakten BGF erneut durchführen." });
         } else {
             toast({ title: "Kostenschätzung fehlgeschlagen", description: costResult.error || "Konnte Kosten nicht schätzen.", variant: "destructive", duration: 9000 });
         }
@@ -402,7 +401,7 @@ export default function Dashboard() {
                         project={activeProject} 
                         isProcessing={isProcessing}
                         onRunAnalysis={() => runAnalysisAndCosts(activeProject)}
-                        onRunCostEstimation={() => runCostEstimation(activeProject)}
+                        onRunCostEstimation={runCostEstimation}
                         onExport={handleExportMaterialPass} 
                       />
                     </TabsContent>

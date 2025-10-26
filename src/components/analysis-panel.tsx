@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileText, TrendingDown, TrendingUp, ArrowRight, BarChart3, Loader2, Euro, Leaf } from 'lucide-react';
@@ -9,12 +10,23 @@ import { ChartConfig, ChartContainer } from '@/components/ui/chart';
 import type { IFCModel } from '@/lib/types';
 import { Separator } from './ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface AnalysisPanelProps {
   project: IFCModel | null;
   isProcessing: boolean;
   onRunAnalysis: () => void;
-  onRunCostEstimation: () => void;
+  onRunCostEstimation: (totalArea: number) => void;
   onExport: () => void;
 }
 
@@ -31,9 +43,62 @@ const RatingIcon = ({ rating }: { rating: string }) => {
   }
 };
 
+const CostEstimationDialog = ({ onRunCostEstimation, isProcessing }: { onRunCostEstimation: (totalArea: number) => void, isProcessing: boolean }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [area, setArea] = useState<string>('');
+
+  const handleRun = () => {
+    const totalArea = parseFloat(area);
+    if (!isNaN(totalArea) && totalArea > 0) {
+      onRunCostEstimation(totalArea);
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button onClick={() => setIsOpen(true)} disabled={isProcessing} size="sm">
+          {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Euro className="mr-2 h-4 w-4" />}
+          Kostenschätzung starten
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Kostenschätzung starten</DialogTitle>
+          <DialogDescription>
+            Geben Sie die Bruttogeschossfläche (BGF) Ihres Projekts ein, um eine Kostenschätzung zu erhalten.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="area" className="text-right">
+              BGF (m²)
+            </Label>
+            <Input
+              id="area"
+              type="number"
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+              className="col-span-3"
+              placeholder="z.B. 5000"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button type="submit" onClick={handleRun} disabled={isProcessing || !area}>
+            Schätzung durchführen
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+
 export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostEstimation, onExport }: AnalysisPanelProps) {
   
-  if (isProcessing) {
+  if (isProcessing && !project?.analysisData) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
         <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
@@ -135,7 +200,12 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
             }
           </CardHeader>
           <CardContent>
-            {costEstimationData ? (
+            {isProcessing && !costEstimationData ? (
+                <div className="flex flex-col items-center justify-center text-center p-8 space-y-2">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    <p className="text-sm font-semibold">Erstelle Kostenschätzung...</p>
+                </div>
+            ) : costEstimationData ? (
               <div className="space-y-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Geschätzte Gesamtkosten</p>
@@ -158,10 +228,7 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
             ) : (
                <div className="text-center text-sm text-muted-foreground space-y-3 flex flex-col items-center justify-center h-full pt-8 pb-8">
                    <p>Führen Sie eine Kostenschätzung durch, um die Ergebnisse hier anzuzeigen.</p>
-                   <Button onClick={onRunCostEstimation} disabled={isProcessing} size="sm">
-                      {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Euro className="mr-2 h-4 w-4" />}
-                      Kostenschätzung starten
-                   </Button>
+                   <CostEstimationDialog onRunCostEstimation={onRunCostEstimation} isProcessing={isProcessing} />
                </div>
             )}
           </CardContent>
