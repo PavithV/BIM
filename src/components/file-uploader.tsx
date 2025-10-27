@@ -64,8 +64,15 @@ export function FileUploader({ onFileUploaded, isUploading, onCancel, showCancel
       const reader = new FileReader();
       reader.onload = (e) => {
         const fileContent = e.target?.result as string;
-        onFileUploaded(file, fileContent);
-        // isUploading state is now managed by parent
+        if (fileContent) {
+          onFileUploaded(file, fileContent);
+        } else {
+           toast({
+              title: 'Fehler beim Lesen der Datei',
+              description: 'Der Dateiinhalt konnte nicht gelesen werden.',
+              variant: 'destructive',
+            });
+        }
         setIsLoadingFile(false);
       };
       reader.onerror = () => {
@@ -113,9 +120,9 @@ export function FileUploader({ onFileUploaded, isUploading, onCancel, showCancel
                 {totalIsLoading ? (
                     <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Analysiere...
+                        Verarbeite...
                     </>
-                ) : 'Projekt analysieren'}
+                ) : 'Projekt erstellen & analysieren'}
             </Button>
           </div>
         )}
