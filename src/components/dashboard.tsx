@@ -267,7 +267,7 @@ const runCostEstimation = useCallback(async (totalArea: number) => {
             userId: user.uid,
             fileName: file.name,
             fileSize: file.size,
-            fileContent: fileContent,
+            fileContent: fileContent, // Ensure fileContent is saved
             uploadDate: serverTimestamp(),
             analysisData: null,
             costEstimationData: null,
