@@ -41,11 +41,7 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
           container,
           backgroundColor: new Color(0xf3f4f6),
         });
-        await viewer.IFC.setWasmPath('/wasm/');
-        await viewer.IFC.ifcManager.applyWebIfcConfig({
-            COORDINATE_TO_ORIGIN: true,
-            USE_FAST_BOOLS: false
-        });
+        await viewer.IFC.setWasmPath('/wasm/', true);
         viewerRef.current = viewer;
       } catch (err) {
         console.error("Fehler bei der Initialisierung des Viewers:", err);
