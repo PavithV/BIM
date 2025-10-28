@@ -5,10 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 import { IfcViewerAPI } from 'web-ifc-viewer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, AlertTriangle } from 'lucide-react';
-import { Color, Group, Box3, Vector3, Mesh, MeshLambertMaterial } from 'three';
+import { Color } from 'three';
 
 interface ModelViewerProps {
-  modelUrl: string | null;
+  ifcContent: string | null;
 }
 
 function base64ToUint8Array(base64: string) {
@@ -24,7 +24,7 @@ function base64ToUint8Array(base64: string) {
     return bytes;
 }
 
-export function ModelViewer({ modelUrl }: ModelViewerProps) {
+export function ModelViewer({ ifcContent }: ModelViewerProps) {
   const viewerContainerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<IfcViewerAPI | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,8 +60,8 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
   useEffect(() => {
     const loadModel = async () => {
       const viewer = viewerRef.current;
-      if (!viewer || !modelUrl) {
-          setIsLoading(!modelUrl);
+      if (!viewer || !ifcContent) {
+          setIsLoading(!ifcContent);
           return;
       }
       
@@ -69,9 +69,8 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
       setIsLoading(true);
 
       try {
-        const response = await fetch(modelUrl);
-        const ifcBytes = await response.arrayBuffer();
-        const model = await viewer.IFC.loadIfc(new Uint8Array(ifcBytes));
+        const ifcBytes = base64ToUint8Array(ifcContent);
+        const model = await viewer.IFC.loadIfc(ifcBytes);
 
         if (model.mesh.geometry.attributes.position.count === 0) {
             setError("Das Modell wurde geladen, enthält aber keine sichtbaren geometrischen Elemente.");
@@ -89,7 +88,7 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
     };
 
     loadModel();
-  }, [modelUrl]);
+  }, [ifcContent]);
 
   return (
     <Card className="h-full flex flex-col min-h-[400px] md:min-h-0">

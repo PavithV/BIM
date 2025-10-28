@@ -36,7 +36,6 @@ export default function Dashboard() {
   const [isProcessing, setIsProcessing] = useState(false); // Combined state for analysis and cost estimation
   const [projects, setProjects] = useState<IFCModel[]>([]);
   const [isProjectsLoading, setIsProjectsLoading] = useState(true);
-  const [modelUrl, setModelUrl] = useState<string | null>(null);
 
   const auth = useAuth();
   const firestore = useFirestore();
@@ -93,33 +92,6 @@ export default function Dashboard() {
     fetchProjects();
   }, [user, fetchProjects]);
 
-  useEffect(() => {
-    if (activeProject?.fileContent) {
-        try {
-            const pureBase64 = activeProject.fileContent.split(',')[1] || activeProject.fileContent;
-            const byteCharacters = atob(pureBase64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: 'application/octet-stream' });
-            const url = URL.createObjectURL(blob);
-            setModelUrl(url);
-
-            return () => {
-                if (url) {
-                    URL.revokeObjectURL(url);
-                }
-            };
-        } catch (e) {
-            console.error("Failed to decode base64 content or create URL:", e);
-            setModelUrl(null);
-        }
-    } else {
-        setModelUrl(null);
-    }
-  }, [activeProject]);
   
   useEffect(() => {
     async function fetchPrompts() {
@@ -260,7 +232,6 @@ const runCostEstimation = useCallback(async (totalArea: number) => {
 
     setIsProjectsLoading(true);
     setActiveProject(null);
-    setModelUrl(null);
     try {
         const newProjectRef = doc(collection(firestore, 'users', user.uid, 'ifcModels'));
         const newProjectData: Omit<IFCModel, 'id'> = {
@@ -367,7 +338,7 @@ const runCostEstimation = useCallback(async (totalArea: number) => {
           {activeProject ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
               <div className="lg:col-span-2 h-full min-h-[400px] lg:min-h-0">
-                 <ModelViewer modelUrl={modelUrl} />
+                 <ModelViewer ifcContent={activeProject.fileContent} />
               </div>
               <div className="lg:col-span-1 flex flex-col bg-card rounded-lg border min-h-0">
                  <div className="p-4 border-b">
