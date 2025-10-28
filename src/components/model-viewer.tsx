@@ -42,7 +42,7 @@ export function ModelViewer({ modelUrl }: ModelViewerProps) {
           backgroundColor: new Color(0xf3f4f6),
         });
         await viewer.IFC.setWasmPath('/wasm/');
-        await viewer.IFC.loader.getIfcManager().applyWebIfcConfig({
+        await viewer.IFC.ifcManager.applyWebIfcConfig({
             COORDINATE_TO_ORIGIN: true,
             USE_FAST_BOOLS: false
         });
