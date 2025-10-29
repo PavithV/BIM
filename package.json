@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "postinstall": "node -e \"const fs = require('fs-extra'); const path = require('path'); const srcDir = path.resolve(__dirname, 'node_modules/web-ifc'); const destDir = path.resolve(__dirname, 'public/wasm'); if (!fs.existsSync(destDir)) { fs.mkdirSync(destDir, { recursive: true }); } const filesToCopy = ['web-ifc.wasm', 'web-ifc-api.js']; filesToCopy.forEach(file => { const src = path.join(srcDir, file); const dest = path.join(destDir, file); if (fs.existsSync(src)) { fs.copySync(src, dest, { overwrite: true }); } });\""
+    "postinstall": "node -e \"const fs = require('fs-extra'); const path = require('path'); const srcDir = path.resolve(__dirname, 'node_modules/web-ifc'); const destDir = path.resolve(__dirname, 'public/wasm'); if (!fs.existsSync(destDir)) { fs.mkdirSync(destDir, { recursive: true }); } const filesToCopy = ['web-ifc.wasm', 'web-ifc-mt.wasm', 'web-ifc-api.js']; filesToCopy.forEach(file => { const src = path.join(srcDir, file); const dest = path.join(destDir, file); if (fs.existsSync(src)) { fs.copySync(src, dest, { overwrite: true }); } });\""
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.20.0",
