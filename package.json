@@ -9,8 +9,7 @@
     "build": "NODE_ENV=production next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "postinstall": "node -e \"const fs = require('fs-extra'); const path = require('path'); const srcDir = path.resolve(__dirname, 'node_modules/web-ifc'); const destDir = path.resolve(__dirname, 'public/wasm'); if (!fs.existsSync(destDir)) { fs.mkdirSync(destDir, { recursive: true }); } const filesToCopy = ['web-ifc.wasm', 'web-ifc-mt.wasm', 'web-ifc-api.js']; filesToCopy.forEach(file => { const src = path.join(srcDir, file); const dest = path.join(destDir, file); if (fs.existsSync(src)) { fs.copySync(src, dest, { overwrite: true }); } });\""
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.20.0",
@@ -55,7 +54,7 @@
     "recharts": "^2.15.1",
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
-    "web-ifc": "0.0.50",
+    "web-ifc": "^0.0.50",
     "web-ifc-viewer": "1.0.218",
     "zod": "^3.24.2"
   },
