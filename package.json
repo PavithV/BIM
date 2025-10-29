@@ -1,7 +1,7 @@
 {
   "name": "nextn",
   "version": "0.1.0",
-  "private": true,
+  "private": "true",
   "scripts": {
     "dev": "next dev --turbopack -p 9002",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
@@ -55,7 +55,6 @@
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "web-ifc": "^0.0.50",
-    "web-ifc-viewer": "1.0.218",
     "zod": "^3.24.2"
   },
   "devDependencies": {
