@@ -54,7 +54,6 @@
     "recharts": "^2.15.1",
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
-    "web-ifc": "^0.0.50",
     "zod": "^3.24.2"
   },
   "devDependencies": {
