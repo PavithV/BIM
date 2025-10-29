@@ -38,13 +38,6 @@ const nextConfig: NextConfig = {
     };
     return config;
   },
-  // Static export für bessere WASM-Unterstützung
-  output: 'export',
-  trailingSlash: true,
-  // Deaktiviere Image Optimization für Static Export
-  images: {
-    unoptimized: true
-  }
 };
 
 export default nextConfig;
