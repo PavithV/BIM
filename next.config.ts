@@ -8,6 +8,14 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  async rewrites() {
+    return [
+      {
+        source: '/_next/static/chunks/wasm/:path*',
+        destination: '/wasm/:path*',
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

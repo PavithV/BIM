@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import { Toaster } from "@/components/ui/toaster"
 import { FirebaseClientProvider } from '@/firebase';
 import './globals.css';
+import Script from 'next/script';
 
 export const metadata: Metadata = {
   title: 'BIMCoach Studio',
@@ -21,6 +22,16 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Code+Pro&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
+        <Script id="ifcjs-wasm-path" strategy="beforeInteractive">
+          {`
+            (function(){
+              var p = '/wasm/';
+              try { window.WEBIFC_PATH = p; } catch(e){}
+              try { window.webIfcWasmPath = p; } catch(e){}
+              try { window.ifcjsWasmPath = p; } catch(e){}
+            })();
+          `}
+        </Script>
         <FirebaseClientProvider>
           {children}
           <Toaster />

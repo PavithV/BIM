@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, addDoc, serverTimestamp, query, orderBy, doc, setDoc, getDoc, updateDoc, getDocs } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUploader } from '@/components/file-uploader';
-import { ModelViewer } from '@/components/model-viewer';
+import { IfcViewer } from '@/components/ifc-viewer';
 import { AnalysisPanel } from '@/components/analysis-panel';
 import { ChatAssistant } from '@/components/chat-assistant';
 import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2, Euro, Leaf } from 'lucide-react';
@@ -338,7 +338,7 @@ const runCostEstimation = useCallback(async (totalArea: number) => {
           {activeProject ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
               <div className="lg:col-span-2 h-full min-h-[400px] lg:min-h-0">
-                 <ModelViewer ifcContent={activeProject.fileContent} />
+                 <IfcViewer ifcContent={activeProject.fileContent} />
               </div>
               <div className="lg:col-span-1 flex flex-col bg-card rounded-lg border min-h-0">
                  <div className="p-4 border-b">
