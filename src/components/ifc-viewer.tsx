@@ -23,6 +23,7 @@ export function IfcViewer({ ifcContent }: IfcViewerProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const initializedRef = useRef(false);
+  const loadedModelIdsRef = useRef<number[]>([]);
 
   useEffect(() => {
     let disposed = false;
@@ -36,8 +37,17 @@ export function IfcViewer({ ifcContent }: IfcViewerProps) {
         try { (window as any).webIfcWasmPath = wasmPath; } catch {}
         try { (window as any).ifcjsWasmPath = wasmPath; } catch {}
 
-        const mod = await import('web-ifc-viewer');
-        const { IfcViewerAPI } = mod as any;
+        let IfcViewerAPI: any;
+        try {
+          const mod = await import('web-ifc-viewer');
+          IfcViewerAPI = (mod as any).IfcViewerAPI || (mod as any).default?.IfcViewerAPI;
+        } catch (err) {
+          // Fallback für Umgebungen, in denen das npm-Paket nicht verfügbar ist (z. B. Firebase Studio Workspace)
+          const cdnUrl = 'https://esm.sh/web-ifc-viewer@1.0.218';
+          const modCdn: any = await import(/* webpackIgnore: true */ cdnUrl);
+          IfcViewerAPI = modCdn?.IfcViewerAPI || modCdn?.default?.IfcViewerAPI;
+          if (!IfcViewerAPI) throw new Error('web-ifc-viewer konnte weder lokal noch vom CDN geladen werden.');
+        }
         // Vorheriges Viewer-Objekt konsequent entsorgen
         try { viewerRef.current?.dispose?.(); } catch {}
         viewerRef.current = null;
@@ -57,7 +67,7 @@ export function IfcViewer({ ifcContent }: IfcViewerProps) {
         } catch {}
         const viewer = new IfcViewerAPI({
           container: containerRef.current,
-          backgroundColor: new (await import('three')).Color(0xf3f4f6),
+          backgroundColor: new (await import('three') as any).Color(0xf3f4f6),
         });
         // Stelle sicher, dass Pfad auch im Manager gesetzt ist
         try { viewer.IFC.setWasmPath(wasmPath); } catch {}
@@ -105,13 +115,20 @@ export function IfcViewer({ ifcContent }: IfcViewerProps) {
 
   useEffect(() => {
     (async () => {
-      const viewer = viewerRef.current;
-      if (!viewer) return;
+      let viewer = viewerRef.current;
+      if (!viewer && !containerRef.current) return;
       if (!ifcContent) {
         // Nichts geladen: Szene räumen
         try {
-          viewer.context.items.pickableIfcModels = [];
-          viewer.context.getScene().removeFromScene();
+          // Entferne bekannte Modelle und leere Pickables
+          try { await viewer.IFC.unloadAll(); } catch {}
+          try {
+            for (const id of loadedModelIdsRef.current) {
+              try { await viewer.IFC.removeModel(id); } catch {}
+            }
+          } catch {}
+          loadedModelIdsRef.current = [];
+          try { viewer.context.items.pickableIfcModels = []; } catch {}
         } catch {}
         setIsLoading(false);
         setError(null);
@@ -121,10 +138,49 @@ export function IfcViewer({ ifcContent }: IfcViewerProps) {
       setIsLoading(true);
       setError(null);
       try {
+        // Viewer komplett neu erstellen, um Artefakte/alte Modelle sicher zu entfernen
+        try {
+          if (viewerRef.current) {
+            try { viewerRef.current.dispose(); } catch {}
+            viewerRef.current = null;
+          }
+          loadedModelIdsRef.current = [];
+          if (containerRef.current) {
+            try { while (containerRef.current.firstChild) containerRef.current.removeChild(containerRef.current.firstChild); } catch {}
+          }
+          initializedRef.current = false;
+          const wasmPath = `/wasm/`;
+          try { (window as any).WEBIFC_PATH = wasmPath; } catch {}
+          try { (window as any).webIfcWasmPath = wasmPath; } catch {}
+          try { (window as any).ifcjsWasmPath = wasmPath; } catch {}
+          let IfcViewerAPI: any;
+          try {
+            const mod = await import('web-ifc-viewer');
+            IfcViewerAPI = (mod as any).IfcViewerAPI || (mod as any).default?.IfcViewerAPI;
+          } catch (err) {
+            const cdnUrl = 'https://esm.sh/web-ifc-viewer@1.0.218';
+            const modCdn: any = await import(/* webpackIgnore: true */ cdnUrl);
+            IfcViewerAPI = modCdn?.IfcViewerAPI || modCdn?.default?.IfcViewerAPI;
+            if (!IfcViewerAPI) throw new Error('web-ifc-viewer konnte weder lokal noch vom CDN geladen werden.');
+          }
+          const newViewer = new IfcViewerAPI({
+            container: containerRef.current!,
+            backgroundColor: new (await import('three') as any).Color(0xf3f4f6),
+          });
+          try { newViewer.IFC.setWasmPath(wasmPath); } catch {}
+          try { newViewer?.IFC?.loader?.ifcManager?.setWasmPath(wasmPath); } catch {}
+          try { newViewer.grid.setGrid(); } catch {}
+          try { newViewer.axes.setAxes(); } catch {}
+          try { newViewer.context.resize(); } catch {}
+          viewerRef.current = newViewer;
+          viewer = newViewer;
+        } catch {}
         // IFC-Datei aus Data-URL oder Plain-Text erzeugen
         const file = await stringToIfcFile(ifcContent, `model_${Date.now()}.ifc`);
-        // Vorherige Modelle (best effort) entfernen
+        // Sicherheitshalber erneut leeren
         try { await viewer.IFC.unloadAll(); } catch {}
+        loadedModelIdsRef.current = [];
+        try { viewer.context.items.pickableIfcModels = []; } catch {}
         // Primär: Datei direkt laden
         let model: any;
         try {
@@ -138,10 +194,40 @@ export function IfcViewer({ ifcContent }: IfcViewerProps) {
             URL.revokeObjectURL(objectUrl);
           }
         }
+        // Tracke geladene modelID
+        try { if (model && typeof model.modelID === 'number') loadedModelIdsRef.current.push(model.modelID); } catch {}
+        // Modellgröße beibehalten; nur Kamera sauber auf das Modell ausrichten
+        try {
+          const THREE: any = await import('three');
+          const mesh = (model as any)?.mesh || (model as any)?.model || model;
+          if (mesh) {
+            const box = new THREE.Box3().setFromObject(mesh);
+            const sphere = box.getBoundingSphere(new THREE.Sphere());
+            const center = sphere.center;
+            const radius = Math.max(sphere.radius, 1);
+            const distance = radius * 4.5;
+
+            const cam: any = (viewer.context as any).ifcCamera?.camera || (viewer.context as any).getCamera?.();
+            if (cam?.position) {
+              cam.position.set(center.x + distance, center.y + distance, center.z + distance);
+              cam.near = Math.max(distance / 1000, 0.1);
+              cam.far = Math.max(distance * 1000, 2000);
+              cam.updateProjectionMatrix?.();
+            }
+            const controls: any = (viewer.context as any).ifcCamera?.controls || (viewer.context as any).getControls?.();
+            if (controls?.target) {
+              controls.target.copy(center);
+              controls.update?.();
+            }
+          }
+        } catch {}
         if (model && model.modelID != null) {
           try { await viewer.shadowDropper.renderShadow(model.modelID); } catch {}
         }
         try { await viewer.context.renderer.postProduction.update(); } catch {}
+        // Erst fitten, dann nachjustieren
+        try { viewer.context.fitToFrame(); } catch {}
+        try { (viewer.context as any).renderer?.update?.(); } catch {}
         try { viewer.context.fitToFrame(); } catch {}
         try { viewer.context.resize(); } catch {}
         setIsLoading(false);
