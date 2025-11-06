@@ -3,7 +3,8 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore'
+import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
@@ -33,10 +34,21 @@ export function initializeFirebase() {
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
+  // Storage kann null sein, wenn storageBucket nicht konfiguriert ist
+  // Versuche Storage zu initialisieren, aber handle Fehler gracefully
+  let storage;
+  try {
+    storage = getStorage(firebaseApp);
+  } catch (error) {
+    console.warn('Firebase Storage konnte nicht initialisiert werden:', error);
+    storage = null;
+  }
+  
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
-    firestore: getFirestore(firebaseApp)
+    firestore: getFirestore(firebaseApp),
+    storage: storage
   };
 }
 

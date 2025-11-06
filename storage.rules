@@ -1,0 +1,51 @@
+/**
+ * @fileoverview Firebase Storage Security Rules for BIMCoach Studio.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model, ensuring that users can only access and modify files that belong to them.
+ * This matches the security philosophy used in Firestore rules.
+ *
+ * Data Structure:
+ * All files are stored under /users/{userId}/, with subdirectories for ifcModels. This hierarchy enforces clear ownership.
+ *
+ * Key Security Decisions:
+ * - Users can only access files in their own directory.
+ * - All write operations require a verified, authenticated user.
+ * - File paths must match the authenticated user's ID.
+ *
+ * @principle Enforces file ownership and prevents unauthorized file access.
+ */
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    /**
+     * @description Checks if the request is made by a signed-in user.
+     * @returns {boolean} True if the user is signed in, false otherwise.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the request is made by the owner of the resource.
+     * @param {string} userId - The user ID to compare against the request's auth UID.
+     * @returns {boolean} True if the user is the owner, false otherwise.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Rules for user files.
+     * @path /users/{userId}/**
+     * @allow (read, write) - A user can read and write files in their own directory.
+     * @deny (read, write) - A user cannot access files in another user's directory.
+     * @principle Enforces file ownership and prevents unauthorized file access.
+     */
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if isOwner(userId);
+    }
+  }
+}
+

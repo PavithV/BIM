@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 interface FileUploaderProps {
-  onFileUploaded: (file: File, data: string) => void;
+  onFileUploaded: (file: File, data: string | null) => void; // data kann null sein für große Dateien
   isUploading: boolean;
   onCancel?: () => void;
   showCancelButton?: boolean;
@@ -60,30 +60,46 @@ export function FileUploader({ onFileUploaded, isUploading, onCancel, showCancel
 
   const handleSubmit = () => {
     if (file) {
-      setIsLoadingFile(true);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const fileContent = e.target?.result as string;
-        if (fileContent) {
-          onFileUploaded(file, fileContent);
-        } else {
-           toast({
-              title: 'Fehler beim Lesen der Datei',
-              description: 'Der Dateiinhalt konnte nicht gelesen werden.',
-              variant: 'destructive',
-            });
+      // Firestore hat ein Limit von ~1MB pro Feld
+      // Base64 erhöht die Dateigröße um ~33%, daher sollte die Datei max. ~750KB sein
+      // Um sicher zu gehen, verwenden wir 700KB als Schwellenwert
+      const FILE_SIZE_THRESHOLD = 700 * 1024; // 700KB
+      
+      if (file.size > FILE_SIZE_THRESHOLD) {
+        // Große Datei: Überspringe FileReader, verwende File direkt
+        // Der Upload wird in handleFileUploaded direkt mit dem File-Objekt gemacht
+        setIsLoadingFile(true);
+        // Für große Dateien übergeben wir null als fileContent
+        // Das File-Objekt wird direkt für den Storage-Upload verwendet
+        onFileUploaded(file, null);
+        setIsLoadingFile(false);
+      } else {
+        // Kleine Datei: Lese Datei als Base64
+        setIsLoadingFile(true);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const fileContent = e.target?.result as string;
+          if (fileContent) {
+            onFileUploaded(file, fileContent);
+          } else {
+             toast({
+                title: 'Fehler beim Lesen der Datei',
+                description: 'Der Dateiinhalt konnte nicht gelesen werden.',
+                variant: 'destructive',
+              });
+          }
+          setIsLoadingFile(false);
+        };
+        reader.onerror = () => {
+          toast({
+            title: 'Fehler beim Lesen der Datei',
+            description: 'Beim Verarbeiten Ihrer Datei ist ein Fehler aufgetreten.',
+            variant: 'destructive',
+          });
+          setIsLoadingFile(false);
         }
-        setIsLoadingFile(false);
-      };
-      reader.onerror = () => {
-        toast({
-          title: 'Fehler beim Lesen der Datei',
-          description: 'Beim Verarbeiten Ihrer Datei ist ein Fehler aufgetreten.',
-          variant: 'destructive',
-        });
-        setIsLoadingFile(false);
+        reader.readAsDataURL(file);
       }
-      reader.readAsDataURL(file);
     }
   };
   

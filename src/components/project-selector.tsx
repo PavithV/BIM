@@ -26,7 +26,7 @@ interface ProjectSelectorProps {
   projects: IFCModel[];
   isLoading: boolean;
   onSelectProject: (project: IFCModel | null) => void;
-  onUploadNew: (file: File, fileContent: string) => Promise<void>;
+  onUploadNew: (file: File, fileContent: string | null) => Promise<void>;
   onDeleteProject: () => Promise<void>;
   activeProjectId?: string | null;
 }
@@ -67,7 +67,7 @@ export function ProjectSelector({ projects, isLoading, onSelectProject, onUpload
     }
   };
   
-  const handleFileUploaded = async (file: File, fileContent: string) => {
+  const handleFileUploaded = async (file: File, fileContent: string | null) => {
     setIsUploading(true);
     await onUploadNew(file, fileContent);
     // The dashboard will handle setting the new active project
