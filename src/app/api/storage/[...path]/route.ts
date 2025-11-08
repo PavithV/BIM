@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path?: string[] } }
+  { params }: { params: Promise<{ path?: string[] }> }
 ) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -21,20 +21,24 @@ export async function GET(
       // Use signed URL directly (contains token)
       console.log('Using signed URL from query parameter');
       storageUrl = signedUrl;
-    } else if (params?.path && params.path.length > 0) {
-      // Construct URL from path
-      const storagePath = params.path.join('/');
-      const storageBucket = 'studio-1988865591-1562f.firebasestorage.app';
-      
-      console.log('Constructing URL from path:', storagePath);
-      // Format: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}?alt=media
-      const encodedPath = encodeURIComponent(storagePath);
-      storageUrl = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodedPath}?alt=media`;
     } else {
-      return NextResponse.json(
-        { error: 'Missing url parameter or path' },
-        { status: 400 }
-      );
+      // Await params for Next.js 15+
+      const resolvedParams = await params;
+      if (resolvedParams?.path && resolvedParams.path.length > 0) {
+        // Construct URL from path
+        const storagePath = resolvedParams.path.join('/');
+        const storageBucket = 'studio-1988865591-1562f.firebasestorage.app';
+        
+        console.log('Constructing URL from path:', storagePath);
+        // Format: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}?alt=media
+        const encodedPath = encodeURIComponent(storagePath);
+        storageUrl = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodedPath}?alt=media`;
+      } else {
+        return NextResponse.json(
+          { error: 'Missing url parameter or path' },
+          { status: 400 }
+        );
+      }
     }
     
     console.log('Fetching from Firebase Storage:', storageUrl);

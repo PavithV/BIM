@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { collection, query, orderBy, getDocs, doc, writeBatch, deleteDoc } from 'firebase/firestore';
-import { useUser, useFirestore } from '@/firebase';
+import { deleteObject, ref } from 'firebase/storage';
+import { useUser, useFirestore, useStorage } from '@/firebase';
 import { Button } from './ui/button';
 import { FileUploader } from './file-uploader';
 import { Building, FilePlus, Loader2, Trash2, CheckCircle } from 'lucide-react';
@@ -34,6 +35,7 @@ interface ProjectSelectorProps {
 export function ProjectSelector({ projects, isLoading, onSelectProject, onUploadNew, onDeleteProject, activeProjectId }: ProjectSelectorProps) {
   const { user } = useUser();
   const firestore = useFirestore();
+  const storage = useStorage();
   const [showUploader, setShowUploader] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -44,6 +46,46 @@ export function ProjectSelector({ projects, isLoading, onSelectProject, onUpload
       // If the deleted project is the active one, clear the view
       if (activeProjectId === projectId) {
         onSelectProject(null);
+      }
+
+      // Find the project to get the storage path
+      const project = projects.find(p => p.id === projectId);
+      
+      // Delete the file from Firebase Storage if it exists
+      if (project?.fileStoragePath && storage) {
+        try {
+          const storagePath = project.fileStoragePath;
+          console.log('Deleting file from Storage:', storagePath);
+          const fileRef = ref(storage, storagePath);
+          await deleteObject(fileRef);
+          console.log('File deleted from Storage successfully');
+        } catch (storageError: any) {
+          // Log error but don't fail the entire deletion if storage deletion fails
+          // (file might already be deleted or not exist)
+          console.warn('Error deleting file from Storage (continuing with Firestore deletion):', storageError);
+          // Only throw if it's not a "file not found" error
+          if (storageError?.code !== 'storage/object-not-found') {
+            console.error('Unexpected error deleting from Storage:', storageError);
+          }
+        }
+      } else if (project?.fileUrl && storage) {
+        // Fallback: Try to extract storage path from URL if fileStoragePath is not available
+        try {
+          const urlObj = new URL(project.fileUrl);
+          const pathMatch = urlObj.pathname.match(/\/o\/(.+)$/);
+          if (pathMatch) {
+            const storagePath = decodeURIComponent(pathMatch[1]);
+            console.log('Deleting file from Storage (extracted from URL):', storagePath);
+            const fileRef = ref(storage, storagePath);
+            await deleteObject(fileRef);
+            console.log('File deleted from Storage successfully');
+          }
+        } catch (storageError: any) {
+          console.warn('Error deleting file from Storage (extracted from URL):', storageError);
+          if (storageError?.code !== 'storage/object-not-found') {
+            console.error('Unexpected error deleting from Storage:', storageError);
+          }
+        }
       }
 
       // Delete all messages in the subcollection
@@ -140,7 +182,7 @@ export function ProjectSelector({ projects, isLoading, onSelectProject, onUpload
                 <AlertDialogHeader>
                   <AlertDialogTitle>Sind Sie sicher?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Diese Aktion kann nicht rückgängig gemacht werden. Dadurch werden das Projekt '{project.fileName}' und alle zugehörigen Chat-Nachrichten endgültig gelöscht.
+                    Diese Aktion kann nicht rückgängig gemacht werden. Dadurch werden das Projekt '{project.fileName}', die IFC-Datei im Storage und alle zugehörigen Chat-Nachrichten endgültig gelöscht.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

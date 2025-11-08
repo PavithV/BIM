@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { collection, addDoc, serverTimestamp, query, orderBy, doc, setDoc, getDoc, updateDoc, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -166,25 +166,94 @@ const runCostEstimation = useCallback(async (totalArea: number) => {
 }, [user, firestore, toast, fetchProjects, activeProject]);
 
 
+  // Cache für geladene Dateien (verhindert doppelte Requests)
+  const fileContentCache = useRef<Map<string, { content: string; timestamp: number }>>(new Map());
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 Minuten
+
+  // Hilfsfunktion zum Laden der IFC-Datei
+  const loadIfcFileContent = useCallback(async (project: IFCModel): Promise<string> => {
+    // 1. Versuche fileContent (für kleine Dateien)
+    if (project.fileContent) {
+      return project.fileContent;
+    }
+
+    // Cache-Key basierend auf Projekt-ID
+    const cacheKey = project.id;
+    const cached = fileContentCache.current.get(cacheKey);
+    const now = Date.now();
+    
+    // Prüfe Cache (nur wenn weniger als 5 Minuten alt)
+    if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+      console.log('Using cached file content for project:', project.id);
+      return cached.content;
+    }
+
+    // 2. Versuche fileUrl über API-Route (mit Token) - BEVORZUGT für große Dateien
+    if (project.fileUrl) {
+      try {
+        const apiUrl = `/api/storage?url=${encodeURIComponent(project.fileUrl)}`;
+        console.log('Loading file via signed URL:', project.id);
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const content = await response.text();
+        
+        // Speichere im Cache
+        fileContentCache.current.set(cacheKey, { content, timestamp: now });
+        return content;
+      } catch (error) {
+        console.error('Fehler beim Laden über Storage-URL:', error);
+        // Fallback zu fileStoragePath nur wenn fileUrl fehlschlägt
+      }
+    }
+
+    // 3. Fallback: Versuche fileStoragePath über API-Route (kann 403 geben ohne Token)
+    if (project.fileStoragePath) {
+      try {
+        const apiUrl = `/api/storage/${project.fileStoragePath}`;
+        console.log('Loading file via storage path (fallback):', project.id);
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const content = await response.text();
+        
+        // Speichere im Cache
+        fileContentCache.current.set(cacheKey, { content, timestamp: now });
+        return content;
+      } catch (error) {
+        console.error('Fehler beim Laden über Storage-Pfad:', error);
+        throw new Error('Datei konnte nicht aus Storage geladen werden. Bitte stellen Sie sicher, dass eine signierte URL verfügbar ist.');
+      }
+    }
+
+    throw new Error('Keine Datei verfügbar (kein Content, keine URL).');
+  }, []);
+
+  // Funktion zum Kürzen großer IFC-Dateien für AI-Analyse
+  const truncateIfcForAnalysis = useCallback((content: string, maxLength: number = 500000): string => {
+    // Wenn die Datei zu groß ist, nimm nur die ersten maxLength Zeichen
+    // IFC-Dateien haben oft wichtige Informationen am Anfang
+    if (content.length > maxLength) {
+      console.warn(`IFC-Datei ist zu groß (${content.length} Zeichen), kürze auf ${maxLength} Zeichen für AI-Analyse`);
+      return content.substring(0, maxLength) + '\n... (Datei wurde für die Analyse gekürzt)';
+    }
+    return content;
+  }, []);
+
   const runAnalysis = useCallback(async (project: IFCModel) => {
     if (!project || !user || !firestore) return;
 
     setIsProcessing(true);
     try {
-      // Lade Dateiinhalt: entweder aus fileContent oder aus Storage
-      let fileContent: string;
-      if (project.fileContent) {
-        fileContent = project.fileContent;
-      } else if (project.fileUrl) {
-        // Lade Datei aus Storage
-        const response = await fetch(project.fileUrl);
-        if (!response.ok) {
-          throw new Error('Datei konnte nicht aus Storage geladen werden.');
-        }
-        fileContent = await response.text();
-      } else {
-        throw new Error('Keine Datei verfügbar.');
-      }
+      // Lade Dateiinhalt: entweder aus fileContent oder aus Storage über API
+      let fileContent = await loadIfcFileContent(project);
+      
+      // Kürze große Dateien, um Token-Limit nicht zu überschreiten
+      // Gemini hat ein Limit von ~250k Tokens für den Free Tier
+      // IFC-Dateien sind oft sehr lang, daher kürzen wir auf ~500k Zeichen
+      fileContent = truncateIfcForAnalysis(fileContent, 500000);
 
       const analysisResult = await getIfcAnalysis({ ifcFileContent: fileContent });
       
@@ -217,7 +286,7 @@ const runCostEstimation = useCallback(async (totalArea: number) => {
     } finally {
       setIsProcessing(false);
     }
-  }, [user, firestore, toast, fetchProjects]);
+  }, [user, firestore, toast, fetchProjects, loadIfcFileContent, truncateIfcForAnalysis]);
 
   const handleSignOut = async () => {
     await signOut(auth);
@@ -239,19 +308,15 @@ const runCostEstimation = useCallback(async (totalArea: number) => {
     try {
       await addDoc(messagesRef, userMessage);
       
-      // Lade Dateiinhalt: entweder aus fileContent oder aus Storage
+      // Lade Dateiinhalt: entweder aus fileContent oder aus Storage über API
       let fileContent: string;
-      if (activeProject.fileContent) {
-        fileContent = activeProject.fileContent;
-      } else if (activeProject.fileUrl) {
-        // Lade Datei aus Storage
-        const response = await fetch(activeProject.fileUrl);
-        if (!response.ok) {
-          throw new Error('Datei konnte nicht aus Storage geladen werden.');
-        }
-        fileContent = await response.text();
-      } else {
-        fileContent = '';
+      try {
+        fileContent = await loadIfcFileContent(activeProject);
+        // Kürze große Dateien für Chat (kleineres Limit, da Chat häufiger verwendet wird)
+        fileContent = truncateIfcForAnalysis(fileContent, 200000);
+      } catch (error) {
+        console.error('Fehler beim Laden der IFC-Datei:', error);
+        fileContent = ''; // Fallback: leere Datei, damit der Chat trotzdem funktioniert
       }
       
       const result = await getAIChatFeedback({
