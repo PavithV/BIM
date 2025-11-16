@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 
 const SummarizeAnalysisInputSchema = z.object({
   analysisData: z
@@ -26,29 +26,38 @@ const SummarizeAnalysisOutputSchema = z.object({
 export type SummarizeAnalysisOutput = z.infer<typeof SummarizeAnalysisOutputSchema>;
 
 export async function summarizeAnalysis(input: SummarizeAnalysisInput): Promise<SummarizeAnalysisOutput> {
-  return summarizeAnalysisFlow(input);
-}
-
-const prompt = ai.definePrompt({
-  name: 'summarizeAnalysisPrompt',
-  input: {schema: SummarizeAnalysisInputSchema},
-  output: {schema: SummarizeAnalysisOutputSchema},
-  prompt: `Sie sind ein erfahrener Nachhaltigkeitsberater, der die Analyse eines BIM-Modells überprüft. Antworten Sie immer auf Deutsch.
+  const prompt = `Sie sind ein erfahrener Nachhaltigkeitsberater, der die Analyse eines BIM-Modells überprüft. Antworten Sie immer auf Deutsch.
 
   Geben Sie eine prägnante Zusammenfassung der wichtigsten Ergebnisse aus den folgenden Nachhaltigkeitsanalysedaten. Konzentrieren Sie sich auf die kritischsten Verbesserungsbereiche. Die Analyse basiert auf EN 15978.
 
-  Analysedaten: {{{analysisData}}}
-  `,
-});
+  Analysedaten: ${input.analysisData}
 
-const summarizeAnalysisFlow = ai.defineFlow(
+  Geben Sie die Antwort im folgenden JSON-Format zurück:
   {
-    name: 'summarizeAnalysisFlow',
-    inputSchema: SummarizeAnalysisInputSchema,
-    outputSchema: SummarizeAnalysisOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+    "summary": "Ihre Zusammenfassung hier"
+  }`;
+
+  const completion = await ai.chat.completions.create({
+    model: "azure.gpt-4.1-mini",
+    messages: [
+      {
+        role: "system",
+        content: "Sie sind ein erfahrener Nachhaltigkeitsberater. Antworten Sie immer auf Deutsch und im JSON-Format."
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    response_format: { type: "json_object" },
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error("Summarize analysis failed to produce an output.");
   }
-);
+
+  const parsed = JSON.parse(content);
+  const output = SummarizeAnalysisOutputSchema.parse(parsed);
+  return output;
+}

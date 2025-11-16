@@ -251,7 +251,6 @@ const runCostEstimation = useCallback(async (totalArea: number) => {
       let fileContent = await loadIfcFileContent(project);
       
       // Kürze große Dateien, um Token-Limit nicht zu überschreiten
-      // Gemini hat ein Limit von ~250k Tokens für den Free Tier
       // IFC-Dateien sind oft sehr lang, daher kürzen wir auf ~500k Zeichen
       fileContent = truncateIfcForAnalysis(fileContent, 500000);
 

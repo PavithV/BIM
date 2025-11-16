@@ -12,18 +12,7 @@ import { GenerateAnalysisFromIfcInputSchema, AnalysisResult, AnalysisResultSchem
 
 
 export async function generateAnalysisFromIfc(input: { ifcFileContent: string }): Promise<AnalysisResult> {
-  const { output } = await analysisPrompt(input);
-  if (!output) {
-    throw new Error("Analysis failed to produce an output.");
-  }
-  return output;
-}
-
-const analysisPrompt = ai.definePrompt({
-  name: 'generateAnalysisFromIfcPrompt',
-  input: { schema: GenerateAnalysisFromIfcInputSchema },
-  output: { schema: AnalysisResultSchema },
-  prompt: `Sie sind ein Experte für nachhaltiges Bauen und analysieren IFC-Modelldaten. Antworten Sie immer auf Deutsch.
+  const prompt = `Sie sind ein Experte für nachhaltiges Bauen und analysieren IFC-Modelldaten. Antworten Sie immer auf Deutsch.
   Analysieren Sie den folgenden Inhalt der IFC-Datei und geben Sie eine Nachhaltigkeitsanalyse zurück.
 
   Die Analyse sollte Folgendes umfassen:
@@ -40,6 +29,50 @@ const analysisPrompt = ai.definePrompt({
       *   'fill': Ein zugewiesener Farbwert in HSL (z. B. 'hsl(var(--chart-1))'). Verwenden Sie die Chart-Farben --chart-1 bis --chart-5.
 
   IFC-Dateiinhalt:
-  {{{ifcFileContent}}}
-  `,
-});
+  ${input.ifcFileContent}
+
+  Geben Sie die Antwort im folgenden JSON-Format zurück:
+  {
+    "summary": "...",
+    "indicators": [
+      {
+        "name": "...",
+        "value": "...",
+        "unit": "...",
+        "a": "...",
+        "rating": "low|medium|high"
+      }
+    ],
+    "materialComposition": [
+      {
+        "name": "...",
+        "value": 0.0,
+        "fill": "..."
+      }
+    ]
+  }`;
+
+  const completion = await ai.chat.completions.create({
+    model: "azure.gpt-4.1-mini",
+    messages: [
+      {
+        role: "system",
+        content: "Sie sind ein Experte für nachhaltiges Bauen. Antworten Sie immer auf Deutsch und im JSON-Format."
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    response_format: { type: "json_object" },
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error("Analysis failed to produce an output.");
+  }
+
+  const parsed = JSON.parse(content);
+  const output = AnalysisResultSchema.parse(parsed);
+  return output;
+}

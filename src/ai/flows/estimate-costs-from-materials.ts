@@ -8,28 +8,17 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 import { CostEstimationResultSchema, MaterialCompositionInputSchema, type MaterialCompositionInput } from '@/lib/types';
 
 
 export async function estimateCostsFromMaterials(input: MaterialCompositionInput): Promise<z.infer<typeof CostEstimationResultSchema>> {
-  const { output } = await costEstimationPrompt(input);
-  if (!output) {
-    throw new Error("Cost estimation failed to produce an output.");
-  }
-  return output;
-}
-
-const costEstimationPrompt = ai.definePrompt({
-  name: 'estimateCostsFromMaterialsPrompt',
-  input: { schema: MaterialCompositionInputSchema },
-  output: { schema: CostEstimationResultSchema },
-  prompt: `Sie sind ein Experte für Baukostenkalkulation in Deutschland. Antworten Sie immer auf Deutsch.
+  const prompt = `Sie sind ein Experte für Baukostenkalkulation in Deutschland. Antworten Sie immer auf Deutsch.
   Ihre Aufgabe ist es, eine grobe Kostenschätzung basierend auf der prozentualen Materialzusammensetzung und der Bruttogeschossfläche (BGF) eines Gebäudes zu erstellen. Verwenden Sie durchschnittliche, aktuelle Kostensätze für Deutschland.
 
   **Eingabedaten:**
-  - Materialien: {{{json materials}}}
-  - Bruttogeschossfläche (BGF): {{{totalBuildingArea}}} m²
+  - Materialien: ${JSON.stringify(input.materials)}
+  - Bruttogeschossfläche (BGF): ${input.totalBuildingArea} m²
 
   **Ihre Aufgabe:**
   1.  **Gesamtkosten schätzen:** Berechnen Sie eine grobe Schätzung der Gesamtbaukosten in Euro. Gehen Sie von einem realistischen, durchschnittlichen Preis pro Quadratmeter für ein Standardgebäude in Deutschland aus und passen Sie diesen basierend auf der Materialzusammensetzung an (z.B. ein hoher Stahlanteil könnte die Kosten erhöhen). Runden Sie das Ergebnis auf eine sinnvolle Summe.
@@ -50,6 +39,29 @@ const costEstimationPrompt = ai.definePrompt({
   - Verwenden Sie realistische, aber allgemeine Zahlen. Es geht um eine erste Orientierung, nicht um eine exakte Kalkulation.
   - Ignorieren Sie Materialien mit dem Namen "Andere", wenn sie in der Liste vorkommen.
 
-  Führen Sie jetzt die Kalkulation durch.
-  `,
-});
+  Führen Sie jetzt die Kalkulation durch und geben Sie das Ergebnis im JSON-Format zurück.`;
+
+  const completion = await ai.chat.completions.create({
+    model: "azure.gpt-4.1-mini",
+    messages: [
+      {
+        role: "system",
+        content: "Sie sind ein Experte für Baukostenkalkulation in Deutschland. Antworten Sie immer auf Deutsch und im JSON-Format."
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    response_format: { type: "json_object" },
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error("Cost estimation failed to produce an output.");
+  }
+
+  const parsed = JSON.parse(content);
+  const output = CostEstimationResultSchema.parse(parsed);
+  return output;
+}

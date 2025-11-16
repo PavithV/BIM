@@ -1,7 +1,6 @@
-import {genkit} from 'genkit';
-import {googleAI} from '@genkit-ai/google-genai';
+import OpenAI from "openai";
 
-export const ai = genkit({
-  plugins: [googleAI()],
-  model: 'googleai/gemini-2.5-flash',
+export const ai = new OpenAI({
+  apiKey: process.env.KIT_API_KEY,
+  baseURL: "https://ki-toolbox.scc.kit.edu/api/v1",
 });

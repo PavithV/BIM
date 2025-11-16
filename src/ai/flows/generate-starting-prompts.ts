@@ -8,7 +8,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 
 const StartingPromptsOutputSchema = z.object({
   prompts: z.array(z.string()).describe('Eine Liste von vorgeschlagenen Eingabeaufforderungen.'),
@@ -16,13 +16,7 @@ const StartingPromptsOutputSchema = z.object({
 export type StartingPromptsOutput = z.infer<typeof StartingPromptsOutputSchema>;
 
 export async function generateStartingPrompts(): Promise<StartingPromptsOutput> {
-  return generateStartingPromptsFlow();
-}
-
-const prompt = ai.definePrompt({
-  name: 'generateStartingPromptsPrompt',
-  output: {schema: StartingPromptsOutputSchema},
-  prompt: `Sie sind ein KI-Assistent, der Architekturstudenten bei der Analyse und Bewertung ihrer Gebäudeentwürfe (IFC-Modelle) unterstützt. Stellen Sie eine Liste von vorgeschlagenen Eingabeaufforderungen auf Deutsch bereit, die ein neuer Benutzer verwenden kann, um schnell mit der Plattform zu interagieren und ihre Funktionen zu erkunden. Die Eingabeaufforderungen sollten für Nachhaltigkeit, Energieeffizienz, Barrierefreiheit und technische Standards relevant sein. Geben Sie sie als JSON-Array von Zeichenfolgen zurück.
+  const prompt = `Sie sind ein KI-Assistent, der Architekturstudenten bei der Analyse und Bewertung ihrer Gebäudeentwürfe (IFC-Modelle) unterstützt. Stellen Sie eine Liste von vorgeschlagenen Eingabeaufforderungen auf Deutsch bereit, die ein neuer Benutzer verwenden kann, um schnell mit der Plattform zu interagieren und ihre Funktionen zu erkunden. Die Eingabeaufforderungen sollten für Nachhaltigkeit, Energieeffizienz, Barrierefreiheit und technische Standards relevant sein. Geben Sie sie als JSON-Array von Zeichenfolgen zurück.
 
 Beispiel-Prompts:
 [
@@ -33,17 +27,32 @@ Beispiel-Prompts:
   "Erstelle einen Materialpass für dieses Projekt."
 ]
 
-Geben Sie die Liste der vorgeschlagenen Eingabeaufforderungen in einem JSON-Array aus:
-`,
-});
+Geben Sie die Liste der vorgeschlagenen Eingabeaufforderungen in einem JSON-Format zurück:
+{
+  "prompts": ["...", "...", "..."]
+}`;
 
-const generateStartingPromptsFlow = ai.defineFlow(
-  {
-    name: 'generateStartingPromptsFlow',
-    outputSchema: StartingPromptsOutputSchema,
-  },
-  async () => {
-    const {output} = await prompt({});
-    return output!;
+  const completion = await ai.chat.completions.create({
+    model: "azure.gpt-4.1-mini",
+    messages: [
+      {
+        role: "system",
+        content: "Sie sind ein KI-Assistent für Architekturstudenten. Antworten Sie immer auf Deutsch und im JSON-Format."
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    response_format: { type: "json_object" },
+  });
+
+  const content = completion.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error("Generate starting prompts failed to produce an output.");
   }
-);
+
+  const parsed = JSON.parse(content);
+  const output = StartingPromptsOutputSchema.parse(parsed);
+  return output;
+}
