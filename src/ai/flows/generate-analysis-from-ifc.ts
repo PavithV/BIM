@@ -12,7 +12,8 @@ import { GenerateAnalysisFromIfcInputSchema, AnalysisResult, AnalysisResultSchem
 
 
 export async function generateAnalysisFromIfc(input: { ifcFileContent: string }): Promise<AnalysisResult> {
-  const prompt = `Sie sind ein Experte für nachhaltiges Bauen und analysieren IFC-Modelldaten. Antworten Sie immer auf Deutsch.
+  const prompt = `Sie sind ein Experte für nachhaltiges Bauen. Antworten Sie immer auf Deutsch und im JSON-Format.
+
   Analysieren Sie den folgenden Inhalt der IFC-Datei und geben Sie eine Nachhaltigkeitsanalyse zurück.
 
   Die Analyse sollte Folgendes umfassen:
@@ -55,24 +56,38 @@ export async function generateAnalysisFromIfc(input: { ifcFileContent: string })
   const completion = await ai.chat.completions.create({
     model: "azure.gpt-4.1-mini",
     messages: [
-      {
-        role: "system",
-        content: "Sie sind ein Experte für nachhaltiges Bauen. Antworten Sie immer auf Deutsch und im JSON-Format."
-      },
-      {
-        role: "user",
-        content: prompt
-      }
+      { role: "system", content: "Sie sind ein Experte für nachhaltiges Bauen. Antworten Sie immer auf Deutsch und im JSON-Format." },
+      { role: "user", content: prompt }
     ],
     response_format: { type: "json_object" },
   });
 
-  const content = completion.choices[0]?.message?.content;
+  const content = completion.choices[0].message.content;
   if (!content) {
     throw new Error("Analysis failed to produce an output.");
   }
 
-  const parsed = JSON.parse(content);
+  // Versuche JSON aus der Antwort zu extrahieren (kann in Markdown-Code-Blöcken sein)
+  let parsed: any;
+  try {
+    // Versuche direkt zu parsen
+    parsed = JSON.parse(content);
+  } catch (e) {
+    // Wenn das fehlschlägt, versuche JSON aus Markdown-Code-Blöcken zu extrahieren
+    const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || content.match(/(\{[\s\S]*\})/);
+    if (jsonMatch) {
+      try {
+        parsed = JSON.parse(jsonMatch[1]);
+      } catch (parseError) {
+        console.error('Failed to parse JSON from response:', content);
+        throw new Error(`Ungültiges JSON-Format in der KI-Antwort: ${parseError instanceof Error ? parseError.message : 'Unbekannter Fehler'}`);
+      }
+    } else {
+      console.error('No JSON found in response:', content);
+      throw new Error('Kein JSON in der KI-Antwort gefunden');
+    }
+  }
+
   const output = AnalysisResultSchema.parse(parsed);
   return output;
 }

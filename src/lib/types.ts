@@ -14,13 +14,13 @@ export const CostEstimationResultSchema = z.object({
 });
 
 export const MaterialCompositionInputSchema = z.object({
-    materials: z.array(z.object({
-      name: z.string(),
-      value: z.number().describe('Der prozentuale Anteil des Materials.'),
-    })),
-    totalBuildingArea: z.number().describe('Die Bruttogeschossfläche (BGF) des Gebäudes in Quadratmetern.')
-  });
-  
+  materials: z.array(z.object({
+    name: z.string(),
+    value: z.number().describe('Der prozentuale Anteil des Materials.'),
+  })),
+  totalBuildingArea: z.number().describe('Die Bruttogeschossfläche (BGF) des Gebäudes in Quadratmetern.')
+});
+
 export type MaterialCompositionInput = z.infer<typeof MaterialCompositionInputSchema>;
 
 export type CostEstimationResult = z.infer<typeof CostEstimationResultSchema>;
@@ -36,6 +36,7 @@ export type IFCModel = {
   uploadDate: any;
   analysisData?: AnalysisResult | null;
   costEstimationData?: CostEstimationResult | null; // New field for cost data
+  replacements?: Record<string, string> | null; // Persisted material replacements
 };
 
 // Zod Schema for validation

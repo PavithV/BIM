@@ -28,6 +28,7 @@ interface AnalysisPanelProps {
   onRunAnalysis: () => void;
   onRunCostEstimation: (totalArea: number) => void;
   onExport: () => void;
+  onDownloadExchangedIfc?: () => void;
 }
 
 const RatingIcon = ({ rating }: { rating: string }) => {
@@ -97,8 +98,8 @@ const CostEstimationDialog = ({ onRunCostEstimation, isProcessing }: { onRunCost
 };
 
 
-export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostEstimation, onExport }: AnalysisPanelProps) {
-  
+export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostEstimation, onExport, onDownloadExchangedIfc }: AnalysisPanelProps) {
+
   if (isProcessing && !project?.analysisData) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
@@ -133,8 +134,8 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
   return (
     <Tabs defaultValue="sustainability" className="w-full">
       <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="sustainability"><Leaf className="w-4 h-4 mr-2"/>Nachhaltigkeit</TabsTrigger>
-        <TabsTrigger value="costs"><Euro className="w-4 h-4 mr-2"/>Kosten</TabsTrigger>
+        <TabsTrigger value="sustainability"><Leaf className="w-4 h-4 mr-2" />Nachhaltigkeit</TabsTrigger>
+        <TabsTrigger value="costs"><Euro className="w-4 h-4 mr-2" />Kosten</TabsTrigger>
       </TabsList>
       <TabsContent value="sustainability" className="mt-4 space-y-4">
         <Card>
@@ -171,8 +172,8 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
                 <BarChart data={analysisData.materialComposition} layout="vertical" margin={{ left: 20, right: 20 }}>
                   <CartesianGrid horizontal={false} />
                   <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tick={{ fill: 'hsl(var(--foreground))' }} width={80} interval={0} className="text-xs"/>
-                  <Tooltip cursor={{ fill: 'hsl(var(--accent) / 0.2)' }} contentStyle={{backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}/>
+                  <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tick={{ fill: 'hsl(var(--foreground))' }} width={80} interval={0} className="text-xs" />
+                  <Tooltip cursor={{ fill: 'hsl(var(--accent) / 0.2)' }} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
                   <Bar dataKey="value" radius={4}>
                     {analysisData.materialComposition.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -185,27 +186,34 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
         </Card>
 
         <Button onClick={onExport} className="w-full">
-            <FileText className="mr-2 h-4 w-4" />
-            Materialpass exportieren
+          <FileText className="mr-2 h-4 w-4" />
+          Materialpass exportieren
         </Button>
+
+        {onDownloadExchangedIfc && (
+          <Button onClick={onDownloadExchangedIfc} variant="outline" className="w-full mt-2">
+            <TrendingUp className="mr-2 h-4 w-4 transform rotate-45" />
+            Aktualisierte IFC herunterladen
+          </Button>
+        )}
       </TabsContent>
 
       <TabsContent value="costs" className="mt-4">
         <Card>
           <CardHeader>
             <CardTitle className="font-headline text-lg">Kostenschätzung</CardTitle>
-            {costEstimationData ? 
-                <CardDescription>Grobe Schätzung basierend auf der Materialanalyse.</CardDescription> 
-                : 
-                <CardDescription>Für dieses Projekt liegt noch keine Kostenschätzung vor.</CardDescription>
+            {costEstimationData ?
+              <CardDescription>Grobe Schätzung basierend auf der Materialanalyse.</CardDescription>
+              :
+              <CardDescription>Für dieses Projekt liegt noch keine Kostenschätzung vor.</CardDescription>
             }
           </CardHeader>
           <CardContent>
             {isProcessing && !costEstimationData ? (
-                <div className="flex flex-col items-center justify-center text-center p-8 space-y-2">
-                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                    <p className="text-sm font-semibold">Erstelle Kostenschätzung...</p>
-                </div>
+              <div className="flex flex-col items-center justify-center text-center p-8 space-y-2">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                <p className="text-sm font-semibold">Erstelle Kostenschätzung...</p>
+              </div>
             ) : costEstimationData ? (
               <div className="space-y-4">
                 <div>
@@ -214,27 +222,27 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
                 </div>
                 <Separator />
                 <div className="space-y-3">
-                   <h4 className="text-sm font-medium">Kosten nach Material</h4>
-                   {costEstimationData.materials.map((mat, idx) => (
-                      <div key={idx}>
-                          <div className="flex justify-between items-baseline">
-                              <p className="font-medium text-sm">{mat.name} ({mat.percentage}%)</p>
-                              <p className="font-semibold text-sm">{mat.estimatedCost}</p>
-                          </div>
-                          <p className="text-xs text-muted-foreground">{mat.explanation}</p>
+                  <h4 className="text-sm font-medium">Kosten nach Material</h4>
+                  {costEstimationData.materials.map((mat, idx) => (
+                    <div key={idx}>
+                      <div className="flex justify-between items-baseline">
+                        <p className="font-medium text-sm">{mat.name} ({mat.percentage}%)</p>
+                        <p className="font-semibold text-sm">{mat.estimatedCost}</p>
                       </div>
-                   ))}
+                      <p className="text-xs text-muted-foreground">{mat.explanation}</p>
+                    </div>
+                  ))}
                 </div>
                 <Separator />
                 <div className="pt-2">
-                   <CostEstimationDialog onRunCostEstimation={onRunCostEstimation} isProcessing={isProcessing} />
+                  <CostEstimationDialog onRunCostEstimation={onRunCostEstimation} isProcessing={isProcessing} />
                 </div>
               </div>
             ) : (
-               <div className="text-center text-sm text-muted-foreground space-y-3 flex flex-col items-center justify-center h-full pt-8 pb-8">
-                   <p>Führen Sie eine Kostenschätzung durch, um die Ergebnisse hier anzuzeigen.</p>
-                   <CostEstimationDialog onRunCostEstimation={onRunCostEstimation} isProcessing={isProcessing} />
-               </div>
+              <div className="text-center text-sm text-muted-foreground space-y-3 flex flex-col items-center justify-center h-full pt-8 pb-8">
+                <p>Führen Sie eine Kostenschätzung durch, um die Ergebnisse hier anzuzeigen.</p>
+                <CostEstimationDialog onRunCostEstimation={onRunCostEstimation} isProcessing={isProcessing} />
+              </div>
             )}
           </CardContent>
         </Card>

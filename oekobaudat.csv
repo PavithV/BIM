@@ -1,0 +1,13 @@
+Name;Kategorie;GWP_A1_A3_kgCO2e_pro_m3;Dichte_kg_m3
+Stahlbeton C25/30;Beton;280.0;2400
+Mauerziegel;Mauerwerk;320.0;1600
+Kalksandstein;Mauerwerk;210.0;1800
+Brettsperrholz (CLT);Holz;-750.0;470
+Konstruktionsvollholz (KVH);Holz;-800.0;450
+EPS Dämmung;Dämmung;18.0;20
+Mineralwolle;Dämmung;25.0;30
+Gipskartonplatte;Ausbau;290.0;900
+Fensterrahmen Holz;Fenster;150.0;500
+Fensterrahmen Kunststoff;Fenster;380.0;1400
+Fließestrich Zement;Boden;350.0;2000
+Fließestrich Anhydrit;Boden;280.0;2100

@@ -7,8 +7,8 @@
  * - StartingPromptsOutput - The return type for the generateStartingPrompts function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'zod';
+import { ai } from '@/ai/genkit';
+import { z } from 'zod';
 
 const StartingPromptsOutputSchema = z.object({
   prompts: z.array(z.string()).describe('Eine Liste von vorgeschlagenen Eingabeaufforderungen.'),
@@ -16,7 +16,9 @@ const StartingPromptsOutputSchema = z.object({
 export type StartingPromptsOutput = z.infer<typeof StartingPromptsOutputSchema>;
 
 export async function generateStartingPrompts(): Promise<StartingPromptsOutput> {
-  const prompt = `Sie sind ein KI-Assistent, der Architekturstudenten bei der Analyse und Bewertung ihrer Gebäudeentwürfe (IFC-Modelle) unterstützt. Stellen Sie eine Liste von vorgeschlagenen Eingabeaufforderungen auf Deutsch bereit, die ein neuer Benutzer verwenden kann, um schnell mit der Plattform zu interagieren und ihre Funktionen zu erkunden. Die Eingabeaufforderungen sollten für Nachhaltigkeit, Energieeffizienz, Barrierefreiheit und technische Standards relevant sein. Geben Sie sie als JSON-Array von Zeichenfolgen zurück.
+  const prompt = `Sie sind ein KI-Assistent für Architekturstudenten. Antworten Sie immer auf Deutsch und im JSON-Format.
+
+Sie sind ein KI-Assistent, der Architekturstudenten bei der Analyse und Bewertung ihrer Gebäudeentwürfe (IFC-Modelle) unterstützt. Stellen Sie eine Liste von vorgeschlagenen Eingabeaufforderungen auf Deutsch bereit, die ein neuer Benutzer verwenden kann, um schnell mit der Plattform zu interagieren und ihre Funktionen zu erkunden. Die Eingabeaufforderungen sollten für Nachhaltigkeit, Energieeffizienz, Barrierefreiheit und technische Standards relevant sein. Geben Sie sie als JSON-Array von Zeichenfolgen zurück.
 
 Beispiel-Prompts:
 [
@@ -35,24 +37,38 @@ Geben Sie die Liste der vorgeschlagenen Eingabeaufforderungen in einem JSON-Form
   const completion = await ai.chat.completions.create({
     model: "azure.gpt-4.1-mini",
     messages: [
-      {
-        role: "system",
-        content: "Sie sind ein KI-Assistent für Architekturstudenten. Antworten Sie immer auf Deutsch und im JSON-Format."
-      },
-      {
-        role: "user",
-        content: prompt
-      }
+      { role: "system", content: "Sie sind ein KI-Assistent für Architekturstudenten. Antworten Sie immer auf Deutsch und im JSON-Format." },
+      { role: "user", content: prompt }
     ],
     response_format: { type: "json_object" },
   });
 
-  const content = completion.choices[0]?.message?.content;
+  const content = completion.choices[0].message.content;
   if (!content) {
     throw new Error("Generate starting prompts failed to produce an output.");
   }
 
-  const parsed = JSON.parse(content);
+  // Versuche JSON aus der Antwort zu extrahieren (kann in Markdown-Code-Blöcken sein)
+  let parsed: any;
+  try {
+    // Versuche direkt zu parsen
+    parsed = JSON.parse(content);
+  } catch (e) {
+    // Wenn das fehlschlägt, versuche JSON aus Markdown-Code-Blöcken zu extrahieren
+    const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || content.match(/(\{[\s\S]*\})/);
+    if (jsonMatch) {
+      try {
+        parsed = JSON.parse(jsonMatch[1]);
+      } catch (parseError) {
+        console.error('Failed to parse JSON from response:', content);
+        throw new Error(`Ungültiges JSON-Format in der KI-Antwort: ${parseError instanceof Error ? parseError.message : 'Unbekannter Fehler'}`);
+      }
+    } else {
+      console.error('No JSON found in response:', content);
+      throw new Error('Kein JSON in der KI-Antwort gefunden');
+    }
+  }
+
   const output = StartingPromptsOutputSchema.parse(parsed);
   return output;
 }
