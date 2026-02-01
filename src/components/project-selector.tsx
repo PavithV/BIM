@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { collection, query, orderBy, getDocs, doc, writeBatch, deleteDoc } from 'firebase/firestore';
-import { deleteObject, ref } from 'firebase/storage';
-import { useUser, useFirestore, useStorage } from '@/firebase';
+import { supabase } from '@/lib/supabase/client';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { Button } from './ui/button';
 import { FileUploader } from './file-uploader';
 import { Building, FilePlus, Loader2, Trash2, CheckCircle } from 'lucide-react';
@@ -33,14 +32,12 @@ interface ProjectSelectorProps {
 }
 
 export function ProjectSelector({ projects, isLoading, onSelectProject, onUploadNew, onDeleteProject, activeProjectId }: ProjectSelectorProps) {
-  const { user } = useUser();
-  const firestore = useFirestore();
-  const storage = useStorage();
+  const { user } = useSupabaseAuth();
   const [showUploader, setShowUploader] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
   const handleDeleteProject = async (projectId: string) => {
-    if (!user || !firestore) return;
+    if (!user) return;
 
     try {
       // If the deleted project is the active one, clear the view
@@ -50,56 +47,26 @@ export function ProjectSelector({ projects, isLoading, onSelectProject, onUpload
 
       // Find the project to get the storage path
       const project = projects.find(p => p.id === projectId);
-      
-      // Delete the file from Firebase Storage if it exists
-      if (project?.fileStoragePath && storage) {
+
+      // Delete the file from Supabase Storage if it exists
+      if (project?.fileStoragePath) {
         try {
-          const storagePath = project.fileStoragePath;
-          console.log('Deleting file from Storage:', storagePath);
-          const fileRef = ref(storage, storagePath);
-          await deleteObject(fileRef);
+          console.log('Deleting file from Storage:', project.fileStoragePath);
+          const { error } = await supabase.storage.from('ifc-models').remove([project.fileStoragePath]);
+          if (error) throw error;
           console.log('File deleted from Storage successfully');
-        } catch (storageError: any) {
-          // Log error but don't fail the entire deletion if storage deletion fails
-          // (file might already be deleted or not exist)
-          console.warn('Error deleting file from Storage (continuing with Firestore deletion):', storageError);
-          // Only throw if it's not a "file not found" error
-          if (storageError?.code !== 'storage/object-not-found') {
-            console.error('Unexpected error deleting from Storage:', storageError);
-          }
-        }
-      } else if (project?.fileUrl && storage) {
-        // Fallback: Try to extract storage path from URL if fileStoragePath is not available
-        try {
-          const urlObj = new URL(project.fileUrl);
-          const pathMatch = urlObj.pathname.match(/\/o\/(.+)$/);
-          if (pathMatch) {
-            const storagePath = decodeURIComponent(pathMatch[1]);
-            console.log('Deleting file from Storage (extracted from URL):', storagePath);
-            const fileRef = ref(storage, storagePath);
-            await deleteObject(fileRef);
-            console.log('File deleted from Storage successfully');
-          }
-        } catch (storageError: any) {
-          console.warn('Error deleting file from Storage (extracted from URL):', storageError);
-          if (storageError?.code !== 'storage/object-not-found') {
-            console.error('Unexpected error deleting from Storage:', storageError);
-          }
+        } catch (storageError) {
+          console.warn('Error deleting file from Storage:', storageError);
         }
       }
 
-      // Delete all messages in the subcollection
-      const messagesRef = collection(firestore, 'users', user.uid, 'ifcModels', projectId, 'messages');
-      const messagesSnapshot = await getDocs(messagesRef);
-      const batch = writeBatch(firestore);
-      messagesSnapshot.forEach(doc => {
-        batch.delete(doc.ref);
-      });
-      await batch.commit();
+      // Delete the project document from Database (Cascade should handle messages)
+      const { error } = await supabase
+        .from('ifc_models')
+        .delete()
+        .eq('id', projectId);
 
-      // Delete the project document itself
-      const projectRef = doc(firestore, 'users', user.uid, 'ifcModels', projectId);
-      await deleteDoc(projectRef);
+      if (error) throw error;
 
       // Trigger a refetch in the parent component
       await onDeleteProject();
@@ -108,7 +75,7 @@ export function ProjectSelector({ projects, isLoading, onSelectProject, onUpload
       console.error("Error deleting project:", error);
     }
   };
-  
+
   const handleFileUploaded = async (file: File, fileContent: string | null) => {
     setIsUploading(true);
     await onUploadNew(file, fileContent);
@@ -119,18 +86,18 @@ export function ProjectSelector({ projects, isLoading, onSelectProject, onUpload
 
   if (isLoading) {
     return (
-        <div className="flex flex-col items-center justify-center h-full text-center p-4">
-            <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-            <p className="text-muted-foreground text-sm">Lade Projekte...</p>
-        </div>
+      <div className="flex flex-col items-center justify-center h-full text-center p-4">
+        <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground text-sm">Lade Projekte...</p>
+      </div>
     );
   }
 
   if (showUploader || projects.length === 0) {
     return (
       <div className="p-2">
-        <FileUploader 
-          onFileUploaded={handleFileUploaded} 
+        <FileUploader
+          onFileUploaded={handleFileUploaded}
           isUploading={isUploading}
           onCancel={() => setShowUploader(false)}
           showCancelButton={projects.length > 0}
@@ -151,24 +118,24 @@ export function ProjectSelector({ projects, isLoading, onSelectProject, onUpload
             )}
           >
             <div
-                onClick={() => onSelectProject(project)}
-                className="flex-grow flex items-center gap-3 overflow-hidden"
+              onClick={() => onSelectProject(project)}
+              className="flex-grow flex items-center gap-3 overflow-hidden"
             >
               <div className="flex-shrink-0">
                 {activeProjectId === project.id ? (
-                    <CheckCircle className="w-5 h-5 text-primary" />
+                  <CheckCircle className="w-5 h-5 text-primary" />
                 ) : (
-                    <Building className="w-5 h-5 text-muted-foreground" />
+                  <Building className="w-5 h-5 text-muted-foreground" />
                 )}
               </div>
               <div className="flex-grow overflow-hidden">
-                  <p className="font-medium text-sm truncate">{project.fileName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {project.uploadDate?.toDate ? 
-                      `vor ${formatDistanceToNow(project.uploadDate.toDate(), { locale: de })}` :
-                      'Wird erstellt...'
-                    }
-                  </p>
+                <p className="font-medium text-sm truncate">{project.fileName}</p>
+                <p className="text-xs text-muted-foreground">
+                  {project.uploadDate ?
+                    `vor ${formatDistanceToNow(new Date(project.uploadDate), { locale: de })}` :
+                    'Wird erstellt...'
+                  }
+                </p>
               </div>
             </div>
             <AlertDialog>

@@ -1,13 +1,13 @@
 'use client';
 
-import { useUser } from '@/firebase';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import Dashboard from '@/components/dashboard';
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
-  const { user, isUserLoading } = useUser();
+  const { user, loading: isUserLoading } = useSupabaseAuth();
   const router = useRouter();
 
   useEffect(() => {

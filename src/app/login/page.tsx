@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { useAuth } from '@/firebase';
+import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,7 +15,6 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const auth = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -24,14 +22,23 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
       router.push('/');
+      router.refresh();
     } catch (error: any) {
       console.error(error);
       let errorMessage = 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.';
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+
+      if (error.message === 'Invalid login credentials') {
         errorMessage = 'Ungültige E-Mail-Adresse oder Passwort.';
       }
+
       toast({
         title: 'Fehler bei der Anmeldung',
         description: errorMessage,
@@ -44,7 +51,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted/40 p-4">
-       <div className="absolute top-8 left-8 flex items-center gap-3">
+      <div className="absolute top-8 left-8 flex items-center gap-3">
         <Building className="w-8 h-8 text-foreground" />
         <h1 className="text-xl md:text-2xl font-bold font-headline text-foreground">BIMCoach Studio</h1>
       </div>
@@ -69,10 +76,10 @@ export default function LoginPage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="password">Passwort</Label>
-              <Input 
-                id="password" 
-                type="password" 
-                required 
+              <Input
+                id="password"
+                type="password"
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}

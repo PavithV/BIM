@@ -110,7 +110,7 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
     );
   }
 
-  if (!project?.analysisData) {
+  if (!project?.analysisData || !project.analysisData.materialComposition || project.analysisData.materialComposition.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
         <BarChart3 className="w-12 h-12 text-muted-foreground/50 mb-4" />

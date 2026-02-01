@@ -3,9 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
-import { useAuth, useFirestore } from '@/firebase';
+import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,39 +16,47 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const auth = useAuth();
-  const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.length < 6) {
-        toast({
-            title: 'Fehler bei der Registrierung',
-            description: 'Das Passwort muss mindestens 6 Zeichen lang sein.',
-            variant: 'destructive',
-        });
-        return;
+      toast({
+        title: 'Fehler bei der Registrierung',
+        description: 'Das Passwort muss mindestens 6 Zeichen lang sein.',
+        variant: 'destructive',
+      });
+      return;
     }
     setIsLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      const { data: { user }, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+          },
+        },
+      });
 
-      await updateProfile(user, { displayName: name });
-      
-      const userRef = doc(firestore, 'users', user.uid);
-      await setDoc(userRef, { name, email });
-      
+      if (error) throw error;
+
+      if (user) {
+        // User created. Profile creation handled by Database Trigger (handle_new_user).
+        console.log('User created:', user.id);
+      }
+
       router.push('/');
+      router.refresh();
 
     } catch (error: any) {
       console.error(error);
       let errorMessage = 'Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.';
-      if (error.code === 'auth/email-already-in-use') {
+      if (error.message.includes('already registered')) {
         errorMessage = 'Diese E-Mail-Adresse wird bereits verwendet.';
-      } else if (error.code === 'auth/invalid-email') {
+      } else if (error.message.includes('valid email')) {
         errorMessage = 'Bitte geben Sie eine gültige E-Mail-Adresse ein.';
       }
       toast({
@@ -78,10 +84,10 @@ export default function RegisterPage() {
           <form onSubmit={handleSignUp} className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="name">Name</Label>
-              <Input 
-                id="name" 
-                placeholder="Max Mustermann" 
-                required 
+              <Input
+                id="name"
+                placeholder="Max Mustermann"
+                required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={isLoading}
@@ -101,10 +107,10 @@ export default function RegisterPage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="password">Passwort</Label>
-              <Input 
-                id="password" 
-                type="password" 
-                required 
+              <Input
+                id="password"
+                type="password"
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}

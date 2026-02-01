@@ -5,7 +5,11 @@
  */
 
 // Konfiguration aus app.py
-const TARGET_ENTITIES = ["IfcWall", "IfcSlab", "IfcWindow", "IfcColumn", "IfcBeam", "IfcCovering", "IfcFooting", "IfcRoof"];
+const TARGET_ENTITIES = [
+  "IfcWall", "IfcWallStandardCase", "IfcSlab", "IfcWindow", "IfcColumn", "IfcBeam",
+  "IfcCovering", "IfcFooting", "IfcRoof", "IfcDoor", "IfcPlate", "IfcMember",
+  "IfcBuildingElementProxy", "IfcStair", "IfcRailing", "IfcRamp"
+];
 const VOLUME_PROPERTIES = ["NetVolume", "GrossVolume", "Volume"];
 const AREA_PROPERTIES = ["NetArea", "GrossArea", "Area"];
 const GWP_PROPERTIES = ["GlobalWarmingPotential", "GWP", "CO2", "GWP_A1_A3"];

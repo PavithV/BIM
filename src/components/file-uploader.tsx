@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, type DragEvent, type ChangeEvent } from 'react';
@@ -10,7 +9,9 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 interface FileUploaderProps {
-  onFileUploaded: (file: File, data: string | null) => void; // data kann null sein für große Dateien
+  // Wir brauchen den string-Parameter eigentlich gar nicht mehr, 
+  // aber ich lasse ihn als 'null' kompatibel, damit du dashboard.tsx nicht sofort ändern musst.
+  onFileUploaded: (file: File, data: string | null) => void;
   isUploading: boolean;
   onCancel?: () => void;
   showCancelButton?: boolean;
@@ -19,21 +20,21 @@ interface FileUploaderProps {
 export function FileUploader({ onFileUploaded, isUploading, onCancel, showCancelButton = false }: FileUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isLoadingFile, setIsLoadingFile] = useState(false);
+  // isLoadingFile wird eigentlich nicht mehr gebraucht, da wir nicht mehr "readen"
   const { toast } = useToast();
 
   const handleFileSelect = (selectedFile: File | null) => {
     if (selectedFile) {
-        if (selectedFile.name.toLowerCase().endsWith('.ifc')) {
-            setFile(selectedFile);
-        } else {
-            toast({
-            title: 'Ungültiger Dateityp',
-            description: 'Bitte laden Sie eine gültige .ifc-Datei hoch.',
-            variant: 'destructive',
-            });
-            setFile(null);
-        }
+      if (selectedFile.name.toLowerCase().endsWith('.ifc')) {
+        setFile(selectedFile);
+      } else {
+        toast({
+          title: 'Ungültiger Dateityp',
+          description: 'Bitte laden Sie eine gültige .ifc-Datei hoch.',
+          variant: 'destructive',
+        });
+        setFile(null);
+      }
     }
   }
 
@@ -52,58 +53,22 @@ export function FileUploader({ onFileUploaded, isUploading, onCancel, showCancel
     e.preventDefault();
     e.stopPropagation();
     if (e.type === 'dragenter' || e.type === 'dragover') {
-        setIsDragging(true);
+      setIsDragging(true);
     } else if (e.type === 'dragleave') {
-        setIsDragging(false);
+      setIsDragging(false);
     }
   };
 
+  // --- HIER IST DER FIX ---
   const handleSubmit = () => {
     if (file) {
-      // Firestore hat ein Limit von ~1MB pro Feld
-      // Base64 erhöht die Dateigröße um ~33%, daher sollte die Datei max. ~750KB sein
-      // Um sicher zu gehen, verwenden wir 700KB als Schwellenwert
-      const FILE_SIZE_THRESHOLD = 700 * 1024; // 700KB
-      
-      if (file.size > FILE_SIZE_THRESHOLD) {
-        // Große Datei: Überspringe FileReader, verwende File direkt
-        // Der Upload wird in handleFileUploaded direkt mit dem File-Objekt gemacht
-        setIsLoadingFile(true);
-        // Für große Dateien übergeben wir null als fileContent
-        // Das File-Objekt wird direkt für den Storage-Upload verwendet
-        onFileUploaded(file, null);
-        setIsLoadingFile(false);
-      } else {
-        // Kleine Datei: Lese Datei als Base64
-        setIsLoadingFile(true);
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const fileContent = e.target?.result as string;
-          if (fileContent) {
-            onFileUploaded(file, fileContent);
-          } else {
-             toast({
-                title: 'Fehler beim Lesen der Datei',
-                description: 'Der Dateiinhalt konnte nicht gelesen werden.',
-                variant: 'destructive',
-              });
-          }
-          setIsLoadingFile(false);
-        };
-        reader.onerror = () => {
-          toast({
-            title: 'Fehler beim Lesen der Datei',
-            description: 'Beim Verarbeiten Ihrer Datei ist ein Fehler aufgetreten.',
-            variant: 'destructive',
-          });
-          setIsLoadingFile(false);
-        }
-        reader.readAsDataURL(file);
-      }
+      // Wir übergeben IMMER das rohe File-Objekt.
+      // Keine Base64 Konvertierung mehr notwendig für Supabase Storage.
+      onFileUploaded(file, null);
     }
   };
-  
-  const totalIsLoading = isUploading || isLoadingFile;
+
+  const totalIsLoading = isUploading; // isLoadingFile entfernt
 
   return (
     <Card className="w-full max-w-lg mx-auto bg-card/80 backdrop-blur-sm border-dashed shadow-none">
@@ -126,23 +91,23 @@ export function FileUploader({ onFileUploaded, isUploading, onCancel, showCancel
             <UploadCloud className="w-10 h-10 text-muted-foreground mb-3" />
             <p className="font-semibold text-sm">Ziehen Sie Ihre .ifc-Datei hierher</p>
             <p className="text-xs text-muted-foreground mt-1">oder klicken Sie zum Durchsuchen</p>
-            <Input id="file-upload" type="file" className="hidden" accept=".ifc" onChange={handleFileChange} disabled={totalIsLoading}/>
+            <Input id="file-upload" type="file" className="hidden" accept=".ifc" onChange={handleFileChange} disabled={totalIsLoading} />
           </label>
         </div>
         {file && (
           <div className="text-center space-y-4 pt-2">
             <p className="text-sm">Ausgewählt: <span className="font-semibold">{file.name}</span></p>
             <Button className="w-full" onClick={handleSubmit} disabled={totalIsLoading}>
-                {totalIsLoading ? (
-                    <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Verarbeite...
-                    </>
-                ) : 'Projekt erstellen & analysieren'}
+              {totalIsLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Verarbeite...
+                </>
+              ) : 'Projekt erstellen & analysieren'}
             </Button>
           </div>
         )}
-         {showCancelButton && onCancel && (
+        {showCancelButton && onCancel && (
           <Button variant="ghost" className="w-full" onClick={onCancel} disabled={totalIsLoading}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Zurück zur Projektliste

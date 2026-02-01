@@ -12,24 +12,25 @@ import type { Message } from './dashboard';
 import { Skeleton } from './ui/skeleton';
 
 interface ChatAssistantProps {
-  messages: Message[];
+  activeMessages: Message[];
+  activeProject: any;
   startingPrompts: string[];
   isLoading: boolean;
   onSendMessage: (message: string) => void;
 }
 
-export function ChatAssistant({ messages, startingPrompts, isLoading, onSendMessage }: ChatAssistantProps) {
+export function ChatAssistant({ activeMessages, activeProject, startingPrompts, isLoading, onSendMessage }: ChatAssistantProps) {
   const [input, setInput] = useState('');
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
-        const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-        if (viewport) {
-            viewport.scrollTop = viewport.scrollHeight;
-        }
+      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight;
+      }
     }
-  }, [messages, isLoading]);
+  }, [activeMessages, isLoading]);
 
 
   const handleSendMessage = (prompt?: string) => {
@@ -45,9 +46,10 @@ export function ChatAssistant({ messages, startingPrompts, isLoading, onSendMess
       handleSendMessage();
     }
   };
-  
+
   const ChatContent = () => {
-    if (isLoading && messages.length === 0) {
+    // Add null/undefined check for activeMessages
+    if (!activeMessages || (isLoading && activeMessages.length === 0)) {
       return (
         <div className="p-4 space-y-4">
           <Skeleton className="h-16 w-2/3" />
@@ -56,41 +58,41 @@ export function ChatAssistant({ messages, startingPrompts, isLoading, onSendMess
         </div>
       );
     }
-    
-    if (messages.length === 0) {
+
+    if (activeMessages.length === 0) {
       return (
         <Card className="bg-transparent border-none shadow-none h-full flex flex-col justify-center">
           <CardContent className="p-0">
-              <div className="text-center p-8">
-                <Avatar className="mx-auto mb-4 w-16 h-16 bg-muted rounded-full">
-                  <AvatarFallback className="bg-transparent">
-                    <Bot className="w-8 h-8 text-foreground/80" />
-                  </AvatarFallback>
-                </Avatar>
-                <h2 className="text-lg font-semibold font-headline">KI-Coach</h2>
-                <p className="text-muted-foreground text-sm mb-6">Fragen Sie mich alles über Ihr Modell.</p>
-                <div className="space-y-2 text-sm">
-                  <p className="text-muted-foreground font-semibold flex items-center justify-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Probieren Sie einen Vorschlag aus</p>
-                  {startingPrompts.slice(0, 3).map((prompt, index) => (
-                    <button key={index} onClick={() => handleSendMessage(prompt)} className="text-left p-3 rounded-md bg-muted/50 hover:bg-muted w-full transition-colors text-foreground/80">
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
+            <div className="text-center p-8">
+              <Avatar className="mx-auto mb-4 w-16 h-16 bg-muted rounded-full">
+                <AvatarFallback className="bg-transparent">
+                  <Bot className="w-8 h-8 text-foreground/80" />
+                </AvatarFallback>
+              </Avatar>
+              <h2 className="text-lg font-semibold font-headline">KI-Coach</h2>
+              <p className="text-muted-foreground text-sm mb-6">Fragen Sie mich alles über Ihr Modell.</p>
+              <div className="space-y-2 text-sm">
+                <p className="text-muted-foreground font-semibold flex items-center justify-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Probieren Sie einen Vorschlag aus</p>
+                {startingPrompts.slice(0, 3).map((prompt, index) => (
+                  <button key={index} onClick={() => handleSendMessage(prompt)} className="text-left p-3 rounded-md bg-muted/50 hover:bg-muted w-full transition-colors text-foreground/80">
+                    {prompt}
+                  </button>
+                ))}
               </div>
+            </div>
           </CardContent>
         </Card>
       );
     }
-    
+
     return (
       <div className="p-4 space-y-6">
-        {messages.map((message, index) => (
+        {activeMessages.map((message, index) => (
           <div key={message.id || index} className={cn('flex items-start gap-3', message.role === 'user' ? 'justify-end' : '')}>
             {message.role === 'assistant' && (
               <Avatar className="w-8 h-8">
                 <AvatarFallback className="bg-muted">
-                  <Bot className="w-4 h-4 text-foreground/80"/>
+                  <Bot className="w-4 h-4 text-foreground/80" />
                 </AvatarFallback>
               </Avatar>
             )}
@@ -100,25 +102,25 @@ export function ChatAssistant({ messages, startingPrompts, isLoading, onSendMess
             {message.role === 'user' && (
               <Avatar className="w-8 h-8">
                 <AvatarFallback>
-                  <User className="w-4 h-4"/>
+                  <User className="w-4 h-4" />
                 </AvatarFallback>
               </Avatar>
             )}
           </div>
         ))}
-         {isLoading && (
-            <div className="flex items-start gap-3">
-              <Avatar className="w-8 h-8">
-                <AvatarFallback className="bg-muted">
-                  <Bot className="w-4 h-4 text-foreground/80"/>
-                </AvatarFallback>
-              </Avatar>
-              <div className="max-w-[85%] rounded-lg px-4 py-3 bg-muted flex items-center">
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                <span className="text-sm">Denke...</span>
-              </div>
+        {isLoading && (
+          <div className="flex items-start gap-3">
+            <Avatar className="w-8 h-8">
+              <AvatarFallback className="bg-muted">
+                <Bot className="w-4 h-4 text-foreground/80" />
+              </AvatarFallback>
+            </Avatar>
+            <div className="max-w-[85%] rounded-lg px-4 py-3 bg-muted flex items-center">
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              <span className="text-sm">Denke...</span>
             </div>
-          )}
+          </div>
+        )}
       </div>
     );
   };
@@ -144,7 +146,7 @@ export function ChatAssistant({ messages, startingPrompts, isLoading, onSendMess
               <Send className="w-4 h-4" />
               <span className="sr-only">Nachricht senden</span>
             </Button>
-            <kbd className="hidden lg:inline-flex items-center gap-1 text-xs text-muted-foreground"><CornerDownLeft className="w-3 h-3"/> Enter</kbd>
+            <kbd className="hidden lg:inline-flex items-center gap-1 text-xs text-muted-foreground"><CornerDownLeft className="w-3 h-3" /> Enter</kbd>
           </div>
         </div>
       </div>

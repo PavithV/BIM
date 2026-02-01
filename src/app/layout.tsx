@@ -1,6 +1,7 @@
-import type {Metadata} from 'next';
+import type { Metadata } from 'next';
 import { Toaster } from "@/components/ui/toaster"
-import { FirebaseClientProvider } from '@/firebase';
+
+import { SupabaseAuthProvider } from '@/context/SupabaseAuthContext';
 import './globals.css';
 import Script from 'next/script';
 
@@ -32,10 +33,10 @@ export default function RootLayout({
             })();
           `}
         </Script>
-        <FirebaseClientProvider>
+        <SupabaseAuthProvider>
           {children}
           <Toaster />
-        </FirebaseClientProvider>
+        </SupabaseAuthProvider>
       </body>
     </html>
   );
