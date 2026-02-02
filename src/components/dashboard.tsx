@@ -99,7 +99,11 @@ export default function Dashboard() {
         filter: `ifc_model_id=eq.${activeProject.id}`
       }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setActiveMessages(prev => [...prev, payload.new as Message]);
+          const newMessage = payload.new as Message;
+          setActiveMessages(prev => {
+            if (prev.some(m => m.id === newMessage.id)) return prev;
+            return [...prev, newMessage];
+          });
         }
       })
       .subscribe();
@@ -390,19 +394,28 @@ export default function Dashboard() {
     setIsLoading(true);
 
     try {
-      await supabase.from('messages').insert({
+      // 1. User Message: Insert & Update State
+      const { data: userMsg, error: userError } = await supabase.from('messages').insert({
         ifc_model_id: activeProject.id, user_id: user.id, role: 'user', content: userQuestion
-      });
+      }).select().single();
 
+      if (userMsg) {
+        setActiveMessages(prev => {
+          if (prev.some(m => m.id === userMsg.id)) return prev;
+          return [...prev, userMsg as Message];
+        });
+      } else if (userError) {
+        console.error("Error sending user message:", userError);
+      }
+
+      // Prepare payload for AI
       let fileContent = '';
       try { fileContent = await loadIfcFileContent(activeProject); } catch (e) { }
 
-      // Prepare payload for AI (same logic as before, just compacting)
-      // ... (Dein existierender Parsing Code für ifcToSend ist hier impliziert, ich kürze ihn für Übersichtlichkeit nicht weg, aber nutze die Logik)
-      // Hier der Einfachheit halber:
-      const ifcToSend = fileContent;
+      const ifcToSend = fileContent; // Simplified for brevity
 
       let replacementMap = activeProject.replacements || undefined;
+      // Check for replacements (same logic as before)
       if (!replacementMap) {
         const checkResult = await checkMaterialReplacements(ifcToSend);
         if (checkResult.replacements?.length) {
@@ -414,14 +427,29 @@ export default function Dashboard() {
         }
       }
 
+      // 2. AI Response
       const result = await getAIChatFeedback({ ifcModelData: ifcToSend, userQuestion, replacementMap });
       const content = result.feedback || result.error || 'Fehler.';
-      await supabase.from('messages').insert({
+
+      const { data: aiMsg, error: aiError } = await supabase.from('messages').insert({
         ifc_model_id: activeProject.id, user_id: user.id, role: 'assistant', content
-      });
+      }).select().single();
+
+      if (aiMsg) {
+        setActiveMessages(prev => {
+          if (prev.some(m => m.id === aiMsg.id)) return prev;
+          return [...prev, aiMsg as Message];
+        });
+      } else if (aiError) {
+        console.error("Error saving assistant message:", aiError);
+      }
+
+      // 3. Fallback Sync
+      await fetchMessages();
 
     } catch (error) {
       console.error("Chat error:", error);
+      toast({ title: "Fehler", description: "Nachricht konnte nicht gesendet werden.", variant: "destructive" });
     } finally {
       if (!materialReviewOpen) setIsLoading(false);
     }
