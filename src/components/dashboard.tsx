@@ -593,7 +593,7 @@ export default function Dashboard() {
                 <div className="absolute inset-0 p-0 overflow-hidden">
                   <IfcViewer
                     ifcStoragePath={activeProject.fileStoragePath || undefined}
-                    ifcUrl={!activeProject.fileStoragePath && activeProject.fileUrl ? `/api/storage?url=${encodeURIComponent(activeProject.fileUrl)}` : undefined}
+                    ifcUrl={!activeProject.fileStoragePath && activeProject.fileUrl ? activeProject.fileUrl : undefined}
                     ifcContent={!activeProject.fileStoragePath && !activeProject.fileUrl ? activeProject.fileContent : undefined}
                     key={activeProject.id}
                   />

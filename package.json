@@ -7,8 +7,7 @@
     "build": "NODE_ENV=production next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "postinstall": "copy node_modules\\web-ifc\\web-ifc.wasm public\\wasm\\web-ifc.wasm && copy node_modules\\web-ifc\\web-ifc-mt.wasm public\\wasm\\web-ifc-mt.wasm"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
