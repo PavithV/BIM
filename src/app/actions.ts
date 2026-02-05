@@ -7,6 +7,16 @@ import { estimateCostsFromMaterials } from '@/ai/flows/estimate-costs-from-mater
 import type { AnalysisResult, CostEstimationResult, GenerateAnalysisFromIfcInput, MaterialCompositionInput } from '@/lib/types';
 import { ZodError } from 'zod';
 import { compressIfcFile, getProposedMaterialReplacements, type MaterialReplacement } from '@/utils/ifcCompressor';
+import { createClient } from '@/lib/supabase/server';
+
+async function requireAuth() {
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    throw new Error('Unauthorized');
+  }
+}
 
 function getDetailedErrorMessage(error: any): string {
   const errorMessage = error.message || 'Ein unbekannter Fehler ist aufgetreten.';
@@ -52,6 +62,8 @@ export async function checkMaterialReplacements(ifcContent: string): Promise<{ r
 
 export async function getAIChatFeedback(input: AIChatFeedbackInput & { replacementMap?: Record<string, string> }) {
   try {
+    await requireAuth();
+
     // Komprimiere IFC-Datei vor dem Senden an die KI
     const compressedIfcData = compressIfcFile(input.ifcModelData, input.replacementMap);
     // Server-side debug: logge Längeninfo und Preview (Terminal)
@@ -79,6 +91,8 @@ export async function getAIChatFeedback(input: AIChatFeedbackInput & { replaceme
 
 export async function getIfcAnalysis(input: GenerateAnalysisFromIfcInput & { replacementMap?: Record<string, string> }): Promise<{ analysis?: AnalysisResult; error?: string }> {
   try {
+    await requireAuth();
+
     // Komprimiere IFC-Datei vor dem Senden an die KI
     // @ts-ignore
     const compressedIfcContent = compressIfcFile(input.ifcFileContent, input.replacementMap);
@@ -101,6 +115,8 @@ export async function getIfcAnalysis(input: GenerateAnalysisFromIfcInput & { rep
 
 export async function getCostEstimation(input: MaterialCompositionInput): Promise<{ costs?: CostEstimationResult; error?: string }> {
   try {
+    await requireAuth();
+
     const result = await estimateCostsFromMaterials(input);
     return { costs: result };
   } catch (error: any) {
