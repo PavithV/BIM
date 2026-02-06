@@ -17,6 +17,7 @@ import { applyReplacementsToIfc } from '@/utils/ifc-modification';
 import { useRouter } from 'next/navigation';
 import { ProjectSelector } from './project-selector';
 import { ProjectComparison } from './project-comparison';
+import { ModelTree, type SpatialNode } from '@/components/model-tree';
 import type { IFCModel } from '@/lib/types';
 import { cn, downloadCsv } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -52,6 +53,10 @@ export default function Dashboard() {
   const [comparisonProjectA, setComparisonProjectA] = useState<IFCModel | null>(null);
   const [comparisonProjectB, setComparisonProjectB] = useState<IFCModel | null>(null);
 
+  const [modelStructure, setModelStructure] = useState<SpatialNode | null>(null);
+  const [selectedElementId, setSelectedElementId] = useState<number | null>(null);
+  const [sidebarTab, setSidebarTab] = useState<'projects' | 'structure'>('projects');
+
   const [materialReviewOpen, setMaterialReviewOpen] = useState(false);
   const [pendingReplacements, setPendingReplacements] = useState<MaterialReplacement[]>([]);
   const [pendingAction, setPendingAction] = useState<{ type: 'analysis' | 'chat', data: any } | null>(null);
@@ -62,6 +67,12 @@ export default function Dashboard() {
 
   const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+
+  // Callback to prevent infinite re-renders
+  const handleModelLoaded = useCallback((structure: SpatialNode) => {
+    setModelStructure(structure);
+    setSidebarTab('structure');
+  }, []);
 
   // --- MESSAGES FETCHING ---
   const fetchMessages = useCallback(async () => {
@@ -530,16 +541,46 @@ export default function Dashboard() {
 
         <div className="flex-1 overflow-hidden p-4 flex flex-col gap-4">
           <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
-            <h2 className="text-sm font-semibold mb-2">Ihre Projekte</h2>
-            <div className="flex-1 overflow-hidden">
-              <ProjectSelector
-                projects={projects}
-                isLoading={isProjectsLoading}
-                onSelectProject={setActiveProject}
-                onUploadNew={handleFileUploaded}
-                onDeleteProject={async () => { await fetchProjects(); if (projects.length <= 1) setActiveProject(null); }}
-                activeProjectId={activeProject?.id}
-              />
+            <div className="flex items-center gap-2 mb-2 bg-muted/50 p-1 rounded-lg shrink-0">
+              <Button
+                variant={sidebarTab === 'projects' ? 'default' : 'ghost'}
+                size="sm"
+                className="flex-1 h-7 text-xs"
+                onClick={() => setSidebarTab('projects')}
+              >
+                Projekte
+              </Button>
+              <Button
+                variant={sidebarTab === 'structure' ? 'default' : 'ghost'}
+                size="sm"
+                className="flex-1 h-7 text-xs"
+                onClick={() => setSidebarTab('structure')}
+                disabled={!modelStructure}
+              >
+                Struktur
+              </Button>
+            </div>
+
+            <div className="flex-1 overflow-hidden relative">
+              {sidebarTab === 'projects' ? (
+                <ProjectSelector
+                  projects={projects}
+                  isLoading={isProjectsLoading}
+                  onSelectProject={(p) => {
+                    setActiveProject(p);
+                    setModelStructure(null); // Reset structure on project switch
+                  }}
+                  onUploadNew={handleFileUploaded}
+                  onDeleteProject={async () => { await fetchProjects(); if (projects.length <= 1) setActiveProject(null); }}
+                  activeProjectId={activeProject?.id}
+                />
+              ) : (
+                <ModelTree
+                  tree={modelStructure}
+                  onSelect={(id) => setSelectedElementId(id)}
+                  selectedId={selectedElementId}
+                />
+              )}
             </div>
           </div>
           {/* Comparison... */}
@@ -596,6 +637,9 @@ export default function Dashboard() {
                     ifcUrl={!activeProject.fileStoragePath && activeProject.fileUrl ? activeProject.fileUrl : undefined}
                     ifcContent={!activeProject.fileStoragePath && !activeProject.fileUrl ? activeProject.fileContent : undefined}
                     key={activeProject.id}
+                    onElementSelected={(id) => setSelectedElementId(id)}
+                    selectedElementId={selectedElementId}
+                    onModelLoaded={handleModelLoaded}
                   />
                 </div>
               </div>

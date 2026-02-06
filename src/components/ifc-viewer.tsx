@@ -11,6 +11,9 @@ interface IfcViewerProps {
   ifcUrl?: string | null;
   ifcStoragePath?: string | null;
   ifcContent?: string | null;
+  onModelLoaded?: (structure: any) => void;
+  onElementSelected?: (id: number | null) => void;
+  selectedElementId?: number | null;
 }
 
 interface SelectedElement {
@@ -21,7 +24,7 @@ interface SelectedElement {
   psets: { [key: string]: any }[];
 }
 
-export function IfcViewer({ ifcFile, ifcContent, ifcUrl, ifcStoragePath }: IfcViewerProps) {
+export function IfcViewer({ ifcFile, ifcContent, ifcUrl, ifcStoragePath, onModelLoaded, onElementSelected, selectedElementId }: IfcViewerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<any>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -33,6 +36,10 @@ export function IfcViewer({ ifcFile, ifcContent, ifcUrl, ifcStoragePath }: IfcVi
   const [selectedElement, setSelectedElement] = useState<SelectedElement | null>(null);
 
   const currentUrlRef = useRef<string | null>(null);
+
+  // Use ref to avoid reloading when callback changes
+  const onModelLoadedRef = useRef(onModelLoaded);
+  useEffect(() => { onModelLoadedRef.current = onModelLoaded; }, [onModelLoaded]);
 
   // 1. INITIALISIERUNG
   useEffect(() => {
@@ -211,6 +218,15 @@ export function IfcViewer({ ifcFile, ifcContent, ifcUrl, ifcStoragePath }: IfcVi
 
         if (isActive && model) {
           setHasModel(true);
+          // Spatial Structure Extraction
+          if (onModelLoadedRef.current) {
+            try {
+              const structure = await viewer.IFC.getSpatialStructure(model.modelID);
+              onModelLoadedRef.current(structure);
+            } catch (e) {
+              console.error("Structure extraction failed", e);
+            }
+          }
         }
 
       } catch (e: any) {
@@ -230,6 +246,35 @@ export function IfcViewer({ ifcFile, ifcContent, ifcUrl, ifcStoragePath }: IfcVi
   }, [ifcFile, ifcUrl, ifcStoragePath, ifcContent, isViewerReady]);
 
 
+  // 2.5 EXTERNAL SELECTION SYNC
+  useEffect(() => {
+    if (!viewerRef.current || !hasModel) return;
+    const viewer = viewerRef.current;
+
+    const highlightExternal = async () => {
+      if (selectedElementId) {
+        try {
+          // Important: Pick without event first to clear previous, or handle specifically
+          // viewer.IFC.selector.unpickIfcItems(); // Optional, depending on behavior desired
+          await viewer.IFC.selector.pickIfcItemsByID(0, [selectedElementId], true);
+          // Also get properties for overlay
+          const props = await viewer.IFC.getProperties(0, selectedElementId, true);
+          let typeName = 'Unknown';
+          try { typeName = await viewer.IFC.loader.ifcManager.getIfcType(0, selectedElementId); } catch { }
+          let psets = [];
+          try { psets = await viewer.IFC.loader.ifcManager.getPropertySets(0, selectedElementId, true); } catch { }
+          setSelectedElement({ modelID: 0, id: selectedElementId, type: typeName, props: props || {}, psets: psets || [] });
+        } catch (e) { console.warn("External pick failed", e); }
+      } else {
+        // If selectedElementId is null, deselect
+        await viewer.IFC.selector.unpickIfcItems();
+        setSelectedElement(null);
+      }
+    };
+    highlightExternal();
+  }, [selectedElementId, hasModel]);
+
+
   // 3. INTERAKTION
   const handleDoubleClick = async () => {
     if (!viewerRef.current || !hasModel) return;
@@ -242,6 +287,12 @@ export function IfcViewer({ ifcFile, ifcContent, ifcUrl, ifcStoragePath }: IfcVi
         return;
       }
       const { modelID, id } = result;
+
+      // Notify parent
+      if (onElementSelected) {
+        onElementSelected(id);
+      }
+
       const props = await viewer.IFC.getProperties(modelID, id, true);
       let typeName = 'Unknown';
       try { typeName = await viewer.IFC.loader.ifcManager.getIfcType(modelID, id); } catch { }
@@ -298,6 +349,7 @@ export function IfcViewer({ ifcFile, ifcContent, ifcUrl, ifcStoragePath }: IfcVi
             onClick={() => {
               viewerRef.current?.IFC?.selector?.unpickIfcItems();
               setSelectedElement(null);
+              if (onElementSelected) onElementSelected(null);
             }}
             className="text-muted-foreground hover:text-foreground p-1"
           >
