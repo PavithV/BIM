@@ -508,6 +508,7 @@ export default function Dashboard() {
       // 3. UI Update
       setActiveProject(newProject as IFCModel);
       await fetchProjects(true);
+      setSelectedElementId(null);
 
       toast({ title: "Projekt erfolgreich hochgeladen" });
 
@@ -569,6 +570,7 @@ export default function Dashboard() {
                   onSelectProject={(p) => {
                     setActiveProject(p);
                     setModelStructure(null); // Reset structure on project switch
+                    setSelectedElementId(null);
                   }}
                   onUploadNew={handleFileUploaded}
                   onDeleteProject={async () => { await fetchProjects(); if (projects.length <= 1) setActiveProject(null); }}

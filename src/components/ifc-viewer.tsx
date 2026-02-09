@@ -254,15 +254,27 @@ export function IfcViewer({ ifcFile, ifcContent, ifcUrl, ifcStoragePath, onModel
     const highlightExternal = async () => {
       if (selectedElementId) {
         try {
-          // Important: Pick without event first to clear previous, or handle specifically
-          // viewer.IFC.selector.unpickIfcItems(); // Optional, depending on behavior desired
-          await viewer.IFC.selector.pickIfcItemsByID(0, [selectedElementId], true);
+          // Check type to prevent focusing on spatial structures (Project, Site, etc.) which kills the camera
+          let typeName = 'Unknown';
+          try {
+            typeName = await viewer.IFC.loader.ifcManager.getIfcType(0, selectedElementId);
+            typeName = typeName.toUpperCase();
+          } catch (e) {
+            console.warn("Could not get type for selection", e);
+          }
+
+          const isSpatial = ['IFCPROJECT', 'IFCSITE', 'IFCBUILDING', 'IFCBUILDINGSTOREY'].includes(typeName);
+          const shouldFocus = !isSpatial;
+
+          // Important: Pick without event first to clear previous
+          await viewer.IFC.selector.pickIfcItemsByID(0, [selectedElementId], shouldFocus);
+
           // Also get properties for overlay
           const props = await viewer.IFC.getProperties(0, selectedElementId, true);
-          let typeName = 'Unknown';
-          try { typeName = await viewer.IFC.loader.ifcManager.getIfcType(0, selectedElementId); } catch { }
+
           let psets = [];
           try { psets = await viewer.IFC.loader.ifcManager.getPropertySets(0, selectedElementId, true); } catch { }
+
           setSelectedElement({ modelID: 0, id: selectedElementId, type: typeName, props: props || {}, psets: psets || [] });
         } catch (e) { console.warn("External pick failed", e); }
       } else {
