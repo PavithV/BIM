@@ -22,7 +22,7 @@ export const config = {
                     scope: "openid profile email",
                 },
             },
-            checks: ["pkce", "state"],
+            checks: ["pkce"],
             profile(profile) {
                 return {
                     id: profile.sub,
