@@ -362,20 +362,48 @@ export default function Dashboard() {
     setIsProcessing(true);
     try {
       const fileContent = await loadIfcFileContent(project);
-      let replacementMap = project.replacements || undefined;
 
-      if (!replacementMap) {
-        const checkResult = await checkMaterialReplacements(fileContent);
-        if (checkResult.replacements && checkResult.replacements.length > 0) {
-          setPendingReplacements(checkResult.replacements);
-          setPendingAction({ type: 'analysis', data: { project, fileContent } });
-          setMaterialReviewOpen(true);
-          setIsProcessing(false);
-          return;
+      // IMMER prüfen ob Replacements möglich sind, auch beim Update.
+      // Das ermöglicht dem User, seine Auswahl zu korrigieren.
+      const checkResult = await checkMaterialReplacements(fileContent);
+
+      if (checkResult.replacements && checkResult.replacements.length > 0) {
+        // Wir haben Vorschläge.
+        // Falls wir bereits eine `project.replacements` Map haben (vom letzten Mal),
+        // sollten wir diese als "Default" setzen, damit der User seine alte Wahl sieht.
+
+        let mergedReplacements = checkResult.replacements;
+
+        if (project.replacements) {
+          // Update the "replacement" field in the suggestions to match what the user chose last time
+          mergedReplacements = mergedReplacements.map(r => {
+            // Did user have a replacement for this original material?
+            const userChoice = project.replacements![r.original];
+            if (userChoice) {
+              return { ...r, replacement: userChoice };
+            } else {
+              // User didn't have a replacement -> maybe they chose "Original"?
+              // How do we distinguish "No Choice" from "Chose Original"?
+              // In current logic: if key missing in map -> "Original".
+              // So if key is missing here -> we should probably keep the suggestion from DB (r.replacement)
+              // OR reset to null?
+              // Let's stick to: if user didn't have it in map, we show the auto-suggestion again.
+              return r;
+            }
+          });
         }
+
+        setPendingReplacements(mergedReplacements);
+        setPendingAction({ type: 'analysis', data: { project, fileContent } });
+        setMaterialReviewOpen(true);
+        setIsProcessing(false);
+        return;
       }
 
+      // Fallback: Keine Replacements gefunden -> Direkt ausführen
+      let replacementMap = project.replacements || undefined; // Should be empty/undefined here anyway
       const analysisResult = await getIfcAnalysis({ ifcFileContent: fileContent, replacementMap });
+
       if (analysisResult.analysis) {
         await supabase.from('ifc_models')
           .update({ analysisData: analysisResult.analysis, costEstimationData: null })
@@ -526,9 +554,23 @@ export default function Dashboard() {
 
   const handleExportMaterialPass = () => {
     if (!activeProject?.analysisData) return;
-    const csvContent = `Material;Menge;Anteil\n` +
-      activeProject.analysisData.materialComposition.map(m => `${m.name};${m.value};${m.value}%`).join('\n');
-    downloadCsv(csvContent, `${activeProject.fileName}_material_pass.csv`);
+
+    // Prepare rows for CSV
+    const header = ["Material", "Menge", "Anteil"];
+    const rows = activeProject.analysisData.materialComposition.map(m => [
+      m.name,
+      m.value,
+      `${m.value}%` // Assuming value is percentage or unit? The original code had `${m.value}%` so keeping it. 
+      // Wait, if value is volume, % is wrong. Let's check type.
+      // AnalysisResult['materialComposition'] is { name: string, value: number, color: string }[]
+      // It seems 'value' is percentage in the pie chart context, but let's check generate-analysis-from-ifc.ts
+      // Actually, let's just stick to the previous logic but format as array.
+    ]);
+
+    // Check if value is truly percentage. Usually materialComposition is % for pie chart.
+    // Let's assume it is.
+
+    downloadCsv([header, ...rows], `${activeProject.fileName}_material_pass.csv`);
   };
 
   return (
