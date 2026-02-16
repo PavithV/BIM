@@ -123,14 +123,14 @@ export const config = {
                         .upsert({
                             id: userId, // Explicitly provide the resolved UUID
                             email: user.email,
-                            name: user.name,
+                            name: user.name ?? undefined,
                             kit_kuerzel: (user as any).kit_kuerzel,
                             first_name: (user as any).given_name,
                             last_name: (user as any).family_name,
                             affiliation: (user as any).affiliation,
                             last_seen: new Date().toISOString(),
                         }, {
-                            onConflict: 'kit_kuerzel',
+                            onConflict: 'id',
                         })
 
                     if (error) {
