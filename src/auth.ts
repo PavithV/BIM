@@ -5,6 +5,7 @@ import { z } from "zod"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 
 export const config = {
+    trustHost: true,
     theme: {
         logo: "https://next-auth.js.org/img/logo/logo-sm.png",
     },
@@ -21,6 +22,7 @@ export const config = {
                     scope: "openid profile email",
                 },
             },
+            checks: ["pkce", "state"],
             profile(profile) {
                 return {
                     id: profile.sub,
