@@ -94,8 +94,7 @@ export const config = {
                             affiliation: (user as any).affiliation,
                             last_seen: new Date().toISOString(),
                         }, {
-                            onConflict: 'email', // Use email as unique identifier for upsert
-                            ignoreDuplicates: false,
+                            onConflict: 'kit_kuerzel',
                         })
 
                     if (error) {
