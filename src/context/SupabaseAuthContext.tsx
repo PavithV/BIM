@@ -1,11 +1,19 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase/client';
+import { createContext, useContext } from 'react';
+import { useSession, signOut as nextAuthSignOut, SessionProvider } from 'next-auth/react';
+import { Session } from 'next-auth';
+
+// Define a compatible User type based on what components might expect
+interface CompatibleUser {
+    id: string;
+    email?: string | null;
+    name?: string | null;
+    image?: string | null;
+}
 
 interface SupabaseAuthContextType {
-    user: User | null;
+    user: CompatibleUser | null;
     session: Session | null;
     loading: boolean;
     signOut: () => Promise<void>;
@@ -13,47 +21,38 @@ interface SupabaseAuthContextType {
 
 const SupabaseAuthContext = createContext<SupabaseAuthContextType | undefined>(undefined);
 
-export function SupabaseAuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
-    const [session, setSession] = useState<Session | null>(null);
-    const [loading, setLoading] = useState(true);
+function InternalSupabaseAuthProvider({ children }: { children: React.ReactNode }) {
+    const { data: session, status } = useSession();
 
-    useEffect(() => {
-        // Initial session check
-        const checkSession = async () => {
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
-                setSession(session);
-                setUser(session?.user ?? null);
-            } catch (error) {
-                console.error('Error checking session:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
+    const loading = status === 'loading';
 
-        checkSession();
-
-        // Listen for changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-            setLoading(false);
-        });
-
-        return () => {
-            subscription.unsubscribe();
-        };
-    }, []);
+    // Map NextAuth user to compatible format
+    const user: CompatibleUser | null = session?.user ? {
+        id: session.user.id || 'unknown', // Use ID from session
+        email: session.user.email,
+        name: session.user.name,
+        image: session.user.image,
+    } : null;
 
     const signOut = async () => {
-        await supabase.auth.signOut();
+        await nextAuthSignOut({ callbackUrl: '/login' });
     };
 
     return (
         <SupabaseAuthContext.Provider value={{ user, session, loading, signOut }}>
             {children}
         </SupabaseAuthContext.Provider>
+    );
+}
+
+// Export the wrapper that includes SessionProvider as the default named export
+export function SupabaseAuthProvider({ children }: { children: React.ReactNode }) {
+    return (
+        <SessionProvider>
+            <InternalSupabaseAuthProvider>
+                {children}
+            </InternalSupabaseAuthProvider>
+        </SessionProvider>
     );
 }
 

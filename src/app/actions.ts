@@ -9,11 +9,12 @@ import { ZodError } from 'zod';
 import { compressIfcFile, getProposedMaterialReplacements, type MaterialReplacement } from '@/utils/ifcCompressor';
 import { createClient } from '@/lib/supabase/server';
 
-async function requireAuth() {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
+import { auth } from '@/auth';
 
-  if (error || !user) {
+async function requireAuth() {
+  const session = await auth();
+
+  if (!session?.user) {
     throw new Error('Unauthorized');
   }
 }

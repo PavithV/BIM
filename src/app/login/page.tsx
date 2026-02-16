@@ -3,51 +3,21 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Building, Loader2 } from 'lucide-react';
+import { LoginButtonKIT } from '@/components/login-button-kit';
+import { signIn } from 'next-auth/react';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
 
-      if (error) throw error;
-
-      router.push('/');
-      router.refresh();
-    } catch (error: any) {
-      console.error(error);
-      let errorMessage = 'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.';
-
-      if (error.message === 'Invalid login credentials') {
-        errorMessage = 'Ungültige E-Mail-Adresse oder Passwort.';
-      }
-
-      toast({
-        title: 'Fehler bei der Anmeldung',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted/40 p-4">
@@ -61,16 +31,63 @@ export default function LoginPage() {
           <CardDescription>Geben Sie Ihre E-Mail-Adresse unten ein, um sich bei Ihrem Konto anzumelden.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSignIn} className="grid gap-4">
+          <div className="grid gap-4">
+            <LoginButtonKIT />
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Oder mit E-Mail
+                </span>
+              </div>
+            </div>
+          </div>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            setIsLoading(true);
+            const formData = new FormData(e.currentTarget);
+            const email = formData.get('email') as string;
+            const password = formData.get('password') as string;
+
+            try {
+              const result = await signIn("credentials", {
+                email,
+                password,
+                redirect: false,
+              });
+
+              if (result?.error) {
+                console.error("Login error:", result.error);
+                toast({
+                  title: 'Fehler bei der Anmeldung',
+                  description: 'Ungültige E-Mail-Adresse oder Passwort.',
+                  variant: 'destructive',
+                });
+              } else {
+                router.push('/');
+                router.refresh();
+              }
+            } catch (error) {
+              console.error(error);
+              toast({
+                title: 'Fehler bei der Anmeldung',
+                description: 'Ein unerwarteter Fehler ist aufgetreten.',
+                variant: 'destructive',
+              });
+            } finally {
+              setIsLoading(false);
+            }
+          }} className="grid gap-4 mt-4">
             <div className="grid gap-2">
               <Label htmlFor="email">E-Mail</Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
                 placeholder="m@beispiel.de"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
               />
             </div>
@@ -78,10 +95,9 @@ export default function LoginPage() {
               <Label htmlFor="password">Passwort</Label>
               <Input
                 id="password"
+                name="password"
                 type="password"
                 required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
               />
             </div>
