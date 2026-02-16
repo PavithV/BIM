@@ -84,12 +84,46 @@ export const config = {
         async signIn({ user, account, profile }) {
             if (account?.provider === "kit") {
                 try {
-                    // Upsert user data to Supabase
+                    let userId = user.id; // Default to incoming ID, but we strictly need a Supabase UUID if strict FK is on.
+
+                    // 1. Try to create a shadow user in Supabase Auth to satisfy FK constraint
+                    // and to ensure we have a valid UUID.
+                    const { data: newAuthUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+                        email: user.email,
+                        email_confirm: true,
+                        user_metadata: { source: 'kit_oidc' }
+                    });
+
+                    if (newAuthUser?.user) {
+                        // Success: We created a new Auth user. Use this UUID.
+                        userId = newAuthUser.user.id;
+                    } else {
+                        // Error (likely "User already registered"): User exists in Auth.
+                        // We try to find the existing user in public.users to get their UUID.
+                        const { data: existingPublicUser } = await supabaseAdmin
+                            .from('users')
+                            .select('id')
+                            .eq('email', user.email)
+                            .maybeSingle(); // Use maybeSingle to avoid error if not found
+
+                        if (existingPublicUser) {
+                            userId = existingPublicUser.id;
+                        } else {
+                            // Edge Case: User in Auth but not in Public.
+                            // We can't easily get the Auth ID without listUsers (expensive) or bypassing.
+                            // However, if we don't provide a valid UUID that matches Auth, FK will fail.
+                            // We will proceed; if this fails, the user might need to contact support or we need to drop the FK.
+                            console.warn("User exists in Auth but not Public. Upsert might fail if FK is strict.");
+                        }
+                    }
+
+                    // 2. Upsert user data to Supabase public.users
                     const { error } = await supabaseAdmin
-                        .from('users') // Assuming 'users' table exists in public schema
+                        .from('users')
                         .upsert({
+                            id: userId, // Explicitly provide the resolved UUID
                             email: user.email,
-                            name: user.name, // Mapping standard OIDC name to existing 'name' column
+                            name: user.name,
                             kit_kuerzel: (user as any).kit_kuerzel,
                             first_name: (user as any).given_name,
                             last_name: (user as any).family_name,
