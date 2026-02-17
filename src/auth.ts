@@ -118,16 +118,18 @@ export const config = {
                     }
 
                     // 2. Upsert user data to Supabase public.users
+                    console.log("Admin Client Key Check:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "Key loaded: " + process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 10) + "..." : "KEY MISSING!");
+
                     const { error } = await supabaseAdmin
                         .from('users')
                         .upsert({
                             id: userId, // Explicitly provide the resolved UUID
                             email: user.email,
                             name: user.name ?? undefined,
-                            kit_kuerzel: (user as any).kit_kuerzel,
-                            first_name: (user as any).given_name,
-                            last_name: (user as any).family_name,
-                            affiliation: (user as any).affiliation,
+                            kit_kuerzel: (profile as any).preferred_username,
+                            first_name: (profile as any).given_name,
+                            last_name: (profile as any).family_name,
+                            affiliation: (profile as any).affiliation,
                             last_seen: new Date().toISOString(),
                         }, {
                             onConflict: 'id',
