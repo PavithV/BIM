@@ -89,7 +89,7 @@ export const config = {
                     // 1. Try to create a shadow user in Supabase Auth to satisfy FK constraint
                     // and to ensure we have a valid UUID.
                     const { data: newAuthUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-                        email: user.email,
+                        email: user.email || undefined,
                         email_confirm: true,
                         user_metadata: { source: 'kit_oidc' }
                     });
@@ -119,6 +119,15 @@ export const config = {
 
                     // 2. Upsert user data to Supabase public.users
                     console.log("Admin Client Key Check:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "Key loaded: " + process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 10) + "..." : "KEY MISSING!");
+                    console.log("KIT OIDC Profile Dump:", JSON.stringify(profile, null, 2));
+
+                    const profileData = profile || {}; // Safe access
+
+                    // Fallback logic for names
+                    const firstName = (profileData as any).given_name || (profileData.name ? profileData.name.split(' ')[0] : '');
+                    const lastName = (profileData as any).family_name || (profileData.name ? profileData.name.split(' ').slice(1).join(' ') : '');
+                    const affiliation = (profileData as any).affiliation || (profileData as any).eduperson_affiliation || (profileData as any).unscoped_affiliation || undefined;
+
 
                     const { error } = await supabaseAdmin
                         .from('users')
@@ -126,10 +135,10 @@ export const config = {
                             id: userId, // Explicitly provide the resolved UUID
                             email: user.email,
                             name: user.name ?? undefined,
-                            kit_kuerzel: (profile as any).preferred_username,
-                            first_name: (profile as any).given_name,
-                            last_name: (profile as any).family_name,
-                            affiliation: (profile as any).affiliation,
+                            kit_kuerzel: (profileData as any).preferred_username,
+                            first_name: firstName,
+                            last_name: lastName,
+                            affiliation: affiliation,
                             last_seen: new Date().toISOString(),
                         }, {
                             onConflict: 'id',
