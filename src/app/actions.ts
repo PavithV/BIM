@@ -10,6 +10,33 @@ import { compressIfcFile, getProposedMaterialReplacements, type MaterialReplacem
 import { createClient } from '@/lib/supabase/server';
 
 import { auth } from '@/auth';
+import { supabaseAdmin } from '@/lib/supabase/admin';
+
+export async function fetchUserProjects() {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return { error: 'Nicht authentifiziert' };
+  }
+
+  try {
+    const { data: projects, error } = await supabaseAdmin
+      .from('ifc_models')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('uploadDate', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching projects:', error);
+      return { error: 'Fehler beim Laden der Projekte.' };
+    }
+
+    return { projects };
+  } catch (error) {
+    console.error('Unexpected error fetching projects:', error);
+    return { error: 'Ein unerwarteter Fehler ist aufgetreten.' };
+  }
+}
 
 async function requireAuth() {
   const session = await auth();

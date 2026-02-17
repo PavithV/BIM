@@ -10,7 +10,7 @@ import { ChatAssistant } from '@/components/chat-assistant';
 import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2, Euro, Leaf, Layers, GitCompare, FilePlus } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
-import { getStartingPrompts, getAIChatFeedback, getIfcAnalysis, getCostEstimation, checkMaterialReplacements } from '@/app/actions';
+import { getStartingPrompts, getAIChatFeedback, getIfcAnalysis, getCostEstimation, checkMaterialReplacements, fetchUserProjects } from '@/app/actions';
 import { MaterialReviewModal, type MaterialReplacement } from './material-review-modal';
 import { parseIFC, toJSONString } from '@/utils/ifcParser';
 import { applyReplacementsToIfc } from '@/utils/ifc-modification';
@@ -131,34 +131,31 @@ export default function Dashboard() {
 
     setIsProjectsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('ifc_models')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('uploadDate', { ascending: false });
+      const { projects: userProjects, error } = await fetchUserProjects();
 
-      if (error) throw error;
+      if (error) throw new Error(error);
 
-      const userProjects = data as IFCModel[];
-      setProjects(userProjects);
+      if (userProjects) {
+        setProjects(userProjects);
 
-      if (!skipActiveProjectUpdate) {
-        if (userProjects.length > 0) {
-          if (!activeProject) {
-            setActiveProject(userProjects[0]);
+        if (!skipActiveProjectUpdate) {
+          if (userProjects.length > 0) {
+            if (!activeProject) {
+              setActiveProject(userProjects[0]);
+            } else {
+              const updatedActiveProject = userProjects.find(p => p.id === activeProject.id);
+              setActiveProject(updatedActiveProject || userProjects[0]);
+            }
           } else {
-            const updatedActiveProject = userProjects.find(p => p.id === activeProject.id);
-            setActiveProject(updatedActiveProject || userProjects[0]);
+            setActiveProject(null);
           }
-        } else {
-          setActiveProject(null);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching projects: ", error);
       toast({
         title: "Fehler beim Laden der Projekte",
-        description: "Ihre Projekte konnten nicht geladen werden.",
+        description: error.message || "Ihre Projekte konnten nicht geladen werden.", // Use error.message if available
         variant: "destructive",
       });
     } finally {
