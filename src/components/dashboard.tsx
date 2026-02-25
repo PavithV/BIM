@@ -10,7 +10,7 @@ import { ChatAssistant } from '@/components/chat-assistant';
 import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2, Euro, Leaf, Layers, GitCompare, FilePlus } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
-import { getStartingPrompts, getAIChatFeedback, getIfcAnalysis, getCostEstimation, checkMaterialReplacements, fetchUserProjects } from '@/app/actions';
+import { getStartingPrompts, getAIChatFeedback, getIfcAnalysis, getCostEstimation, checkMaterialReplacements, fetchUserProjects, createSignedUploadUrl, createIfcModelRecord, insertMessage, fetchMessagesForProject, updateIfcModel } from '@/app/actions';
 import { MaterialReviewModal, type MaterialReplacement } from './material-review-modal';
 import { parseIFC, toJSONString } from '@/utils/ifcParser';
 import { applyReplacementsToIfc } from '@/utils/ifc-modification';
@@ -81,16 +81,12 @@ export default function Dashboard() {
       return;
     }
     setMessagesLoading(true);
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('ifc_model_id', activeProject.id)
-      .order('createdAt', { ascending: true });
+    const result = await fetchMessagesForProject(activeProject.id);
 
-    if (error) {
-      console.error('Error fetching messages:', error);
+    if (result.error) {
+      console.error('Error fetching messages:', result.error);
     } else {
-      setActiveMessages(data as Message[] || []);
+      setActiveMessages(result.messages as Message[] || []);
     }
     setMessagesLoading(false);
   }, [activeProject, user]);
@@ -205,12 +201,9 @@ export default function Dashboard() {
       const result = await getCostEstimation(input);
 
       if (result.costs) {
-        const { error } = await supabase
-          .from('ifc_models')
-          .update({ costEstimationData: result.costs })
-          .eq('id', project.id);
+        const updateResult = await updateIfcModel(project.id, { costEstimationData: result.costs });
 
-        if (error) throw error;
+        if (updateResult.error) throw new Error(updateResult.error);
         await fetchProjects();
         toast({ title: "Erfolg", description: "Kostenschätzung erstellt." });
       } else {
@@ -280,9 +273,7 @@ export default function Dashboard() {
       try {
         const analysisResult = await getIfcAnalysis({ ifcFileContent: fileContent, replacementMap });
         if (analysisResult.analysis) {
-          await supabase.from('ifc_models')
-            .update({ analysisData: analysisResult.analysis, costEstimationData: null })
-            .eq('id', project.id);
+          await updateIfcModel(project.id, { analysisData: analysisResult.analysis, costEstimationData: null });
 
           setActiveProject(prev => prev ? { ...prev, analysisData: analysisResult.analysis || null, costEstimationData: null } : null);
           await fetchProjects();
@@ -304,8 +295,8 @@ export default function Dashboard() {
         const result = await getAIChatFeedback({ ifcModelData: ifcToSend, userQuestion, replacementMap });
         const content = result.feedback || result.error || 'Fehler aufgetreten.';
 
-        await supabase.from('messages').insert({
-          ifc_model_id: activeProject.id, user_id: user.id, role: 'assistant', content
+        await insertMessage({
+          ifc_model_id: activeProject.id, role: 'assistant', content
         });
         await fetchMessages();
       } catch (error) {
@@ -321,7 +312,7 @@ export default function Dashboard() {
   const handleReviewConfirm = async (approvedMap: Record<string, string>) => {
     setMaterialReviewOpen(false);
     if (activeProject && user) {
-      await supabase.from('ifc_models').update({ replacements: approvedMap }).eq('id', activeProject.id);
+      await updateIfcModel(activeProject.id, { replacements: approvedMap });
       setActiveProject(prev => prev ? { ...prev, replacements: approvedMap } : null);
     }
     executePendingAction(approvedMap);
@@ -402,9 +393,7 @@ export default function Dashboard() {
       const analysisResult = await getIfcAnalysis({ ifcFileContent: fileContent, replacementMap });
 
       if (analysisResult.analysis) {
-        await supabase.from('ifc_models')
-          .update({ analysisData: analysisResult.analysis, costEstimationData: null })
-          .eq('id', project.id);
+        await updateIfcModel(project.id, { analysisData: analysisResult.analysis, costEstimationData: null });
         setActiveProject(prev => prev ? { ...prev, analysisData: analysisResult.analysis || null, costEstimationData: null } : null);
         fetchProjects();
         toast({ title: "Analyse abgeschlossen" });
@@ -430,18 +419,18 @@ export default function Dashboard() {
     setIsLoading(true);
 
     try {
-      // 1. User Message: Insert & Update State
-      const { data: userMsg, error: userError } = await supabase.from('messages').insert({
-        ifc_model_id: activeProject.id, user_id: user.id, role: 'user', content: userQuestion
-      }).select().single();
+      // 1. User Message: Insert via Server Action & Update State
+      const userMsgResult = await insertMessage({
+        ifc_model_id: activeProject.id, role: 'user', content: userQuestion
+      });
 
-      if (userMsg) {
+      if (userMsgResult.message) {
         setActiveMessages(prev => {
-          if (prev.some(m => m.id === userMsg.id)) return prev;
-          return [...prev, userMsg as Message];
+          if (prev.some(m => m.id === userMsgResult.message.id)) return prev;
+          return [...prev, userMsgResult.message as Message];
         });
-      } else if (userError) {
-        console.error("Error sending user message:", userError);
+      } else if (userMsgResult.error) {
+        console.error("Error sending user message:", userMsgResult.error);
       }
 
       // Prepare payload for AI
@@ -467,17 +456,17 @@ export default function Dashboard() {
       const result = await getAIChatFeedback({ ifcModelData: ifcToSend, userQuestion, replacementMap });
       const content = result.feedback || result.error || 'Fehler.';
 
-      const { data: aiMsg, error: aiError } = await supabase.from('messages').insert({
-        ifc_model_id: activeProject.id, user_id: user.id, role: 'assistant', content
-      }).select().single();
+      const aiMsgResult = await insertMessage({
+        ifc_model_id: activeProject.id, role: 'assistant', content
+      });
 
-      if (aiMsg) {
+      if (aiMsgResult.message) {
         setActiveMessages(prev => {
-          if (prev.some(m => m.id === aiMsg.id)) return prev;
-          return [...prev, aiMsg as Message];
+          if (prev.some(m => m.id === aiMsgResult.message.id)) return prev;
+          return [...prev, aiMsgResult.message as Message];
         });
-      } else if (aiError) {
-        console.error("Error saving assistant message:", aiError);
+      } else if (aiMsgResult.error) {
+        console.error("Error saving assistant message:", aiMsgResult.error);
       }
 
       // 3. Fallback Sync
@@ -499,39 +488,35 @@ export default function Dashboard() {
     setIsProjectsLoading(true);
 
     try {
-      // 1. Wir nutzen IMMER Storage, egal wie klein die Datei ist.
-      // Das verhindert Base64 Probleme und DB-Bloat.
-      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const timestamp = Date.now();
-      const storagePath = `users/${user.id}/${timestamp}_${sanitizedFileName}`;
+      // 1. Get signed upload URL from server (bypasses RLS)
+      const urlResult = await createSignedUploadUrl(file.name, file.size);
+      if (urlResult.error || !urlResult.signedUrl || !urlResult.storagePath || !urlResult.token) {
+        throw new Error(urlResult.error || 'Signed Upload URL konnte nicht erstellt werden.');
+      }
 
-      console.log('Uploading to Storage:', storagePath);
+      console.log('Uploading to Storage via signed URL:', urlResult.storagePath);
 
+      // 2. Upload directly from browser to Supabase Storage using signed URL
       const { error: uploadError } = await supabase.storage
         .from('ifc-models')
-        .upload(storagePath, file);
+        .uploadToSignedUrl(urlResult.storagePath, urlResult.token, file);
 
       if (uploadError) throw uploadError;
 
-      // 2. DB Eintrag erstellen
+      // 3. Create DB record via server action (bypasses RLS)
       console.log('Creating DB Record...');
-      const { data: newProject, error: insertError } = await supabase
-        .from('ifc_models')
-        .insert({
-          user_id: user.id,
-          fileName: file.name,
-          fileSize: file.size,
-          fileContent: null, // Wir speichern den Content NICHT mehr in der DB
-          fileUrl: null,     // URL holen wir bei Bedarf dynamisch oder via Storage Path
-          fileStoragePath: storagePath
-        })
-        .select()
-        .single();
+      const recordResult = await createIfcModelRecord({
+        fileName: file.name,
+        fileSize: file.size,
+        fileStoragePath: urlResult.storagePath,
+      });
 
-      if (insertError) throw insertError;
+      if (recordResult.error || !recordResult.project) {
+        throw new Error(recordResult.error || 'Projekteintrag konnte nicht erstellt werden.');
+      }
 
-      // 3. UI Update
-      setActiveProject(newProject as IFCModel);
+      // 4. UI Update
+      setActiveProject(recordResult.project as IFCModel);
       await fetchProjects(true);
       setSelectedElementId(null);
 

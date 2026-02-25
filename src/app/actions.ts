@@ -155,3 +155,168 @@ export async function getCostEstimation(input: MaterialCompositionInput): Promis
     return { error: getDetailedErrorMessage(error) };
   }
 }
+
+// ----------------------------------------------------------------
+// Server Actions that bypass RLS (using supabaseAdmin)
+// These replace direct browser-side Supabase calls.
+// ----------------------------------------------------------------
+
+/**
+ * Creates a signed upload URL so the browser can upload directly to Supabase Storage
+ * without needing a Supabase Auth session.
+ */
+export async function createSignedUploadUrl(fileName: string, fileSize: number): Promise<{ signedUrl?: string; token?: string; storagePath?: string; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { error: 'Nicht authentifiziert' };
+
+  try {
+    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const timestamp = Date.now();
+    const storagePath = `users/${session.user.id}/${timestamp}_${sanitizedFileName}`;
+
+    const { data, error } = await supabaseAdmin.storage
+      .from('ifc-models')
+      .createSignedUploadUrl(storagePath);
+
+    if (error) {
+      console.error('Error creating signed upload URL:', error);
+      return { error: 'Fehler beim Erstellen der Upload-URL.' };
+    }
+
+    return {
+      signedUrl: data.signedUrl,
+      token: data.token,
+      storagePath,
+    };
+  } catch (error) {
+    console.error('Unexpected error creating signed upload URL:', error);
+    return { error: 'Ein unerwarteter Fehler ist aufgetreten.' };
+  }
+}
+
+/**
+ * Creates a new ifc_models record in the database.
+ */
+export async function createIfcModelRecord(input: {
+  fileName: string;
+  fileSize: number;
+  fileStoragePath: string;
+}): Promise<{ project?: any; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { error: 'Nicht authentifiziert' };
+
+  try {
+    const { data: newProject, error } = await supabaseAdmin
+      .from('ifc_models')
+      .insert({
+        user_id: session.user.id,
+        fileName: input.fileName,
+        fileSize: input.fileSize,
+        fileContent: null,
+        fileUrl: null,
+        fileStoragePath: input.fileStoragePath,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating ifc_model record:', error);
+      return { error: 'Fehler beim Erstellen des Projekteintrags.' };
+    }
+
+    return { project: newProject };
+  } catch (error) {
+    console.error('Unexpected error creating ifc_model record:', error);
+    return { error: 'Ein unerwarteter Fehler ist aufgetreten.' };
+  }
+}
+
+/**
+ * Inserts a message into the messages table.
+ */
+export async function insertMessage(input: {
+  ifc_model_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+}): Promise<{ message?: any; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { error: 'Nicht authentifiziert' };
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('messages')
+      .insert({
+        ifc_model_id: input.ifc_model_id,
+        user_id: session.user.id,
+        role: input.role,
+        content: input.content,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error inserting message:', error);
+      return { error: 'Fehler beim Speichern der Nachricht.' };
+    }
+
+    return { message: data };
+  } catch (error) {
+    console.error('Unexpected error inserting message:', error);
+    return { error: 'Ein unerwarteter Fehler ist aufgetreten.' };
+  }
+}
+
+/**
+ * Fetches messages for a given project.
+ */
+export async function fetchMessagesForProject(ifcModelId: string): Promise<{ messages?: any[]; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { error: 'Nicht authentifiziert' };
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('messages')
+      .select('*')
+      .eq('ifc_model_id', ifcModelId)
+      .order('createdAt', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching messages:', error);
+      return { error: 'Fehler beim Laden der Nachrichten.' };
+    }
+
+    return { messages: data || [] };
+  } catch (error) {
+    console.error('Unexpected error fetching messages:', error);
+    return { error: 'Ein unerwarteter Fehler ist aufgetreten.' };
+  }
+}
+
+/**
+ * Updates an ifc_models record (for analysis data, cost estimation, replacements, etc.)
+ */
+export async function updateIfcModel(
+  projectId: string,
+  updateData: Record<string, any>
+): Promise<{ error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { error: 'Nicht authentifiziert' };
+
+  try {
+    const { error } = await supabaseAdmin
+      .from('ifc_models')
+      .update(updateData)
+      .eq('id', projectId)
+      .eq('user_id', session.user.id); // Extra safety: only update own projects
+
+    if (error) {
+      console.error('Error updating ifc_model:', error);
+      return { error: 'Fehler beim Aktualisieren des Projekts.' };
+    }
+
+    return {};
+  } catch (error) {
+    console.error('Unexpected error updating ifc_model:', error);
+    return { error: 'Ein unerwarteter Fehler ist aufgetreten.' };
+  }
+}
