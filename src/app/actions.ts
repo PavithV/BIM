@@ -320,3 +320,54 @@ export async function updateIfcModel(
     return { error: 'Ein unerwarteter Fehler ist aufgetreten.' };
   }
 }
+
+/**
+ * Deletes an IFC project: removes the file from Storage and the DB record.
+ */
+export async function deleteIfcProject(projectId: string): Promise<{ error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { error: 'Nicht authentifiziert' };
+
+  try {
+    // 1. Find the project to get storage path
+    const { data: project, error: fetchError } = await supabaseAdmin
+      .from('ifc_models')
+      .select('fileStoragePath')
+      .eq('id', projectId)
+      .eq('user_id', session.user.id)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching project for deletion:', fetchError);
+      return { error: 'Projekt nicht gefunden.' };
+    }
+
+    // 2. Delete file from Storage
+    if (project?.fileStoragePath) {
+      const { error: storageError } = await supabaseAdmin.storage
+        .from('ifc-models')
+        .remove([project.fileStoragePath]);
+
+      if (storageError) {
+        console.warn('Error deleting file from Storage:', storageError);
+      }
+    }
+
+    // 3. Delete DB record (cascade should handle messages)
+    const { error: deleteError } = await supabaseAdmin
+      .from('ifc_models')
+      .delete()
+      .eq('id', projectId)
+      .eq('user_id', session.user.id);
+
+    if (deleteError) {
+      console.error('Error deleting ifc_model:', deleteError);
+      return { error: 'Fehler beim Löschen des Projekts.' };
+    }
+
+    return {};
+  } catch (error) {
+    console.error('Unexpected error deleting project:', error);
+    return { error: 'Ein unerwarteter Fehler ist aufgetreten.' };
+  }
+}

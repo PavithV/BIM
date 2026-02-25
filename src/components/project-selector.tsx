@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase/client';
+import { deleteIfcProject } from '@/app/actions';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { Button } from './ui/button';
 import { FileUploader } from './file-uploader';
@@ -45,28 +45,12 @@ export function ProjectSelector({ projects, isLoading, onSelectProject, onUpload
         onSelectProject(null);
       }
 
-      // Find the project to get the storage path
-      const project = projects.find(p => p.id === projectId);
-
-      // Delete the file from Supabase Storage if it exists
-      if (project?.fileStoragePath) {
-        try {
-          console.log('Deleting file from Storage:', project.fileStoragePath);
-          const { error } = await supabase.storage.from('ifc-models').remove([project.fileStoragePath]);
-          if (error) throw error;
-          console.log('File deleted from Storage successfully');
-        } catch (storageError) {
-          console.warn('Error deleting file from Storage:', storageError);
-        }
+      // Delete project via server action (handles Storage + DB, bypasses RLS)
+      const result = await deleteIfcProject(projectId);
+      if (result.error) {
+        console.error('Error deleting project:', result.error);
+        return;
       }
-
-      // Delete the project document from Database (Cascade should handle messages)
-      const { error } = await supabase
-        .from('ifc_models')
-        .delete()
-        .eq('id', projectId);
-
-      if (error) throw error;
 
       // Trigger a refetch in the parent component
       await onDeleteProject();
