@@ -84,36 +84,47 @@ export const config = {
         async signIn({ user, account, profile }) {
             if (account?.provider === "kit") {
                 try {
-                    let userId = user.id; // Default to incoming ID, but we strictly need a Supabase UUID if strict FK is on.
+                    let userId: string | null = null;
 
-                    // 1. Try to create a shadow user in Supabase Auth to satisfy FK constraint
-                    // and to ensure we have a valid UUID.
-                    const { data: newAuthUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-                        email: user.email || undefined,
-                        email_confirm: true,
-                        user_metadata: { source: 'kit_oidc' }
-                    });
+                    // Step 1: Check if user already exists in public.users
+                    const { data: existingPublicUser } = await supabaseAdmin
+                        .from('users')
+                        .select('id')
+                        .eq('email', user.email)
+                        .maybeSingle();
 
-                    if (newAuthUser?.user) {
-                        // Success: We created a new Auth user. Use this UUID.
-                        userId = newAuthUser.user.id;
+                    if (existingPublicUser) {
+                        // User exists in public.users — use their existing UUID
+                        userId = existingPublicUser.id;
                     } else {
-                        // Error (likely "User already registered"): User exists in Auth.
-                        // We try to find the existing user in public.users to get their UUID.
-                        const { data: existingPublicUser } = await supabaseAdmin
-                            .from('users')
-                            .select('id')
-                            .eq('email', user.email)
-                            .maybeSingle(); // Use maybeSingle to avoid error if not found
+                        // Step 2: User not in public.users — try to create a shadow Auth user
+                        const { data: newAuthUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+                            email: user.email || undefined,
+                            email_confirm: true,
+                            user_metadata: { source: 'kit_oidc' }
+                        });
 
-                        if (existingPublicUser) {
-                            userId = existingPublicUser.id;
+                        if (newAuthUser?.user) {
+                            // New Auth user created successfully
+                            userId = newAuthUser.user.id;
                         } else {
-                            // Edge Case: User in Auth but not in Public.
-                            // We can't easily get the Auth ID without listUsers (expensive) or bypassing.
-                            // However, if we don't provide a valid UUID that matches Auth, FK will fail.
-                            // We will proceed; if this fails, the user might need to contact support or we need to drop the FK.
-                            console.warn("User exists in Auth but not Public. Upsert might fail if FK is strict.");
+                            // Step 3: Auth user already exists but not in public.users
+                            // (e.g. from a previous failed login). Find their UUID.
+                            console.log("Auth user exists but not in public.users. Looking up Auth UUID...");
+                            const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+
+                            if (!listError && listData?.users) {
+                                const authUser = listData.users.find(u => u.email === user.email);
+                                if (authUser) {
+                                    userId = authUser.id;
+                                    console.log("Found Auth UUID:", userId);
+                                }
+                            }
+
+                            if (!userId) {
+                                console.error("Could not resolve Supabase Auth UUID for:", user.email);
+                                return false;
+                            }
                         }
                     }
 
