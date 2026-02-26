@@ -3,6 +3,7 @@ import type { NextAuthConfig } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import { z } from "zod"
 import { supabaseAdmin } from "@/lib/supabase/admin"
+import { createClient } from "@supabase/supabase-js"
 
 export const config = {
     trustHost: true,
@@ -84,10 +85,18 @@ export const config = {
         async signIn({ user, account, profile }) {
             if (account?.provider === "kit") {
                 try {
+                    // Create a FRESH admin client to ensure service role key is used
+                    // (avoids potential singleton/bundling issues in auth route handler)
+                    const admin = createClient(
+                        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+                        { auth: { autoRefreshToken: false, persistSession: false } }
+                    );
+
                     let userId: string | null = null;
 
                     // Step 1: Check if user already exists in public.users
-                    const { data: existingPublicUser } = await supabaseAdmin
+                    const { data: existingPublicUser } = await admin
                         .from('users')
                         .select('id')
                         .eq('email', user.email)
@@ -98,7 +107,7 @@ export const config = {
                         userId = existingPublicUser.id;
                     } else {
                         // Step 2: User not in public.users — try to create a shadow Auth user
-                        const { data: newAuthUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+                        const { data: newAuthUser, error: createError } = await admin.auth.admin.createUser({
                             email: user.email || undefined,
                             email_confirm: true,
                             user_metadata: { source: 'kit_oidc' }
@@ -111,7 +120,7 @@ export const config = {
                             // Step 3: Auth user already exists but not in public.users
                             // (e.g. from a previous failed login). Find their UUID.
                             console.log("Auth user exists but not in public.users. Looking up Auth UUID...");
-                            const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+                            const { data: listData, error: listError } = await admin.auth.admin.listUsers({ perPage: 1000 });
 
                             if (!listError && listData?.users) {
                                 const authUser = listData.users.find(u => u.email === user.email);
@@ -128,8 +137,12 @@ export const config = {
                         }
                     }
 
-                    // 2. Upsert user data to Supabase public.users
-                    console.log("Admin Client Key Check:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "Key loaded: " + process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 10) + "..." : "KEY MISSING!");
+                    // CRITICAL: Override user.id with the Supabase UUID so the JWT/session
+                    // uses the correct ID (not the KIT OIDC sub).
+                    user.id = userId;
+
+                    // Upsert user data to Supabase public.users
+                    console.log("KIT Login - Resolved Supabase UUID:", userId);
                     console.log("KIT OIDC Profile Dump:", JSON.stringify(profile, null, 2));
 
                     const profileData = profile || {}; // Safe access
@@ -139,11 +152,10 @@ export const config = {
                     const lastName = (profileData as any).family_name || (profileData.name ? profileData.name.split(' ').slice(1).join(' ') : '');
                     const affiliation = (profileData as any).affiliation || (profileData as any).eduperson_affiliation || (profileData as any).unscoped_affiliation || undefined;
 
-
-                    const { error } = await supabaseAdmin
+                    const { error } = await admin
                         .from('users')
                         .upsert({
-                            id: userId, // Explicitly provide the resolved UUID
+                            id: userId, // Supabase Auth UUID
                             email: user.email,
                             name: user.name ?? undefined,
                             kit_kuerzel: (profileData as any).preferred_username,
@@ -184,7 +196,7 @@ export const config = {
         async jwt({ token, user }) {
             // Persist custom user data to the token
             if (user) {
-                token.sub = user.id; // Ensure sub is set to user ID
+                token.sub = user.id; // Now uses Supabase UUID (overridden in signIn callback)
                 token.kit_kuerzel = (user as any).kit_kuerzel;
                 token.affiliation = (user as any).affiliation;
             }
@@ -194,3 +206,4 @@ export const config = {
 } satisfies NextAuthConfig
 
 export const { handlers, auth, signIn, signOut } = NextAuth(config)
+
