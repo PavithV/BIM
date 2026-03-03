@@ -237,14 +237,29 @@ function processCompactModel(elements: any[], replacementMap?: Record<string, st
     try {
       const type = (el.type || '').replace(/^IFC/i, '');
 
+      // Helper function for parsing strings with units
+      const parseVal = (v: any) => {
+        if (typeof v === 'number') return v;
+        const num = Number(v);
+        if (!isNaN(num)) return num;
+        if (typeof v === 'string') {
+          const match = v.match(/([-+]?(?:\d+\.?\d*|\.\d+)(?:[Ee][-+]?\d+)?)/);
+          if (match) return parseFloat(match[0]);
+        }
+        return NaN;
+      };
+
       // Volumen
       let volume = 0;
       if (el.quantities) {
-        for (const prop of VOLUME_PROPERTIES) {
-          const val = el.quantities[prop] || el.quantities[prop.toLowerCase()] || el.quantities[prop.toUpperCase()];
-          if (val != null) {
-            volume = Number(val);
-            if (!isNaN(volume)) break;
+        if (el.quantities.volume !== undefined) volume = parseVal(el.quantities.volume);
+        if (volume === 0 || isNaN(volume)) {
+          for (const prop of VOLUME_PROPERTIES) {
+            const val = el.quantities[prop] || el.quantities[prop.toLowerCase()] || el.quantities[prop.toUpperCase()];
+            if (val != null) {
+              volume = parseVal(val);
+              if (!isNaN(volume) && volume > 0) break;
+            }
           }
         }
       }
@@ -252,12 +267,35 @@ function processCompactModel(elements: any[], replacementMap?: Record<string, st
       // Fläche
       let area = 0;
       if (el.quantities) {
-        for (const prop of AREA_PROPERTIES) {
-          const val = el.quantities[prop] || el.quantities[prop.toLowerCase()] || el.quantities[prop.toUpperCase()];
-          if (val != null) {
-            area = Number(val);
-            if (!isNaN(area)) break;
+        if (el.quantities.area !== undefined) area = parseVal(el.quantities.area);
+        if (area === 0 || isNaN(area)) {
+          for (const prop of AREA_PROPERTIES) {
+            const val = el.quantities[prop] || el.quantities[prop.toLowerCase()] || el.quantities[prop.toUpperCase()];
+            if (val != null) {
+              area = parseVal(val);
+              if (!isNaN(area) && area > 0) break;
+            }
           }
+        }
+      }
+
+      // Fallback: Wenn volume/area aus quantities nicht gefunden, suche in properties
+      if ((volume === 0 || area === 0) && el.properties && typeof el.properties === 'object') {
+        for (const [key, val] of Object.entries(el.properties)) {
+          const upperKey = key.toUpperCase();
+          if (volume === 0) {
+            if (VOLUME_PROPERTIES.some(p => upperKey.includes(p.toUpperCase())) || upperKey.includes('VOLUMEN')) {
+              const numVal = parseVal(val);
+              if (!isNaN(numVal) && numVal > 0) volume = numVal;
+            }
+          }
+          if (area === 0) {
+            if (AREA_PROPERTIES.some(p => upperKey.includes(p.toUpperCase())) || upperKey.includes('FLÄCHE') || upperKey.includes('FLAECHE')) {
+              const numVal = parseVal(val);
+              if (!isNaN(numVal) && numVal > 0) area = numVal;
+            }
+          }
+          if (volume > 0 && area > 0) break;
         }
       }
 
@@ -435,6 +473,279 @@ function getLayerMaterials(element: any, totalVolume: number, totalArea: number)
 
 /**
  * ==================================================================================
+ * GEOMETRY-BASED VOLUME/AREA COMPUTATION (Fallback when no quantities exist)
+ * ==================================================================================
+ */
+
+/**
+ * Berechnet Volumen und Fläche aus IFCEXTRUDEDAREASOLID Geometrie.
+ * Trace: Element → IFCPRODUCTDEFINITIONSHAPE → IFCSHAPEREPRESENTATION(Body) → IFCEXTRUDEDAREASOLID → Profil × Tiefe
+ */
+function computeGeometryVolume(
+  elementId: number,
+  instances: Map<number, { type: string; args: string }>
+): { volume: number; area: number } {
+  const result = { volume: 0, area: 0 };
+
+  try {
+    const element = instances.get(elementId);
+    if (!element) return result;
+
+    // Element args: (..., ObjectPlacement, Representation, ...)
+    // Representation is typically at index 6 for most IFC building elements
+    const elemParams = splitIfcArguments(element.args);
+
+    // Find the shape reference (IFCPRODUCTDEFINITIONSHAPE) - usually index 6
+    let shapeId: number | null = null;
+    for (let i = 5; i < Math.min(elemParams.length, 8); i++) {
+      const match = elemParams[i]?.match(/#(\d+)/);
+      if (match) {
+        const refId = parseInt(match[1]);
+        const refInst = instances.get(refId);
+        if (refInst && refInst.type.toUpperCase() === 'IFCPRODUCTDEFINITIONSHAPE') {
+          shapeId = refId;
+          break;
+        }
+      }
+    }
+    if (!shapeId) return result;
+
+    const shapeInst = instances.get(shapeId);
+    if (!shapeInst) return result;
+
+    // IFCPRODUCTDEFINITIONSHAPE($, $, (list of ShapeRepresentation refs))
+    const shapeParams = splitIfcArguments(shapeInst.args);
+    if (shapeParams.length < 3) return result;
+
+    // Find all shape representation refs
+    const shapeRepRefs = Array.from(shapeParams[2].matchAll(/#(\d+)/g)).map(m => parseInt(m[1]));
+
+    // Find the 'Body' representation
+    for (const repId of shapeRepRefs) {
+      const repInst = instances.get(repId);
+      if (!repInst || repInst.type.toUpperCase() !== 'IFCSHAPEREPRESENTATION') continue;
+
+      const repParams = splitIfcArguments(repInst.args);
+      // IFCSHAPEREPRESENTATION(Context, RepresentationIdentifier, RepresentationType, Items)
+      if (repParams.length < 4) continue;
+
+      const repIdentifier = cleanIfcString(repParams[1]).toUpperCase();
+      if (repIdentifier !== 'BODY') continue;
+
+      // Find IFCEXTRUDEDAREASOLID items
+      const itemRefs = Array.from(repParams[3].matchAll(/#(\d+)/g)).map(m => parseInt(m[1]));
+
+      for (const itemId of itemRefs) {
+        const itemInst = instances.get(itemId);
+        if (!itemInst) continue;
+
+        const itemType = itemInst.type.toUpperCase();
+
+        if (itemType === 'IFCEXTRUDEDAREASOLID') {
+          const geo = computeFromExtrudedAreaSolid(itemId, instances);
+          if (geo.volume > 0) {
+            result.volume += geo.volume;
+            result.area += geo.area;
+          }
+        } else if (itemType === 'IFCBOOLEANCLIPPINGRESULT') {
+          // Try to extract from the first operand (usually the base solid)
+          const boolParams = splitIfcArguments(itemInst.args);
+          // IFCBOOLEANCLIPPINGRESULT(.DIFFERENCE., #FirstOperand, #SecondOperand)
+          if (boolParams.length >= 2) {
+            const firstOpMatch = boolParams[1]?.match(/#(\d+)/);
+            if (firstOpMatch) {
+              const firstOpId = parseInt(firstOpMatch[1]);
+              const firstOp = instances.get(firstOpId);
+              if (firstOp && firstOp.type.toUpperCase() === 'IFCEXTRUDEDAREASOLID') {
+                const geo = computeFromExtrudedAreaSolid(firstOpId, instances);
+                if (geo.volume > 0) {
+                  result.volume += geo.volume;
+                  result.area += geo.area;
+                }
+              }
+            }
+          }
+        }
+        // IFCFACETEDBREP etc. too complex to compute volume from here
+      }
+
+      if (result.volume > 0) break; // Found geometry, stop searching
+    }
+  } catch (e) {
+    // Geometry computation is best-effort
+    console.warn(`[GEOM] Fehler bei Geometrie-Berechnung für #${elementId}:`, e);
+  }
+
+  return result;
+}
+
+/**
+ * Berechnet Volume/Area aus IFCEXTRUDEDAREASOLID: Profil-Fläche × Extrusionstiefe
+ */
+function computeFromExtrudedAreaSolid(
+  solidId: number,
+  instances: Map<number, { type: string; args: string }>
+): { volume: number; area: number } {
+  const solid = instances.get(solidId);
+  if (!solid) return { volume: 0, area: 0 };
+
+  // IFCEXTRUDEDAREASOLID(SweptArea, Position, ExtrudedDirection, Depth)
+  const params = splitIfcArguments(solid.args);
+  if (params.length < 4) return { volume: 0, area: 0 };
+
+  const profileMatch = params[0].match(/#(\d+)/);
+  const depth = parseFloat(params[3]);
+  if (!profileMatch || isNaN(depth) || depth <= 0) return { volume: 0, area: 0 };
+
+  const profileId = parseInt(profileMatch[1]);
+  const profileArea = computeProfileArea(profileId, instances);
+  if (profileArea <= 0) return { volume: 0, area: 0 };
+
+  const volume = profileArea * depth;
+
+  // Area Heuristik: Maximale Profil-Dimension × Tiefe (Seitenfläche)
+  const profileDims = getProfileDimensions(profileId, instances);
+  const maxDim = Math.max(profileDims.width, profileDims.height);
+  const area = maxDim > 0 ? maxDim * depth : Math.sqrt(profileArea) * depth;
+
+  return { volume, area };
+}
+
+/**
+ * Berechnet die Fläche eines IFC-Profils
+ */
+function computeProfileArea(
+  profileId: number,
+  instances: Map<number, { type: string; args: string }>
+): number {
+  const profile = instances.get(profileId);
+  if (!profile) return 0;
+
+  const type = profile.type.toUpperCase();
+  const params = splitIfcArguments(profile.args);
+
+  if (type === 'IFCRECTANGLEPROFILEDEF') {
+    // IFCRECTANGLEPROFILEDEF(ProfileType, ProfileName, Position, XDim, YDim)
+    if (params.length >= 5) {
+      const xDim = parseFloat(params[3]);
+      const yDim = parseFloat(params[4]);
+      if (!isNaN(xDim) && !isNaN(yDim)) return xDim * yDim;
+    }
+  } else if (type === 'IFCCIRCLEPROFILEDEF') {
+    // IFCCIRCLEPROFILEDEF(ProfileType, ProfileName, Position, Radius)
+    if (params.length >= 4) {
+      const radius = parseFloat(params[3]);
+      if (!isNaN(radius)) return Math.PI * radius * radius;
+    }
+  } else if (type === 'IFCARBITRARYCLOSEDPROFILEDEF') {
+    // IFCARBITRARYCLOSEDPROFILEDEF(ProfileType, ProfileName, OuterCurve)
+    if (params.length >= 3) {
+      const curveMatch = params[2].match(/#(\d+)/);
+      if (curveMatch) {
+        return computePolylineArea(parseInt(curveMatch[1]), instances);
+      }
+    }
+  } else if (type === 'IFCRECTANGLEHOLLOWPROFILEDEF') {
+    // IFCRECTANGLEHOLLOWPROFILEDEF(ProfileType, ProfileName, Position, XDim, YDim, WallThickness, ...)
+    if (params.length >= 6) {
+      const xDim = parseFloat(params[3]);
+      const yDim = parseFloat(params[4]);
+      const wallThick = parseFloat(params[5]);
+      if (!isNaN(xDim) && !isNaN(yDim) && !isNaN(wallThick)) {
+        return xDim * yDim - (xDim - 2 * wallThick) * (yDim - 2 * wallThick);
+      }
+    }
+  } else if (type === 'IFCISHAPEPROFILEDEF' || type === 'IFCLSHAPEPROFILEDEF' || type === 'IFCTSHAPEPROFILEDEF') {
+    // Für Stahlprofile: Approximate Fläche aus Bounding Box
+    if (params.length >= 5) {
+      const d = parseFloat(params[3]); // OverallDepth
+      const w = parseFloat(params[4]); // OverallWidth
+      if (!isNaN(d) && !isNaN(w)) return d * w * 0.3; // ~30% Füllung typisch für I/L/T-Profile
+    }
+  }
+
+  return 0;
+}
+
+/**
+ * Gibt die Hauptdimensionen eines Profils zurück
+ */
+function getProfileDimensions(
+  profileId: number,
+  instances: Map<number, { type: string; args: string }>
+): { width: number; height: number } {
+  const profile = instances.get(profileId);
+  if (!profile) return { width: 0, height: 0 };
+
+  const type = profile.type.toUpperCase();
+  const params = splitIfcArguments(profile.args);
+
+  if (type === 'IFCRECTANGLEPROFILEDEF' || type === 'IFCRECTANGLEHOLLOWPROFILEDEF') {
+    if (params.length >= 5) {
+      return { width: parseFloat(params[3]) || 0, height: parseFloat(params[4]) || 0 };
+    }
+  } else if (type === 'IFCCIRCLEPROFILEDEF') {
+    if (params.length >= 4) {
+      const r = parseFloat(params[3]) || 0;
+      return { width: r * 2, height: r * 2 };
+    }
+  }
+
+  return { width: 0, height: 0 };
+}
+
+/**
+ * Berechnet die Fläche eines geschlossenen Polygons (Shoelace-Formel) aus IFCPOLYLINE
+ */
+function computePolylineArea(
+  curveId: number,
+  instances: Map<number, { type: string; args: string }>
+): number {
+  const curve = instances.get(curveId);
+  if (!curve) return 0;
+
+  const curveType = curve.type.toUpperCase();
+  if (curveType !== 'IFCPOLYLINE' && curveType !== 'IFCINDEXEDPOLYCURVE') return 0;
+
+  if (curveType === 'IFCPOLYLINE') {
+    // IFCPOLYLINE((#pt1, #pt2, ...))
+    const params = splitIfcArguments(curve.args);
+    if (params.length < 1) return 0;
+
+    const ptRefs = Array.from(params[0].matchAll(/#(\d+)/g)).map(m => parseInt(m[1]));
+    const points: [number, number][] = [];
+
+    for (const ptId of ptRefs) {
+      const ptInst = instances.get(ptId);
+      if (!ptInst || ptInst.type.toUpperCase() !== 'IFCCARTESIANPOINT') continue;
+      const ptParams = splitIfcArguments(ptInst.args);
+      if (ptParams.length < 1) continue;
+
+      // Coordinates: (x, y) or (x, y, z) — use x, y
+      const coords = ptParams[0].replace(/[()]/g, '').split(',').map(s => parseFloat(s.trim()));
+      if (coords.length >= 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
+        points.push([coords[0], coords[1]]);
+      }
+    }
+
+    if (points.length < 3) return 0;
+
+    // Shoelace formula
+    let area = 0;
+    const n = points.length;
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      area += points[i][0] * points[j][1];
+      area -= points[j][0] * points[i][1];
+    }
+    return Math.abs(area) / 2;
+  }
+
+  return 0;
+}
+
+/**
+ * ==================================================================================
  * CORE IFC PARSING LOGIC (STEP FORMAT)
  * ==================================================================================
  */
@@ -520,6 +831,30 @@ function processIfcText(text: string, replacementMap?: Record<string, string>): 
         for (const prop of AREA_PROPERTIES) if (qty[prop] != null) { area = qty[prop]; break; }
       }
       if (volume > 0 && area > 0) break;
+    }
+
+    // Fallback: Wenn volume oder area aus Quantities nicht gefunden, suche in Properties
+    if (volume === 0 || area === 0) {
+      const psetIds = propertyRelations.filter(r => r.elementId === id).map(r => r.propertySetId);
+      for (const psetId of psetIds) {
+        const props = properties.get(psetId);
+        if (props) {
+          if (volume === 0 && props['Volume'] != null && !isNaN(props['Volume'])) {
+            volume = props['Volume'];
+          }
+          if (area === 0 && props['Area'] != null && !isNaN(props['Area'])) {
+            area = props['Area'];
+          }
+        }
+        if (volume > 0 && area > 0) break;
+      }
+    }
+
+    // Fallback 2: Wenn volume/area immer noch 0, berechne aus Geometrie (IFCEXTRUDEDAREASOLID)
+    if (volume === 0 || area === 0) {
+      const geo = computeGeometryVolume(id, instances);
+      if (volume === 0 && geo.volume > 0) volume = geo.volume;
+      if (area === 0 && geo.area > 0) area = geo.area;
     }
 
     // 2. GWP finden (via Properties)
@@ -954,7 +1289,7 @@ function parseQuantities(instances: Map<number, any>): Map<number, Record<string
 
   // Schritt 1: Einzelne Quantities finden
   // IfcQuantityVolume(Name, Description, Unit, VolumeValue)
-  const singleQtys = new Map<number, { name: string, val: number }>();
+  const singleQtys = new Map<number, { name: string, val: number, type: string }>();
 
   for (const [id, instance] of instances.entries()) {
     const type = instance.type.toUpperCase();
@@ -966,9 +1301,9 @@ function parseQuantities(instances: Map<number, any>): Map<number, Record<string
         const name = cleanIfcString(params[0]);
         const valStr = params[3];
         // Value kann z.B. 25.0 oder IfcVolumeMeasure(25.0) sein
-        const valMatch = valStr.match(/([0-9]+\.[0-9]+(?:[Ee][+-]?[0-9]+)?|[0-9]+)/);
+        const valMatch = valStr.match(/([-+]?(?:\d+\.?\d*|\.\d+)(?:[Ee][-+]?\d+)?)/);
         if (valMatch) {
-          singleQtys.set(id, { name: name, val: parseFloat(valMatch[0]) });
+          singleQtys.set(id, { name: name, val: parseFloat(valMatch[0]), type: type });
         }
       }
     }
@@ -987,14 +1322,16 @@ function parseQuantities(instances: Map<number, any>): Map<number, Record<string
           const refId = parseInt(r[1]);
           const qData = singleQtys.get(refId);
           if (qData) {
-            // Mapping
+            // Mapping mit deutschen Begriffen und Typ-Fallback
             const n = qData.name.toUpperCase();
             if (n.includes('NETVOLUME')) qty['NetVolume'] = qData.val;
             else if (n.includes('GROSSVOLUME')) qty['GrossVolume'] = qData.val;
             else if (n.includes('NETAREA')) qty['NetArea'] = qData.val;
             else if (n.includes('GROSSAREA')) qty['GrossArea'] = qData.val;
-            else if (n.includes('AREA')) qty['Area'] = qData.val;
-            else if (n.includes('VOLUME')) qty['NetVolume'] = qData.val; // Fallback
+            else if (n.includes('AREA') || n.includes('FLÄCHE') || n.includes('FLAECHE')) qty['Area'] = qData.val;
+            else if (n.includes('VOLUME') || n.includes('VOLUMEN')) qty['NetVolume'] = qData.val;
+            else if (qData.type === 'IFCQUANTITYVOLUME') qty['NetVolume'] = qData.val;
+            else if (qData.type === 'IFCQUANTITYAREA') qty['Area'] = qData.val;
           }
         }
         if (Object.keys(qty).length > 0) quantities.set(id, qty);
@@ -1022,10 +1359,18 @@ function parseProperties(instances: Map<number, any>): Map<number, Record<string
       // Index 2: NominalValue
       if (params.length >= 3) {
         const name = cleanIfcString(params[0]);
-        // Prüfen ob relevanter Name
-        if (GWP_PROPERTIES.some(p => name.toUpperCase().includes(p.toUpperCase()))) {
+        const upperName = name.toUpperCase();
+        // Prüfen ob relevanter Name (GWP, Volume, Area, deutsche Begriffe)
+        const isRelevant =
+          GWP_PROPERTIES.some(p => upperName.includes(p.toUpperCase())) ||
+          VOLUME_PROPERTIES.some(p => upperName.includes(p.toUpperCase())) ||
+          AREA_PROPERTIES.some(p => upperName.includes(p.toUpperCase())) ||
+          upperName.includes('VOLUMEN') ||
+          upperName.includes('FLÄCHE') ||
+          upperName.includes('FLAECHE');
+        if (isRelevant) {
           const valStr = params[2];
-          const valMatch = valStr.match(/([0-9]+\.[0-9]+(?:[Ee][+-]?[0-9]+)?|[0-9]+)/);
+          const valMatch = valStr.match(/([-+]?(?:\d+\.?\d*|\.\d+)(?:[Ee][-+]?\d+)?)/);
           if (valMatch) {
             singleProps.set(id, { name: name, val: parseFloat(valMatch[0]) });
           }
@@ -1047,11 +1392,23 @@ function parseProperties(instances: Map<number, any>): Map<number, Record<string
           const refId = parseInt(r[1]);
           const pData = singleProps.get(refId);
           if (pData) {
-            // Einfügen unter dem gefundenen Namen
-            // Wir mappen es auf den ersten passenden GWP Key
+            const upperName = pData.name.toUpperCase();
+            // GWP mapping
             for (const gwpKey of GWP_PROPERTIES) {
-              if (pData.name.toUpperCase().includes(gwpKey.toUpperCase())) {
+              if (upperName.includes(gwpKey.toUpperCase())) {
                 props[gwpKey] = pData.val;
+              }
+            }
+            // Volume mapping
+            for (const volKey of VOLUME_PROPERTIES) {
+              if (upperName.includes(volKey.toUpperCase()) || upperName.includes('VOLUMEN')) {
+                props['Volume'] = pData.val;
+              }
+            }
+            // Area mapping
+            for (const areaKey of AREA_PROPERTIES) {
+              if (upperName.includes(areaKey.toUpperCase()) || upperName.includes('FLÄCHE') || upperName.includes('FLAECHE')) {
+                props['Area'] = pData.val;
               }
             }
           }

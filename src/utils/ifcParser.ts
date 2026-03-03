@@ -214,14 +214,24 @@ async function extractQuantities(
                 const qty = await ifcAPI.GetLine(ifcAPI.modelID, qtyLineID);
 
                 const qtyType = qty.constructor.name;
-                const qtyName = qty.Name?.value || qty.name || '';
+                const qtyName = (qty.Name?.value || qty.name || '').toLowerCase();
 
-                if (qtyType === 'IFCQUANTITYAREA' && qtyName.toLowerCase().includes('area')) {
-                  result.area = qty.AreaValue?.value || qty.value;
-                } else if (qtyType === 'IFCQUANTITYVOLUME' && qtyName.toLowerCase().includes('volume')) {
-                  result.volume = qty.VolumeValue?.value || qty.value;
-                } else if (qtyType === 'IFCQUANTITYLENGTH' && qtyName.toLowerCase().includes('length')) {
-                  result.length = qty.LengthValue?.value || qty.value;
+                // Regex Fallback für Werte wie "12.5 m3"
+                const extractVal = (v: any) => {
+                  if (typeof v === 'number') return v;
+                  if (!v) return undefined;
+                  const match = String(v).match(/([-+]?(?:\d+\.?\d*|\.\d+)(?:[Ee][-+]?\d+)?)/);
+                  return match ? parseFloat(match[0]) : undefined;
+                };
+
+                const val = extractVal(qty.AreaValue?.value || qty.VolumeValue?.value || qty.LengthValue?.value || qty.value);
+
+                if (qtyType === 'IFCQUANTITYAREA') {
+                  if (qtyName.includes('area') || qtyName.includes('flä') || qtyName.includes('fla') || result.area === undefined) result.area = val;
+                } else if (qtyType === 'IFCQUANTITYVOLUME') {
+                  if (qtyName.includes('volume') || qtyName.includes('volumen') || result.volume === undefined) result.volume = val;
+                } else if (qtyType === 'IFCQUANTITYLENGTH') {
+                  if (qtyName.includes('length') || qtyName.includes('länge') || qtyName.includes('laenge') || result.length === undefined) result.length = val;
                 }
               }
             }
@@ -323,6 +333,96 @@ async function extractParentId(
     return undefined;
   } catch (error) {
     console.warn('Fehler beim Extrahieren der Parent-ID:', error);
+    return undefined;
+  }
+}
+
+/**
+ * Berechnet Volume/Area aus IFCEXTRUDEDAREASOLID Geometrie via web-ifc API.
+ * Fallback wenn keine IfcElementQuantity vorhanden.
+ */
+async function computeVolumeFromGeometry(
+  ifcAPI: any,
+  expressID: number,
+  modelID: number,
+  WebIFC: any
+): Promise<CompactElement['quantities'] | undefined> {
+  try {
+    const element = await ifcAPI.GetLine(modelID, expressID);
+    if (!element) return undefined;
+
+    // Get Representation (IFCPRODUCTDEFINITIONSHAPE)
+    const repRef = element.Representation?.value || element.Representation;
+    if (!repRef) return undefined;
+
+    const productShape = await ifcAPI.GetLine(modelID, repRef);
+    if (!productShape || !productShape.Representations) return undefined;
+
+    const representations = Array.isArray(productShape.Representations)
+      ? productShape.Representations
+      : [productShape.Representations];
+
+    for (const repRefObj of representations) {
+      const repID = repRefObj?.value || repRefObj;
+      if (!repID) continue;
+
+      const rep = await ifcAPI.GetLine(modelID, repID);
+      if (!rep) continue;
+
+      const repIdentifier = rep.RepresentationIdentifier?.value || rep.RepresentationIdentifier || '';
+      if (repIdentifier.toUpperCase() !== 'BODY') continue;
+
+      const items = rep.Items ? (Array.isArray(rep.Items) ? rep.Items : [rep.Items]) : [];
+
+      for (const itemRef of items) {
+        const itemID = itemRef?.value || itemRef;
+        if (!itemID) continue;
+
+        const item = await ifcAPI.GetLine(modelID, itemID);
+        if (!item) continue;
+
+        const itemType = item.constructor?.name || '';
+
+        if (itemType === 'IFCEXTRUDEDAREASOLID' || itemType === 'IfcExtrudedAreaSolid') {
+          const depth = item.Depth?.value || item.Depth;
+          if (!depth || depth <= 0) continue;
+
+          const profileRef = item.SweptArea?.value || item.SweptArea;
+          if (!profileRef) continue;
+
+          const profile = await ifcAPI.GetLine(modelID, profileRef);
+          if (!profile) continue;
+
+          const profileType = profile.constructor?.name || '';
+          let profileArea = 0;
+
+          if (profileType.includes('RectangleProfileDef') || profileType === 'IFCRECTANGLEPROFILEDEF') {
+            const xDim = profile.XDim?.value || profile.XDim || 0;
+            const yDim = profile.YDim?.value || profile.YDim || 0;
+            profileArea = xDim * yDim;
+          } else if (profileType.includes('CircleProfileDef') || profileType === 'IFCCIRCLEPROFILEDEF') {
+            const radius = profile.Radius?.value || profile.Radius || 0;
+            profileArea = Math.PI * radius * radius;
+          }
+          // ArbitraryClosedProfileDef with complex curves would need more work
+
+          if (profileArea > 0) {
+            const volume = profileArea * depth;
+            // Area heuristic: use the larger dimension × depth
+            const xDim = profile.XDim?.value || profile.XDim || 0;
+            const yDim = profile.YDim?.value || profile.YDim || 0;
+            const maxDim = Math.max(xDim, yDim);
+            const area = maxDim > 0 ? maxDim * depth : Math.sqrt(profileArea) * depth;
+
+            return { volume, area };
+          }
+        }
+      }
+    }
+
+    return undefined;
+  } catch (error) {
+    // Geometry computation is best-effort
     return undefined;
   }
 }
@@ -432,7 +532,19 @@ export async function toCompactModel(
           const properties = await extractProperties(ifcAPI, expressID, WebIFC);
 
           // Extrahiere Quantities
-          const quantities = await extractQuantities(ifcAPI, expressID, WebIFC);
+          let quantities = await extractQuantities(ifcAPI, expressID, WebIFC);
+
+          // Fallback: Berechne Volume/Area aus Geometrie wenn keine Quantities vorhanden
+          if (!quantities || (quantities.volume === undefined && quantities.area === undefined)) {
+            try {
+              const geoQty = await computeVolumeFromGeometry(ifcAPI, expressID, modelID, WebIFC);
+              if (geoQty) {
+                quantities = { ...quantities, ...geoQty };
+              }
+            } catch (geoError) {
+              // Geometry computation is best-effort
+            }
+          }
 
           // Extrahiere Parent-ID (Geschoss, etc.)
           const parentId = await extractParentId(ifcAPI, expressID, WebIFC);
