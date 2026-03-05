@@ -10,9 +10,10 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { CostEstimationResultSchema, MaterialCompositionInputSchema, type MaterialCompositionInput } from '@/lib/types';
+import { DEFAULT_MODEL } from '@/ai/models';
 
 
-export async function estimateCostsFromMaterials(input: MaterialCompositionInput): Promise<z.infer<typeof CostEstimationResultSchema>> {
+export async function estimateCostsFromMaterials(input: MaterialCompositionInput & { model?: string }): Promise<z.infer<typeof CostEstimationResultSchema>> {
   const prompt = `Sie sind ein Experte für Baukostenkalkulation in Deutschland. Antworten Sie immer auf Deutsch und im JSON-Format.
 
   Ihre Aufgabe ist es, eine grobe Kostenschätzung basierend auf der prozentualen Materialzusammensetzung und der Bruttogeschossfläche (BGF) eines Gebäudes zu erstellen. Verwenden Sie durchschnittliche, aktuelle Kostensätze für Deutschland.
@@ -43,7 +44,7 @@ export async function estimateCostsFromMaterials(input: MaterialCompositionInput
   Führen Sie jetzt die Kalkulation durch und geben Sie das Ergebnis im JSON-Format zurück.`;
 
   const completion = await ai.chat.completions.create({
-    model: "azure.gpt-4.1-mini", // Or "gpt-oss:120b"
+    model: input.model ?? DEFAULT_MODEL,
     messages: [
       { role: "system", content: "Sie sind ein Experte für Baukostenkalkulation in Deutschland. Antworten Sie immer auf Deutsch und im JSON-Format." },
       { role: "user", content: prompt }

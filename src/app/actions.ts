@@ -68,9 +68,9 @@ function getDetailedErrorMessage(error: any): string {
   return 'Bei der Interaktion mit der KI ist ein unerwarteter Fehler aufgetreten. Bitte versuchen Sie es später erneut.';
 }
 
-export async function getStartingPrompts() {
+export async function getStartingPrompts(options?: { model?: string }) {
   try {
-    const result = await generateStartingPrompts();
+    const result = await generateStartingPrompts(options);
     return { prompts: result.prompts };
   } catch (error) {
     console.error('Error in getStartingPrompts:', error);
@@ -88,7 +88,7 @@ export async function checkMaterialReplacements(ifcContent: string): Promise<{ r
   }
 }
 
-export async function getAIChatFeedback(input: AIChatFeedbackInput & { replacementMap?: Record<string, string> }) {
+export async function getAIChatFeedback(input: AIChatFeedbackInput & { replacementMap?: Record<string, string>; model?: string }) {
   try {
     await requireAuth();
 
@@ -105,7 +105,8 @@ export async function getAIChatFeedback(input: AIChatFeedbackInput & { replaceme
 
     const result = await aiChatFeedback({
       ...input,
-      ifcModelData: compressedIfcData
+      ifcModelData: compressedIfcData,
+      model: input.model,
     });
     return { feedback: result.feedback };
   } catch (error: any) {
@@ -117,7 +118,7 @@ export async function getAIChatFeedback(input: AIChatFeedbackInput & { replaceme
   }
 }
 
-export async function getIfcAnalysis(input: GenerateAnalysisFromIfcInput & { replacementMap?: Record<string, string> }): Promise<{ analysis?: AnalysisResult; error?: string }> {
+export async function getIfcAnalysis(input: GenerateAnalysisFromIfcInput & { replacementMap?: Record<string, string>; model?: string }): Promise<{ analysis?: AnalysisResult; error?: string }> {
   try {
     await requireAuth();
 
@@ -129,7 +130,8 @@ export async function getIfcAnalysis(input: GenerateAnalysisFromIfcInput & { rep
     console.log('------------------------------------------');
 
     const result = await generateAnalysisFromIfc({
-      ifcFileContent: compressedIfcContent
+      ifcFileContent: compressedIfcContent,
+      model: input.model,
     });
     return { analysis: result };
   } catch (error: any) {
@@ -141,11 +143,11 @@ export async function getIfcAnalysis(input: GenerateAnalysisFromIfcInput & { rep
   }
 }
 
-export async function getCostEstimation(input: MaterialCompositionInput): Promise<{ costs?: CostEstimationResult; error?: string }> {
+export async function getCostEstimation(input: MaterialCompositionInput & { model?: string }): Promise<{ costs?: CostEstimationResult; error?: string }> {
   try {
     await requireAuth();
 
-    const result = await estimateCostsFromMaterials(input);
+    const result = await estimateCostsFromMaterials({ ...input, model: input.model });
     return { costs: result };
   } catch (error: any) {
     console.error('Error in getCostEstimation:', error);

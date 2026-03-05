@@ -9,13 +9,14 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import { DEFAULT_MODEL } from '@/ai/models';
 
 const StartingPromptsOutputSchema = z.object({
   prompts: z.array(z.string()).describe('Eine Liste von vorgeschlagenen Eingabeaufforderungen.'),
 });
 export type StartingPromptsOutput = z.infer<typeof StartingPromptsOutputSchema>;
 
-export async function generateStartingPrompts(): Promise<StartingPromptsOutput> {
+export async function generateStartingPrompts(options?: { model?: string }): Promise<StartingPromptsOutput> {
   const prompt = `Sie sind ein KI-Assistent für Architekturstudenten. Antworten Sie immer auf Deutsch und im JSON-Format.
 
 Sie sind ein KI-Assistent, der Architekturstudenten bei der Analyse und Bewertung ihrer Gebäudeentwürfe (IFC-Modelle) unterstützt. Stellen Sie eine Liste von vorgeschlagenen Eingabeaufforderungen auf Deutsch bereit, die ein neuer Benutzer verwenden kann, um schnell mit der Plattform zu interagieren und ihre Funktionen zu erkunden. Die Eingabeaufforderungen sollten für Nachhaltigkeit, Energieeffizienz, Barrierefreiheit und technische Standards relevant sein. Geben Sie sie als JSON-Array von Zeichenfolgen zurück.
@@ -35,7 +36,7 @@ Geben Sie die Liste der vorgeschlagenen Eingabeaufforderungen in einem JSON-Form
 }`;
 
   const completion = await ai.chat.completions.create({
-    model: "azure.gpt-4.1-mini",
+    model: options?.model ?? DEFAULT_MODEL,
     messages: [
       { role: "system", content: "Sie sind ein KI-Assistent für Architekturstudenten. Antworten Sie immer auf Deutsch und im JSON-Format." },
       { role: "user", content: prompt }

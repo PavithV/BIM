@@ -10,6 +10,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import { DEFAULT_MODEL } from '@/ai/models';
 
 const SummarizeAnalysisInputSchema = z.object({
   analysisData: z
@@ -25,7 +26,7 @@ const SummarizeAnalysisOutputSchema = z.object({
 });
 export type SummarizeAnalysisOutput = z.infer<typeof SummarizeAnalysisOutputSchema>;
 
-export async function summarizeAnalysis(input: SummarizeAnalysisInput): Promise<SummarizeAnalysisOutput> {
+export async function summarizeAnalysis(input: SummarizeAnalysisInput & { model?: string }): Promise<SummarizeAnalysisOutput> {
   const prompt = `Sie sind ein erfahrener Nachhaltigkeitsberater. Antworten Sie immer auf Deutsch und im JSON-Format.
 
   Geben Sie eine prägnante Zusammenfassung der wichtigsten Ergebnisse aus den folgenden Nachhaltigkeitsanalysedaten. Konzentrieren Sie sich auf die kritischsten Verbesserungsbereiche. Die Analyse basiert auf EN 15978.
@@ -38,7 +39,7 @@ export async function summarizeAnalysis(input: SummarizeAnalysisInput): Promise<
   }`;
 
   const completion = await ai.chat.completions.create({
-    model: "azure.gpt-4.1-mini",
+    model: input.model ?? DEFAULT_MODEL,
     messages: [
       { role: "system", content: "Sie sind ein erfahrener Nachhaltigkeitsberater. Antworten Sie immer auf Deutsch und im JSON-Format." },
       { role: "user", content: prompt }

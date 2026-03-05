@@ -9,9 +9,10 @@
 
 import { ai } from '@/ai/genkit';
 import { GenerateAnalysisFromIfcInputSchema, AnalysisResult, AnalysisResultSchema } from '@/lib/types';
+import { DEFAULT_MODEL } from '@/ai/models';
 
 
-export async function generateAnalysisFromIfc(input: { ifcFileContent: string }): Promise<AnalysisResult> {
+export async function generateAnalysisFromIfc(input: { ifcFileContent: string; model?: string }): Promise<AnalysisResult> {
   const prompt = `Sie sind ein Experte für nachhaltiges Bauen. Antworten Sie immer auf Deutsch und im JSON-Format.
 
   Analysieren Sie den folgenden Inhalt der IFC-Datei und geben Sie eine Nachhaltigkeitsanalyse zurück.
@@ -54,7 +55,7 @@ export async function generateAnalysisFromIfc(input: { ifcFileContent: string })
   }`;
 
   const completion = await ai.chat.completions.create({
-    model: "azure.gpt-4.1-mini",
+    model: input.model ?? DEFAULT_MODEL,
     messages: [
       { role: "system", content: "Sie sind ein Experte für nachhaltiges Bauen. Antworten Sie immer auf Deutsch und im JSON-Format." },
       { role: "user", content: prompt }

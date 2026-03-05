@@ -7,9 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import dynamic from 'next/dynamic';
 import { AnalysisPanel } from '@/components/analysis-panel';
 import { ChatAssistant } from '@/components/chat-assistant';
-import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2, Euro, Leaf, Layers, GitCompare, FilePlus } from 'lucide-react';
+import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2, Euro, Leaf, Layers, GitCompare, FilePlus, Sparkles } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { getStartingPrompts, getAIChatFeedback, getIfcAnalysis, getCostEstimation, checkMaterialReplacements, fetchUserProjects, createSignedUploadUrl, createIfcModelRecord, insertMessage, fetchMessagesForProject, updateIfcModel } from '@/app/actions';
 import { MaterialReviewModal, type MaterialReplacement } from './material-review-modal';
 import { parseIFC, toJSONString } from '@/utils/ifcParser';
@@ -21,6 +22,7 @@ import { ModelTree, type SpatialNode } from '@/components/model-tree';
 import type { IFCModel } from '@/lib/types';
 import { cn, downloadCsv } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { AI_MODELS, DEFAULT_MODEL, type AIModelId } from '@/ai/models';
 
 export type Message = {
   id: string;
@@ -67,6 +69,7 @@ export default function Dashboard() {
 
   const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<AIModelId>(DEFAULT_MODEL);
 
   // Callback to prevent infinite re-renders
   const handleModelLoaded = useCallback((structure: SpatialNode) => {
@@ -193,12 +196,11 @@ export default function Dashboard() {
     }
     setIsProcessing(true);
     try {
-      const input = {
+      const result = await getCostEstimation({
         materials: project.analysisData.materialComposition.map(({ name, value }) => ({ name, value })),
         totalBuildingArea: totalArea,
-      };
-
-      const result = await getCostEstimation(input);
+        model: selectedModel,
+      });
 
       if (result.costs) {
         const updateResult = await updateIfcModel(project.id, { costEstimationData: result.costs });
@@ -271,7 +273,7 @@ export default function Dashboard() {
     if (type === 'analysis') {
       const { project, fileContent } = data;
       try {
-        const analysisResult = await getIfcAnalysis({ ifcFileContent: fileContent, replacementMap });
+        const analysisResult = await getIfcAnalysis({ ifcFileContent: fileContent, replacementMap, model: selectedModel });
         if (analysisResult.analysis) {
           await updateIfcModel(project.id, { analysisData: analysisResult.analysis, costEstimationData: null });
 
@@ -292,7 +294,7 @@ export default function Dashboard() {
       const { ifcToSend, userQuestion } = data;
       setIsLoading(true);
       try {
-        const result = await getAIChatFeedback({ ifcModelData: ifcToSend, userQuestion, replacementMap });
+        const result = await getAIChatFeedback({ ifcModelData: ifcToSend, userQuestion, replacementMap, model: selectedModel });
         const content = result.feedback || result.error || 'Fehler aufgetreten.';
 
         await insertMessage({
@@ -390,7 +392,7 @@ export default function Dashboard() {
 
       // Fallback: Keine Replacements gefunden -> Direkt ausführen
       let replacementMap = project.replacements || undefined; // Should be empty/undefined here anyway
-      const analysisResult = await getIfcAnalysis({ ifcFileContent: fileContent, replacementMap });
+      const analysisResult = await getIfcAnalysis({ ifcFileContent: fileContent, replacementMap, model: selectedModel });
 
       if (analysisResult.analysis) {
         await updateIfcModel(project.id, { analysisData: analysisResult.analysis, costEstimationData: null });
@@ -453,7 +455,7 @@ export default function Dashboard() {
       }
 
       // 2. AI Response
-      const result = await getAIChatFeedback({ ifcModelData: ifcToSend, userQuestion, replacementMap });
+      const result = await getAIChatFeedback({ ifcModelData: ifcToSend, userQuestion, replacementMap, model: selectedModel });
       const content = result.feedback || result.error || 'Fehler.';
 
       const aiMsgResult = await insertMessage({
@@ -644,6 +646,17 @@ export default function Dashboard() {
             </div>
           ) : <span className="text-muted-foreground">Kein Projekt ausgewählt</span>}
           <div className="ml-auto flex items-center gap-2">
+            <Select value={selectedModel} onValueChange={(v) => setSelectedModel(v as AIModelId)}>
+              <SelectTrigger className="w-[180px] h-8 text-xs">
+                <Sparkles className="w-3 h-3 mr-1 text-primary" />
+                <SelectValue placeholder="Modell wählen" />
+              </SelectTrigger>
+              <SelectContent>
+                {AI_MODELS.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {activeProject && (
               <Button variant="ghost" size="sm" onClick={handleDownloadUpdatedIfc} disabled={!activeProject.replacements || isProcessing}>
                 <Layers className="w-4 h-4 mr-2" /> Download IFC

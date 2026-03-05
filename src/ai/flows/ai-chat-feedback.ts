@@ -11,6 +11,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import { DEFAULT_MODEL } from '@/ai/models';
 
 const AIChatFeedbackInputSchema = z.object({
   ifcModelData: z
@@ -19,6 +20,7 @@ const AIChatFeedbackInputSchema = z.object({
       'Die IFC-Modelldaten als Zeichenkette.'
     ),
   userQuestion: z.string().describe('Die Benutzerfrage zum IFC-Modell.'),
+  model: z.string().optional().describe('Das zu verwendende KI-Modell.'),
 });
 export type AIChatFeedbackInput = z.infer<typeof AIChatFeedbackInputSchema>;
 
@@ -40,7 +42,7 @@ Geben Sie detailliertes und hilfreiches Feedback basierend auf der Frage des Ben
 }`;
 
   const completion = await ai.chat.completions.create({
-    model: "azure.gpt-4.1-mini",
+    model: input.model ?? DEFAULT_MODEL,
     messages: [
       { role: "system", content: "Sie sind ein KI-Assistent, der Feedback zu IFC-Modellen gibt. Antworten Sie immer auf Deutsch und im JSON-Format. Nutzen Sie Ihr Wissen, um Fragen zum Modell zu beantworten und dabei Aspekte wie Nachhaltigkeit, Energieeffizienz und Barrierefreiheit einzubeziehen." },
       { role: "user", content: prompt }
