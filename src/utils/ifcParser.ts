@@ -81,11 +81,23 @@ function extractMaterialName(ifcMaterial: any): string | undefined {
 function toIterable(x: any): any[] {
   if (!x) return [];
   if (Array.isArray(x)) return x;
+
+  // FIX: web-ifc IfcLineSet (WASM) korrekt auslesen!
+  if (typeof x.size === 'function' && typeof x.get === 'function') {
+    const arr: any[] = [];
+    const len = x.size();
+    for (let i = 0; i < len; i++) {
+      arr.push(x.get(i));
+    }
+    return arr;
+  }
+
   try {
     if (typeof x[Symbol.iterator] === 'function') return Array.from(x as Iterable<any>);
   } catch (e) {
     // ignore
   }
+
   if (typeof x === 'object') return Object.values(x);
   return [x];
 }
@@ -456,6 +468,15 @@ export async function toCompactModel(
     WebIFC.IFCBUILDINGSTOREY,
     WebIFC.IFCBUILDING,
     WebIFC.IFCPROJECT,
+    // Neue Typen für Archicad/Generische Modelle
+    WebIFC.IFCBUILDINGELEMENTPROXY,
+    WebIFC.IFCCOVERING,
+    WebIFC.IFCFOOTING,
+    WebIFC.IFCMEMBER,
+    WebIFC.IFCPLATE,
+    WebIFC.IFCRAILING,
+    WebIFC.IFCRAMP,
+    WebIFC.IFCSPACE,
   ];
 
   // Map für konstanten Name (explicit mapping avoids minification issues)
@@ -472,6 +493,14 @@ export async function toCompactModel(
     [WebIFC.IFCBUILDINGSTOREY, 'IFCBUILDINGSTOREY'],
     [WebIFC.IFCBUILDING, 'IFCBUILDING'],
     [WebIFC.IFCPROJECT, 'IFCPROJECT'],
+    [WebIFC.IFCBUILDINGELEMENTPROXY, 'IFCBUILDINGELEMENTPROXY'],
+    [WebIFC.IFCCOVERING, 'IFCCOVERING'],
+    [WebIFC.IFCFOOTING, 'IFCFOOTING'],
+    [WebIFC.IFCMEMBER, 'IFCMEMBER'],
+    [WebIFC.IFCPLATE, 'IFCPLATE'],
+    [WebIFC.IFCRAILING, 'IFCRAILING'],
+    [WebIFC.IFCRAMP, 'IFCRAMP'],
+    [WebIFC.IFCSPACE, 'IFCSPACE'],
   ]);
 
   // Sammle alle relevanten Elemente

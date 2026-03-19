@@ -96,6 +96,7 @@ export function assignDIN276CostGroups(
  */
 function mapElementToKG(el: CompactElement): string | undefined {
     const type = (el.type ?? '').toUpperCase();
+    const searchText = `${el.name ?? ''} ${el.material ?? ''}`.toLowerCase();
 
     switch (true) {
         // ── Wände ──
@@ -103,12 +104,16 @@ function mapElementToKG(el: CompactElement): string | undefined {
             return isExternal(el) ? '330' : '340';
 
         // ── Decken / Bodenplatten ──
-        case type === 'IFCSLAB':
+        case type === 'IFCSLAB' || type === 'IFCPLATE':
             return isFoundation(el) ? '320' : '350';
 
         // ── Dach ──
         case type === 'IFCROOF':
             return '360';
+
+        // ── Fundamente ──
+        case type === 'IFCFOOTING':
+            return '320';
 
         // ── Fenster ──
         case type === 'IFCWINDOW':
@@ -118,17 +123,35 @@ function mapElementToKG(el: CompactElement): string | undefined {
         case type === 'IFCDOOR':
             return isExternal(el) ? '334' : '344';
 
-        // ── Stützen ──
-        case type === 'IFCCOLUMN':
+        // ── Stützen / Bauteile ──
+        case type === 'IFCCOLUMN' || type === 'IFCMEMBER':
             return isExternal(el) ? '330' : '340';
 
         // ── Träger ──
         case type === 'IFCBEAM':
             return '340';
 
-        // ── Treppe ──
-        case type === 'IFCSTAIR':
+        // ── Treppen / Rampen / Geländer ──
+        case type === 'IFCSTAIR' || type === 'IFCRAMP' || type === 'IFCRAILING':
             return '370';
+
+        // ── Verkleidungen / Beläge ──
+        case type === 'IFCCOVERING':
+            if (searchText.includes('dach') || searchText.includes('roof')) return '360';
+            if (searchText.includes('fassade') || searchText.includes('facade')) return '330';
+            if (searchText.includes('boden') || searchText.includes('floor') || searchText.includes('estrich')) return '350';
+            return '370';
+
+        // ── Generische Elemente (Fallback-Heuristik) ──
+        case type === 'IFCBUILDINGELEMENTPROXY':
+            if (searchText.includes('wand') || searchText.includes('wall')) return isExternal(el) ? '330' : '340';
+            if (searchText.includes('decke') || searchText.includes('slab') || searchText.includes('boden')) return '350';
+            if (searchText.includes('dach') || searchText.includes('roof')) return '360';
+            if (searchText.includes('fundament') || searchText.includes('footing')) return '320';
+            if (searchText.includes('fenster') || searchText.includes('window')) return isExternal(el) ? '334' : '344';
+            if (searchText.includes('tür') || searchText.includes('door') || searchText.includes('tuer')) return isExternal(el) ? '334' : '344';
+            if (searchText.includes('stütze') || searchText.includes('column') || searchText.includes('stuetze')) return isExternal(el) ? '330' : '340';
+            return undefined;
 
         default:
             return undefined;
