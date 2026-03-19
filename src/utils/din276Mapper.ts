@@ -23,6 +23,8 @@ export const DIN276_LABELS: Record<string, string> = {
     '390': 'Sonstige Maßnahmen',
 };
 
+import { BKI_COSTS } from '../lib/bki-data';
+
 /** Aggregiertes Ergebnis für eine Kostengruppe */
 export interface Din276CostGroupResult {
     kg: string;
@@ -32,6 +34,10 @@ export interface Din276CostGroupResult {
     totalLength: number;
     elementCount: number;
     elements: CompactElement[];
+    // Neue Felder für BKI-Kosten
+    totalCost: number;
+    unitPrice: number;
+    unit: string;
 }
 
 /** Gesamtergebnis der DIN 276 Mengenauswertung */
@@ -39,6 +45,7 @@ export interface Din276QuantityResult {
     groups: Din276CostGroupResult[];
     totalArea: number;
     totalVolume: number;
+    totalCost: number; // Neu
 }
 
 // ─── Heuristik-Hilfsfunktionen ──────────────────────────────────────────────
@@ -174,6 +181,7 @@ export function calculateDIN276Quantities(
 
         let group = groupMap.get(kg);
         if (!group) {
+            const bkiData = BKI_COSTS[kg] || { pricePerUnit: 0, unit: 'm2' };
             group = {
                 kg,
                 label: DIN276_LABELS[kg] ?? `KG ${kg}`,
@@ -182,6 +190,9 @@ export function calculateDIN276Quantities(
                 totalLength: 0,
                 elementCount: 0,
                 elements: [],
+                totalCost: 0,
+                unitPrice: bkiData.pricePerUnit,
+                unit: bkiData.unit,
             };
             groupMap.set(kg, group);
         }
@@ -193,6 +204,15 @@ export function calculateDIN276Quantities(
         group.elements.push(el);
     }
 
+    // Berechne Kosten für alle Gruppen
+    for (const group of groupMap.values()) {
+        if (group.unit === 'm3') {
+            group.totalCost = group.totalVolume * group.unitPrice;
+        } else if (group.unit === 'm2') {
+            group.totalCost = group.totalArea * group.unitPrice;
+        }
+    }
+
     // Sortiere nach KG-Nummer
     const groups = Array.from(groupMap.values()).sort(
         (a, b) => parseInt(a.kg, 10) - parseInt(b.kg, 10),
@@ -200,6 +220,7 @@ export function calculateDIN276Quantities(
 
     const totalArea = groups.reduce((s, g) => s + g.totalArea, 0);
     const totalVolume = groups.reduce((s, g) => s + g.totalVolume, 0);
+    const totalCost = groups.reduce((s, g) => s + g.totalCost, 0);
 
-    return { groups, totalArea, totalVolume };
+    return { groups, totalArea, totalVolume, totalCost };
 }

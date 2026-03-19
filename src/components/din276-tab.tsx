@@ -72,6 +72,23 @@ export function Din276Tab({ result }: Din276TabProps) {
 
     return (
         <div className="space-y-4">
+            {/* Kostenübersicht */}
+            <Card className="border-primary/20 bg-primary/5">
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-primary">
+                        Geschätzte Baukosten (KG 300)
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-3xl font-bold text-primary">
+                        {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(result.totalCost)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                        Basierend auf statistischen BKI-Mittelwerten
+                    </p>
+                </CardContent>
+            </Card>
+
             {/* Zusammenfassung */}
             <Card>
                 <CardHeader>
@@ -139,9 +156,17 @@ function CostGroupItem({ group }: { group: Din276CostGroupResult }) {
                             ({group.elementCount} {group.elementCount === 1 ? 'Bauteil' : 'Bauteile'})
                         </span>
                     </div>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground tabular-nums shrink-0">
-                        {group.totalArea > 0 && <span>{fmt(group.totalArea, 'm²')}</span>}
-                        {group.totalVolume > 0 && <span>{fmt(group.totalVolume, 'm³')}</span>}
+                    <div className="flex items-center gap-4 text-xs tabular-nums shrink-0">
+                        <div className="text-muted-foreground text-right hidden sm:block w-20">
+                            {group.unitPrice > 0 ? `${group.unitPrice} €/${group.unit}` : '—'}
+                        </div>
+                        <div className="font-medium text-right w-24 text-primary">
+                            {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(group.totalCost)}
+                        </div>
+                        <div className="text-muted-foreground text-right w-24">
+                            {group.totalArea > 0 && <span>{fmt(group.totalArea, 'm²')}</span>}
+                            {group.totalArea === 0 && group.totalVolume > 0 && <span>{fmt(group.totalVolume, 'm³')}</span>}
+                        </div>
                     </div>
                 </div>
             </AccordionTrigger>
