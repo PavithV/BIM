@@ -26,8 +26,7 @@ Das Projekt basiert auf einem modernen und leistungsfähigen Tech-Stack:
 
 ### Backend & Services
 ![Supabase](https://img.shields.io/badge/Supabase-181818?style=for-the-badge&logo=supabase&logoColor=3ECF8E)
-![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)
-![Google Gemini](https://img.shields.io/badge/Google%20Gemini-8E75B2?style=for-the-badge&logo=google&logoColor=white)
+![OpenAI API](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)
 
 ### BIM & 3D
 ![Three.js](https://img.shields.io/badge/Three.js-000000?style=for-the-badge&logo=three.js&logoColor=white)
@@ -52,7 +51,7 @@ Das Projekt basiert auf einem modernen und leistungsfähigen Tech-Stack:
    ```env
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   GEMINI_API_KEY=your_gemini_key
+   KIT_TOOLBOX_API_KEY=your_kit_toolbox_key
    # Weitere Keys je nach Bedarf
    ```
 
@@ -64,7 +63,7 @@ Das Projekt basiert auf einem modernen und leistungsfähigen Tech-Stack:
 
 ## 🌐 Deployment
 
-Das Projekt ist für das Hosting auf **Firebase App Hosting** optimiert, kann aber auch auf Vercel oder anderen Node.js-kompatiblen Plattformen deployed werden.
+Das Projekt kann auf Vercel oder anderen Node.js-kompatiblen Plattformen deployed werden.
 
 ## 🤝 Mitwirken
 

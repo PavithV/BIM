@@ -50,13 +50,13 @@ function getDetailedErrorMessage(error: any): string {
   const errorMessage = error.message || 'Ein unbekannter Fehler ist aufgetreten.';
 
   if (errorMessage.includes("API key not valid") || errorMessage.includes("invalid_api_key") || (errorMessage.includes("permission denied") && !errorMessage.includes("Billing account"))) {
-    return "Das KI-Feedback konnte nicht abgerufen werden. Ihr API-Schlüssel ist ungültig oder hat nicht die nötigen Berechtigungen. Bitte überprüfen Sie Ihren GEMINI_API_KEY im .env File.";
+    return "Das KI-Feedback konnte nicht abgerufen werden. Ihr API-Schlüssel ist ungültig oder hat nicht die nötigen Berechtigungen. Bitte überprüfen Sie Ihren KIT_TOOLBOX_API_KEY im .env File.";
   }
   if (errorMessage.includes("Billing account") || (errorMessage.includes("permission denied") && errorMessage.includes("project"))) {
     return "Das KI-Feedback konnte nicht abgerufen werden. Für Ihr Projekt ist kein Abrechnungskonto aktiviert oder es fehlen die nötigen Berechtigungen.";
   }
   if (errorMessage.includes("API not enabled")) {
-    return "Das KI-Feedback konnte nicht abgerufen werden. Die API ist für Ihr Projekt nicht aktiviert. Bitte überprüfen Sie die Gemini-API-Konfiguration.";
+    return "Das KI-Feedback konnte nicht abgerufen werden. Die API ist für Ihr Projekt nicht aktiviert. Bitte überprüfen Sie die KI-Konto-Konfiguration.";
   }
   if (errorMessage.includes("Content creation is blocked")) {
     return 'Ihre Anfrage wurde aufgrund unserer Sicherheitsrichtlinien blockiert. Bitte versuchen Sie es mit einer anderen Anfrage.';

@@ -31,8 +31,8 @@ export type IFCModel = {
   fileName: string;
   fileSize: number;
   fileContent?: string | null; // Optional: may be null for large files stored in Storage
-  fileUrl?: string | null; // URL to file in Firebase Storage for large files
-  fileStoragePath?: string | null; // Storage path for direct access via Storage SDK (more reliable than URL extraction)
+  fileUrl?: string | null; // URL to file in Supabase Storage for large files
+  fileStoragePath?: string | null; // Storage path for direct access via Supabase Storage SDK (more reliable than URL extraction)
   uploadDate: any;
   analysisData?: AnalysisResult | null;
   costEstimationData?: CostEstimationResult | null; // New field for cost data
