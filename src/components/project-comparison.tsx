@@ -414,36 +414,34 @@ export function ProjectComparison({
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfig} className="h-[300px] w-full">
-            <ResponsiveContainer>
-              <BarChart data={chartData.slice(0, 2)}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="metric"
-                  tick={{ fill: 'hsl(var(--foreground))' }}
-                  className="text-xs"
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis tick={{ fill: 'hsl(var(--foreground))' }} className="text-xs" />
-                <Tooltip
-                  cursor={{ fill: 'hsl(var(--accent) / 0.2)' }}
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                  }}
-                  formatter={(value: number, name: string, entry: any) => {
-                    const metric = entry?.payload?.metric || '';
-                    const unit = chartData.find((d) => d.metric === metric)?.unit || '';
-                    const projectName = name === 'projectA' ? 'Projekt A' : 'Projekt B';
-                    return [`${value.toLocaleString('de-DE')} ${unit}`, projectName];
-                  }}
-                />
-                <Legend />
-                <Bar dataKey="projectA" fill="hsl(var(--chart-1))" name="Projekt A" />
-                <Bar dataKey="projectB" fill="hsl(var(--chart-2))" name="Projekt B" />
-              </BarChart>
-            </ResponsiveContainer>
+            <BarChart data={chartData.slice(0, 2)}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="metric"
+                tick={{ fill: 'hsl(var(--foreground))' }}
+                className="text-xs"
+                angle={-45}
+                textAnchor="end"
+                height={80}
+              />
+              <YAxis tick={{ fill: 'hsl(var(--foreground))' }} className="text-xs" />
+              <Tooltip
+                cursor={{ fill: 'hsl(var(--accent) / 0.2)' }}
+                contentStyle={{
+                  backgroundColor: 'hsl(var(--card))',
+                  border: '1px solid hsl(var(--border))',
+                }}
+                formatter={(value: number, name: string, entry: any) => {
+                  const metric = entry?.payload?.metric || '';
+                  const unit = chartData.find((d) => d.metric === metric)?.unit || '';
+                  const projectName = name === 'projectA' ? 'Projekt A' : 'Projekt B';
+                  return [`${value.toLocaleString('de-DE')} ${unit}`, projectName];
+                }}
+              />
+              <Legend />
+              <Bar dataKey="projectA" fill="hsl(var(--chart-1))" name="Projekt A" />
+              <Bar dataKey="projectB" fill="hsl(var(--chart-2))" name="Projekt B" />
+            </BarChart>
           </ChartContainer>
         </CardContent>
       </Card>
@@ -509,10 +507,10 @@ export function ProjectComparison({
             <div className="pt-4 border-t">
               <div
                 className={`flex items-center gap-2 ${comparisonData.differences.sustainabilityScore.absolute > 0
-                    ? 'text-green-600'
-                    : comparisonData.differences.sustainabilityScore.absolute < 0
-                      ? 'text-red-600'
-                      : 'text-muted-foreground'
+                  ? 'text-green-600'
+                  : comparisonData.differences.sustainabilityScore.absolute < 0
+                    ? 'text-red-600'
+                    : 'text-muted-foreground'
                   }`}
               >
                 {comparisonData.differences.sustainabilityScore.absolute > 0 ? (
@@ -542,28 +540,26 @@ export function ProjectComparison({
             </div>
           )}
           <ChartContainer config={chartConfig} className="h-[200px] w-full mt-4">
-            <ResponsiveContainer>
-              <BarChart data={chartData.slice(3, 4)}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="metric"
-                  tick={{ fill: 'hsl(var(--foreground))' }}
-                  className="text-xs"
-                />
-                <YAxis tick={{ fill: 'hsl(var(--foreground))' }} className="text-xs" />
-                <Tooltip
-                  cursor={{ fill: 'hsl(var(--accent) / 0.2)' }}
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                  }}
-                  formatter={(value: number) => [`${value.toFixed(1)}%`, '']}
-                />
-                <Legend />
-                <Bar dataKey="projectA" fill="hsl(var(--chart-1))" name="Projekt A" />
-                <Bar dataKey="projectB" fill="hsl(var(--chart-2))" name="Projekt B" />
-              </BarChart>
-            </ResponsiveContainer>
+            <BarChart data={chartData.slice(3, 4)}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="metric"
+                tick={{ fill: 'hsl(var(--foreground))' }}
+                className="text-xs"
+              />
+              <YAxis tick={{ fill: 'hsl(var(--foreground))' }} className="text-xs" />
+              <Tooltip
+                cursor={{ fill: 'hsl(var(--accent) / 0.2)' }}
+                contentStyle={{
+                  backgroundColor: 'hsl(var(--card))',
+                  border: '1px solid hsl(var(--border))',
+                }}
+                formatter={(value: number) => [`${value.toFixed(1)}%`, '']}
+              />
+              <Legend />
+              <Bar dataKey="projectA" fill="hsl(var(--chart-1))" name="Projekt A" />
+              <Bar dataKey="projectB" fill="hsl(var(--chart-2))" name="Projekt B" />
+            </BarChart>
           </ChartContainer>
         </CardContent>
       </Card>

@@ -168,19 +168,17 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
           </CardHeader>
           <CardContent className="pl-0">
             <ChartContainer config={chartConfig} className="h-[250px] w-full">
-              <ResponsiveContainer>
-                <BarChart data={analysisData.materialComposition} layout="vertical" margin={{ left: 20, right: 20 }}>
-                  <CartesianGrid horizontal={false} />
-                  <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tick={{ fill: 'hsl(var(--foreground))' }} width={80} interval={0} className="text-xs" />
-                  <Tooltip cursor={{ fill: 'hsl(var(--accent) / 0.2)' }} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
-                  <Bar dataKey="value" radius={4}>
-                    {analysisData.materialComposition.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <BarChart data={analysisData.materialComposition} layout="vertical" margin={{ left: 20, right: 20 }}>
+                <CartesianGrid horizontal={false} />
+                <XAxis type="number" hide />
+                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} tick={{ fill: 'hsl(var(--foreground))' }} width={80} interval={0} className="text-xs" />
+                <Tooltip cursor={{ fill: 'hsl(var(--accent) / 0.2)' }} contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }} />
+                <Bar dataKey="value" radius={4}>
+                  {analysisData.materialComposition.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
             </ChartContainer>
           </CardContent>
         </Card>
