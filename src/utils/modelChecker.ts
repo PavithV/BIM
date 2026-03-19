@@ -1,9 +1,13 @@
 /**
- * @fileOverview Model Checker & DIN 277 Flächenauswertung
+ * @fileOverview Model Checker, DIN 277 Flächenauswertung & DIN 276 Mengenauswertung
  *
  * Analysiert ein geladenes IFC-Modell (via web-ifc API) und gibt
- * strukturierte Ergebnisse für Qualitätsprüfungen und Flächenauswertung zurück.
+ * strukturierte Ergebnisse für Qualitätsprüfungen, Flächenauswertung
+ * und Kostengruppen-Klassifizierung zurück.
  */
+
+import { toCompactModel } from './ifcParser';
+import { assignDIN276CostGroups, calculateDIN276Quantities, type Din276QuantityResult } from './din276Mapper';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -60,6 +64,7 @@ export interface Din277Result {
 export interface FullModelAnalysis {
   modelCheck: ModelCheckResult;
   din277: Din277Result;
+  din276: Din276QuantityResult | null;
 }
 
 // ─── Hilfsfunktionen ─────────────────────────────────────────────────────────
@@ -470,5 +475,18 @@ export async function runFullAnalysis(
     runDin277Analysis(ifcAPI, modelID, WebIFC),
   ]);
 
-  return { modelCheck, din277 };
+  // DIN 276 Mengenauswertung: uses parsed elements from toCompactModel
+  let din276: Din276QuantityResult | null = null;
+  try {
+    // Setze modelID, damit toCompactModel korrekt arbeitet
+    try { (ifcAPI as any).modelID = modelID; } catch { /* ignore */ }
+    const compactModel = await toCompactModel(ifcAPI, modelID, WebIFC);
+    const enrichedElements = assignDIN276CostGroups(compactModel.elements);
+    din276 = calculateDIN276Quantities(enrichedElements);
+    console.log('[DIN276] Zuordnung abgeschlossen:', din276.groups.length, 'Kostengruppen');
+  } catch (err) {
+    console.warn('[DIN276] Fehler bei der Mengenauswertung:', err);
+  }
+
+  return { modelCheck, din277, din276 };
 }

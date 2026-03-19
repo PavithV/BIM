@@ -1,0 +1,182 @@
+/**
+ * @fileOverview DIN 276 Kostengruppen-Zuordnung und Mengen-Aggregation
+ *
+ * Ordnet IFC-Bauteile (CompactElement) automatisiert den DIN 276
+ * Kostengruppen zu und aggregiert Mengen (Flächen, Volumina, Längen).
+ */
+
+import type { CompactElement } from './ifcParser';
+
+// ─── DIN 276 Kostengruppen-Definitionen ─────────────────────────────────────
+
+/** Bezeichnung der DIN 276 Kostengruppen (2. Ebene) */
+export const DIN276_LABELS: Record<string, string> = {
+    '310': 'Baugrube / Erdbau',
+    '320': 'Gründung',
+    '330': 'Außenwände',
+    '334': 'Außentüren und -fenster',
+    '340': 'Innenwände',
+    '344': 'Innentüren und -fenster',
+    '350': 'Decken',
+    '360': 'Dächer',
+    '370': 'Baukonstruktive Einbauten',
+    '390': 'Sonstige Maßnahmen',
+};
+
+/** Aggregiertes Ergebnis für eine Kostengruppe */
+export interface Din276CostGroupResult {
+    kg: string;
+    label: string;
+    totalArea: number;
+    totalVolume: number;
+    totalLength: number;
+    elementCount: number;
+    elements: CompactElement[];
+}
+
+/** Gesamtergebnis der DIN 276 Mengenauswertung */
+export interface Din276QuantityResult {
+    groups: Din276CostGroupResult[];
+    totalArea: number;
+    totalVolume: number;
+}
+
+// ─── Heuristik-Hilfsfunktionen ──────────────────────────────────────────────
+
+const EXTERNAL_KEYWORDS = [
+    'außen', 'aussen', 'extern', 'exterior', 'external', 'fassade', 'facade',
+];
+const FOUNDATION_KEYWORDS = [
+    'fundament', 'bodenplatte', 'foundation', 'gründung', 'gruendung',
+    'sohle', 'kellerdecke',
+];
+
+/**
+ * Prüft ob ein Element als "extern" gilt.
+ * Nutzt zuerst `properties.IsExternal`, dann Namens-Heuristik.
+ */
+function isExternal(el: CompactElement): boolean {
+    // 1. Explizite Property (am zuverlässigsten)
+    const isExt = el.properties?.IsExternal ?? el.properties?.isExternal;
+    if (isExt === true || isExt === 'TRUE' || isExt === '.T.') return true;
+    if (isExt === false || isExt === 'FALSE' || isExt === '.F.') return false;
+
+    // 2. Namens-/Property-Heuristik
+    const searchText = `${el.name ?? ''} ${el.material ?? ''}`.toLowerCase();
+    return EXTERNAL_KEYWORDS.some((kw) => searchText.includes(kw));
+}
+
+/**
+ * Prüft ob eine Decke/Platte als Gründung/Fundament gilt.
+ */
+function isFoundation(el: CompactElement): boolean {
+    const searchText = `${el.name ?? ''}`.toLowerCase();
+    return FOUNDATION_KEYWORDS.some((kw) => searchText.includes(kw));
+}
+
+// ─── Zuordnung ──────────────────────────────────────────────────────────────
+
+/**
+ * Ordnet jedem Element eine DIN 276 Kostengruppe zu.
+ * Gibt ein neues Array zurück (mutiert nicht).
+ */
+export function assignDIN276CostGroups(
+    elements: CompactElement[],
+): CompactElement[] {
+    return elements.map((el) => {
+        const kg = mapElementToKG(el);
+        if (!kg) return el; // Nicht zuordenbar → unverändert
+        return { ...el, din276_kg: kg };
+    });
+}
+
+/**
+ * Heuristik: bestimmt KG für ein einzelnes Element.
+ * Gibt `undefined` zurück wenn der Typ nicht zugeordnet werden kann.
+ */
+function mapElementToKG(el: CompactElement): string | undefined {
+    const type = (el.type ?? '').toUpperCase();
+
+    switch (true) {
+        // ── Wände ──
+        case type === 'IFCWALL' || type === 'IFCWALLSTANDARDCASE':
+            return isExternal(el) ? '330' : '340';
+
+        // ── Decken / Bodenplatten ──
+        case type === 'IFCSLAB':
+            return isFoundation(el) ? '320' : '350';
+
+        // ── Dach ──
+        case type === 'IFCROOF':
+            return '360';
+
+        // ── Fenster ──
+        case type === 'IFCWINDOW':
+            return isExternal(el) ? '334' : '344';
+
+        // ── Türen ──
+        case type === 'IFCDOOR':
+            return isExternal(el) ? '334' : '344';
+
+        // ── Stützen ──
+        case type === 'IFCCOLUMN':
+            return isExternal(el) ? '330' : '340';
+
+        // ── Träger ──
+        case type === 'IFCBEAM':
+            return '340';
+
+        // ── Treppe ──
+        case type === 'IFCSTAIR':
+            return '370';
+
+        default:
+            return undefined;
+    }
+}
+
+// ─── Aggregation ────────────────────────────────────────────────────────────
+
+/**
+ * Aggregiert Mengen (Fläche, Volumen, Länge) pro Kostengruppe.
+ */
+export function calculateDIN276Quantities(
+    elements: CompactElement[],
+): Din276QuantityResult {
+    const groupMap = new Map<string, Din276CostGroupResult>();
+
+    for (const el of elements) {
+        const kg = el.din276_kg;
+        if (!kg) continue;
+
+        let group = groupMap.get(kg);
+        if (!group) {
+            group = {
+                kg,
+                label: DIN276_LABELS[kg] ?? `KG ${kg}`,
+                totalArea: 0,
+                totalVolume: 0,
+                totalLength: 0,
+                elementCount: 0,
+                elements: [],
+            };
+            groupMap.set(kg, group);
+        }
+
+        group.totalArea += el.quantities?.area ?? 0;
+        group.totalVolume += el.quantities?.volume ?? 0;
+        group.totalLength += el.quantities?.length ?? 0;
+        group.elementCount += 1;
+        group.elements.push(el);
+    }
+
+    // Sortiere nach KG-Nummer
+    const groups = Array.from(groupMap.values()).sort(
+        (a, b) => parseInt(a.kg, 10) - parseInt(b.kg, 10),
+    );
+
+    const totalArea = groups.reduce((s, g) => s + g.totalArea, 0);
+    const totalVolume = groups.reduce((s, g) => s + g.totalVolume, 0);
+
+    return { groups, totalArea, totalVolume };
+}

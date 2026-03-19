@@ -23,6 +23,7 @@ import { ProjectComparison } from './project-comparison';
 import { ModelTree, type SpatialNode } from '@/components/model-tree';
 import { ModelChecksTab } from '@/components/model-checks-tab';
 import { Din277Tab } from '@/components/din277-tab';
+import { Din276Tab } from '@/components/din276-tab';
 import type { IFCModel } from '@/lib/types';
 import { cn, downloadCsv } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -858,6 +859,27 @@ export default function Dashboard() {
                                 </div>
                               )}
                               {!isModelAnalysisLoading && <Din277Tab result={modelAnalysis?.din277 ?? null} />}
+                            </div>
+                          </div>
+
+                          <div className="space-y-6 border-t pt-8">
+                            <div className="max-w-5xl mx-auto space-y-6">
+                              <div className="flex items-center justify-between">
+                                <div><h2 className="text-2xl font-bold font-headline mb-1">DIN 276 Mengenauswertung</h2></div>
+                                {!modelAnalysis && (
+                                  <Button onClick={runModelAnalysis} disabled={isModelAnalysisLoading}>
+                                    {isModelAnalysisLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
+                                    {' Auswertung starten'}
+                                  </Button>
+                                )}
+                              </div>
+                              {isModelAnalysisLoading && (
+                                <div className="flex flex-col items-center justify-center py-12">
+                                  <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+                                  <p className="font-semibold">Mengenauswertung wird erstellt...</p>
+                                </div>
+                              )}
+                              {!isModelAnalysisLoading && <Din276Tab result={modelAnalysis?.din276 ?? null} />}
                             </div>
                           </div>
                         </div>

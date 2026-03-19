@@ -34,6 +34,7 @@ export interface CompactElement {
     volume?: number;
     length?: number;
   };
+  din276_kg?: string; // DIN 276 Kostengruppe, z.B. "330" für Außenwände
 }
 
 /**
@@ -213,7 +214,7 @@ async function extractQuantities(
                 const qtyLineID = qtyRef?.value || qtyRef;
                 const qty = await ifcAPI.GetLine(ifcAPI.modelID, qtyLineID);
 
-                const qtyType = qty.constructor.name;
+                // Safer parsing without relying on constructor.name (which gets minified)
                 const qtyName = (qty.Name?.value || qty.name || '').toLowerCase();
 
                 // Regex Fallback für Werte wie "12.5 m3"
@@ -224,14 +225,15 @@ async function extractQuantities(
                   return match ? parseFloat(match[0]) : undefined;
                 };
 
-                const val = extractVal(qty.AreaValue?.value || qty.VolumeValue?.value || qty.LengthValue?.value || qty.value);
+                const val = extractVal(qty.AreaValue?.value ?? qty.VolumeValue?.value ?? qty.LengthValue?.value ?? qty.value);
 
-                if (qtyType === 'IFCQUANTITYAREA') {
-                  if (qtyName.includes('area') || qtyName.includes('flä') || qtyName.includes('fla') || result.area === undefined) result.area = val;
-                } else if (qtyType === 'IFCQUANTITYVOLUME') {
-                  if (qtyName.includes('volume') || qtyName.includes('volumen') || result.volume === undefined) result.volume = val;
-                } else if (qtyType === 'IFCQUANTITYLENGTH') {
-                  if (qtyName.includes('length') || qtyName.includes('länge') || qtyName.includes('laenge') || result.length === undefined) result.length = val;
+                // Duck-Typing via properties
+                if (qty.AreaValue !== undefined || qtyName.includes('area') || qtyName.includes('flä') || qtyName.includes('fla')) {
+                  if (result.area === undefined && val !== undefined) result.area = val;
+                } else if (qty.VolumeValue !== undefined || qtyName.includes('volume') || qtyName.includes('volumen')) {
+                  if (result.volume === undefined && val !== undefined) result.volume = val;
+                } else if (qty.LengthValue !== undefined || qtyName.includes('length') || qtyName.includes('länge') || qtyName.includes('laenge')) {
+                  if (result.length === undefined && val !== undefined) result.length = val;
                 }
               }
             }
@@ -381,27 +383,28 @@ async function computeVolumeFromGeometry(
         const item = await ifcAPI.GetLine(modelID, itemID);
         if (!item) continue;
 
-        const itemType = item.constructor?.name || '';
-
-        if (itemType === 'IFCEXTRUDEDAREASOLID' || itemType === 'IfcExtrudedAreaSolid') {
-          const depth = item.Depth?.value || item.Depth;
+        // Duck-Typing for ExtrudedAreaSolid (has Depth and SweptArea)
+        if (item.Depth !== undefined && item.SweptArea !== undefined) {
+          const depth = item.Depth?.value ?? item.Depth;
           if (!depth || depth <= 0) continue;
 
-          const profileRef = item.SweptArea?.value || item.SweptArea;
+          const profileRef = item.SweptArea?.value ?? item.SweptArea;
           if (!profileRef) continue;
 
           const profile = await ifcAPI.GetLine(modelID, profileRef);
           if (!profile) continue;
 
-          const profileType = profile.constructor?.name || '';
           let profileArea = 0;
 
-          if (profileType.includes('RectangleProfileDef') || profileType === 'IFCRECTANGLEPROFILEDEF') {
-            const xDim = profile.XDim?.value || profile.XDim || 0;
-            const yDim = profile.YDim?.value || profile.YDim || 0;
+          // RectangleProfileDef has XDim and YDim
+          if (profile.XDim !== undefined && profile.YDim !== undefined) {
+            const xDim = profile.XDim?.value ?? profile.XDim ?? 0;
+            const yDim = profile.YDim?.value ?? profile.YDim ?? 0;
             profileArea = xDim * yDim;
-          } else if (profileType.includes('CircleProfileDef') || profileType === 'IFCCIRCLEPROFILEDEF') {
-            const radius = profile.Radius?.value || profile.Radius || 0;
+          }
+          // CircleProfileDef has Radius
+          else if (profile.Radius !== undefined) {
+            const radius = profile.Radius?.value ?? profile.Radius ?? 0;
             profileArea = Math.PI * radius * radius;
           }
           // ArbitraryClosedProfileDef with complex curves would need more work
@@ -455,16 +458,33 @@ export async function toCompactModel(
     WebIFC.IFCPROJECT,
   ];
 
+  // Map für konstanten Name (explicit mapping avoids minification issues)
+  const typeNameMap = new Map<number, string>([
+    [WebIFC.IFCWALL, 'IFCWALL'],
+    [WebIFC.IFCWALLSTANDARDCASE, 'IFCWALLSTANDARDCASE'],
+    [WebIFC.IFCSLAB, 'IFCSLAB'],
+    [WebIFC.IFCDOOR, 'IFCDOOR'],
+    [WebIFC.IFCWINDOW, 'IFCWINDOW'],
+    [WebIFC.IFCCOLUMN, 'IFCCOLUMN'],
+    [WebIFC.IFCBEAM, 'IFCBEAM'],
+    [WebIFC.IFCROOF, 'IFCROOF'],
+    [WebIFC.IFCSTAIR, 'IFCSTAIR'],
+    [WebIFC.IFCBUILDINGSTOREY, 'IFCBUILDINGSTOREY'],
+    [WebIFC.IFCBUILDING, 'IFCBUILDING'],
+    [WebIFC.IFCPROJECT, 'IFCPROJECT'],
+  ]);
+
   // Sammle alle relevanten Elemente
   for (const elementType of elementTypes) {
     try {
       const elementIDsRaw = await ifcAPI.GetLineIDsWithType(modelID, elementType);
       const elementIDs = toIterable(elementIDsRaw);
+      const mappedTypeName = typeNameMap.get(elementType) || 'UNKNOWN';
 
       for (const expressID of elementIDs) {
         try {
           const element = await ifcAPI.GetLine(modelID, expressID);
-          const elementTypeName = element.constructor.name;
+          const elementTypeName = mappedTypeName; // avoid element.constructor.name
 
           // Überspringe Container-Elemente für die Hauptliste (behalten aber für Metadaten)
           if (elementTypeName === 'IFCPROJECT') {
