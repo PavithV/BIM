@@ -169,43 +169,40 @@ async function extractProperties(
 }
 
 /**
- * Extrahiert Quantities aus IFC-Element
+ * Extrahiert Quantities aus IFC-Element (Unterstützt IFC2x3 und IFC4)
  */
 async function extractQuantities(
-  ifcAPI: any, // WebIFC.IfcAPI, aber dynamisch importiert
+  ifcAPI: any,
   expressID: number,
   WebIFC: any
 ): Promise<CompactElement['quantities'] | undefined> {
   try {
-    // Collect quantity sets from multiple possible IDs to support both IFC2x3 and IFC4 robustly
-    // 144 = IFC4 IFCRELDEFINESBYQUANTITY
-    // 123 = IFC2x3 IFCRELDEFINESBYQUANTITY
-    // Using constant if available, otherwise fallback to numbers
-
     let quantitiesRaw: number[] = [];
 
-    // Try getting via constant
+    // 1. Suche nach IFCRELDEFINESBYQUANTITY (Standard für IFC4)
     if (WebIFC && WebIFC.IFCRELDEFINESBYQUANTITY) {
       try {
         const result = await ifcAPI.GetLineIDsWithType(ifcAPI.modelID, WebIFC.IFCRELDEFINESBYQUANTITY);
         quantitiesRaw.push(...toIterable(result));
-      } catch (e) { console.warn('GetLineIDsWithType failed for constant IFCRELDEFINESBYQUANTITY', e); }
+      } catch (e) { }
     } else {
-      // Fallback to numeric IDs
-      const candidates = [144, 123];
-      for (const typeID of candidates) {
-        try {
-          const result = await ifcAPI.GetLineIDsWithType(ifcAPI.modelID, typeID);
-          quantitiesRaw.push(...toIterable(result));
-        } catch (e) {
-          // ignore specific type error
-        }
-      }
+      // Fallback
+      try {
+        const result144 = await ifcAPI.GetLineIDsWithType(ifcAPI.modelID, 144);
+        quantitiesRaw.push(...toIterable(result144));
+      } catch (e) { }
     }
 
-    // Deduplicate IDs
-    const quantities = Array.from(new Set(quantitiesRaw));
+    // 2. WICHTIGER FIX: Archicad und IFC2x3 nutzen IFCRELDEFINESBYPROPERTIES um Quantities zu verknüpfen!
+    if (WebIFC && WebIFC.IFCRELDEFINESBYPROPERTIES) {
+      try {
+        const resultProps = await ifcAPI.GetLineIDsWithType(ifcAPI.modelID, WebIFC.IFCRELDEFINESBYPROPERTIES);
+        quantitiesRaw.push(...toIterable(resultProps));
+      } catch (e) { }
+    }
 
+    // Dedupliziere IDs, falls beide Ansätze etwas finden
+    const quantities = Array.from(new Set(quantitiesRaw));
     const result: CompactElement['quantities'] = {};
 
     for (const qtyID of quantities) {
@@ -217,16 +214,16 @@ async function extractQuantities(
         );
 
         if (relatedIds.includes(expressID)) {
-          const elemQtyID = relQty.RelatingPropertyDefinition?.value;
+          // FIX: In IFC4 heißt die Relation "RelatingQuantity", in IFC2x3/Archicad "RelatingPropertyDefinition"
+          const elemQtyID = relQty.RelatingQuantity?.value ?? relQty.RelatingPropertyDefinition?.value;
           if (elemQtyID) {
             const elemQty = await ifcAPI.GetLine(ifcAPI.modelID, elemQtyID);
 
+            // Prüfe, ob es sich wirklich um ein ElementQuantity-Objekt handelt
             if (elemQty.Quantities && Array.isArray(elemQty.Quantities)) {
               for (const qtyRef of elemQty.Quantities) {
                 const qtyLineID = qtyRef?.value || qtyRef;
                 const qty = await ifcAPI.GetLine(ifcAPI.modelID, qtyLineID);
-
-                // Safer parsing without relying on constructor.name (which gets minified)
                 const qtyName = (qty.Name?.value || qty.name || '').toLowerCase();
 
                 // Regex Fallback für Werte wie "12.5 m3"
@@ -239,8 +236,8 @@ async function extractQuantities(
 
                 const val = extractVal(qty.AreaValue?.value ?? qty.VolumeValue?.value ?? qty.LengthValue?.value ?? qty.value);
 
-                // Duck-Typing via properties
-                if (qty.AreaValue !== undefined || qtyName.includes('area') || qtyName.includes('flä') || qtyName.includes('fla')) {
+                // Duck-Typing für Flächen, Volumen und Längen
+                if (qty.AreaValue !== undefined || qtyName.includes('area') || qtyName.includes('flä') || qtyName.includes('fla') || qtyName.includes('bereich')) {
                   if (result.area === undefined && val !== undefined) result.area = val;
                 } else if (qty.VolumeValue !== undefined || qtyName.includes('volume') || qtyName.includes('volumen')) {
                   if (result.volume === undefined && val !== undefined) result.volume = val;
@@ -582,6 +579,33 @@ export async function toCompactModel(
 
           // Extrahiere Quantities
           let quantities = await extractQuantities(ifcAPI, expressID, WebIFC);
+
+          if (!quantities) {
+            quantities = {};
+          }
+
+          // FIX: BIM-Programme verstecken Mengen oft in normalen Properties, wenn Qto-Relationen fehlen!
+          if (properties) {
+            const getPropVal = (keywords: string[]) => {
+              const key = Object.keys(properties).find(k => keywords.some(kw => k.toLowerCase().includes(kw)));
+              if (key) {
+                // parseFloat filtert Einheiten wie "m3" oder "m2" automatisch weg (z.B. "12.5 m3" -> 12.5)
+                const val = parseFloat(String(properties[key]).replace(',', '.'));
+                return isNaN(val) ? undefined : val;
+              }
+              return undefined;
+            };
+
+            if (quantities.area === undefined) {
+              quantities.area = getPropVal(['area', 'fläche', 'fla', 'oberfläche', 'net side area', 'gross side area']);
+            }
+            if (quantities.volume === undefined) {
+              quantities.volume = getPropVal(['volume', 'volumen', 'netto-volumen', 'brutto-volumen']);
+            }
+            if (quantities.length === undefined) {
+              quantities.length = getPropVal(['length', 'länge', 'laenge']);
+            }
+          }
 
           // Fallback: Berechne Volume/Area aus Geometrie wenn keine Quantities vorhanden
           if (!quantities || (quantities.volume === undefined && quantities.area === undefined)) {
