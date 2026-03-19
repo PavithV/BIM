@@ -510,8 +510,6 @@ export default function Dashboard() {
         throw new Error(urlResult.error || 'Signed Upload URL konnte nicht erstellt werden.');
       }
 
-      console.log('Uploading to Storage via signed URL:', urlResult.storagePath);
-
       // 2. Upload directly from browser to Supabase Storage using signed URL
       const { error: uploadError } = await supabase.storage
         .from('ifc-models')
@@ -520,7 +518,6 @@ export default function Dashboard() {
       if (uploadError) throw uploadError;
 
       // 3. Create DB record via server action (bypasses RLS)
-      console.log('Creating DB Record...');
       const recordResult = await createIfcModelRecord({
         fileName: file.name,
         fileSize: file.size,
@@ -620,24 +617,14 @@ export default function Dashboard() {
         throw new Error('WASM-Modul konnte nicht initialisiert werden.');
       }
 
-      console.log('[ModelAnalysis] Opening model, data size:', data.length);
-
       const modelID = await ifcAPI.OpenModel(data, {
         COORDINATE_TO_ORIGIN: false,
         USE_FAST_BOOLS: false,
       });
 
-      console.log('[ModelAnalysis] Model opened, ID:', modelID);
-
-      // Diagnose: Prüfe ob Typen korrekt aufgelöst werden
-      console.log('[ModelAnalysis] WebIFC.IFCSPACE =', WebIFC.IFCSPACE);
-      console.log('[ModelAnalysis] WebIFC.IFCWALL =', WebIFC.IFCWALL);
-      console.log('[ModelAnalysis] WebIFC.IFCPROJECT =', WebIFC.IFCPROJECT);
-
       try {
         const { runFullAnalysis } = await import('@/utils/modelChecker');
         const analysisResult = await runFullAnalysis(ifcAPI, modelID, WebIFC, data);
-        console.log('[ModelAnalysis] Result:', JSON.stringify(analysisResult, null, 2).slice(0, 500));
         setModelAnalysis(analysisResult);
         toast({ title: 'Modellprüfung abgeschlossen' });
       } finally {

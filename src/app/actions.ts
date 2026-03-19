@@ -94,14 +94,6 @@ export async function getAIChatFeedback(input: AIChatFeedbackInput & { replaceme
 
     // Komprimiere IFC-Datei vor dem Senden an die KI
     const compressedIfcData = compressIfcFile(input.ifcModelData, input.replacementMap);
-    // Server-side debug: logge Längeninfo und Preview (Terminal)
-    try {
-      const preview = typeof compressedIfcData === 'string' ? compressedIfcData.slice(0, 1000) : String(compressedIfcData);
-      console.log('getAIChatFeedback - compressedIfcData length:', typeof compressedIfcData === 'string' ? compressedIfcData.length : undefined);
-      console.log('getAIChatFeedback - compressedIfcData preview:\n', preview);
-    } catch (e) {
-      console.warn('Could not log compressedIfcData preview', e);
-    }
 
     const result = await aiChatFeedback({
       ...input,
@@ -123,11 +115,7 @@ export async function getIfcAnalysis(input: GenerateAnalysisFromIfcInput & { rep
     await requireAuth();
 
     // Komprimiere IFC-Datei vor dem Senden an die KI
-    // @ts-ignore
     const compressedIfcContent = compressIfcFile(input.ifcFileContent, input.replacementMap);
-    console.log('--- Compressed IFC Data (Verification) ---');
-    console.log(compressedIfcContent.slice(0, 2000) + (compressedIfcContent.length > 2000 ? '\n... (truncated)' : ''));
-    console.log('------------------------------------------');
 
     const result = await generateAnalysisFromIfc({
       ifcFileContent: compressedIfcContent,

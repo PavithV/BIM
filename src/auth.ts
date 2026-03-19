@@ -76,7 +76,6 @@ export const config = {
                     };
                 }
 
-                console.log("Invalid credentials format", parsedCredentials.error);
                 return null;
             },
         }),
@@ -119,14 +118,11 @@ export const config = {
                         } else {
                             // Step 3: Auth user already exists but not in public.users
                             // (e.g. from a previous failed login). Find their UUID.
-                            console.log("Auth user exists but not in public.users. Looking up Auth UUID...");
                             const { data: listData, error: listError } = await admin.auth.admin.listUsers({ perPage: 1000 });
-
                             if (!listError && listData?.users) {
-                                const authUser = listData.users.find(u => u.email === user.email);
+                                const authUser = listData.users.find((u: { email?: string }) => u.email === user.email);
                                 if (authUser) {
                                     userId = authUser.id;
-                                    console.log("Found Auth UUID:", userId);
                                 }
                             }
 
@@ -137,13 +133,9 @@ export const config = {
                         }
                     }
 
-                    // CRITICAL: Override user.id with the Supabase UUID so the JWT/session
+                    // Override user.id with the Supabase UUID so the JWT/session
                     // uses the correct ID (not the KIT OIDC sub).
                     user.id = userId || undefined;
-
-                    // Upsert user data to Supabase public.users
-                    console.log("KIT Login - Resolved Supabase UUID:", userId);
-                    console.log("KIT OIDC Profile Dump:", JSON.stringify(profile, null, 2));
 
                     const profileData = profile || {}; // Safe access
 

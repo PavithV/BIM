@@ -45,7 +45,6 @@ export default function RegisterPage() {
 
       if (user) {
         // User created. Profile creation handled by Database Trigger (handle_new_user).
-        console.log('User created:', user.id);
       }
 
       router.push('/');

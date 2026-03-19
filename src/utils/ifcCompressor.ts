@@ -352,11 +352,6 @@ function processCompactModel(elements: any[], replacementMap?: Record<string, st
           // Aber im neuen Flow wird map provided sein.
           // Wenn map undefined ist -> Auto Replace wie bisher
           if (matched) {
-            if (!replacementMap) { // Nur loggen wenn kein explizites Handling
-              if (matched.Name !== material) {
-                console.log(`Material ersetzt (Auto): "${material}" -> "${matched.Name}"`);
-              }
-            }
             // Wenn replacementMap existiert aber Key fehlt -> Default: Replacement oder Original?
             // Plan: Wenn map da ist, gelten nur Einträge in Map? Oder Map sind OVERRIDES?
             // Sicherer: Wenn Map da ist, dann ist sie vollständig für alle replacements.
@@ -791,7 +786,7 @@ function processIfcText(text: string, replacementMap?: Record<string, string>): 
     .map(([t, c]) => `${t}:${c}`)
     .join(', ');
 
-  console.log(`compressIfcFile: found ${instances.size} instances. Top Types: ${topTypes}`);
+  // type census computed for internal reference; removed debug log
 
   for (const [id, instance] of instances.entries()) {
     const typeUpper = instance.type.toUpperCase();
@@ -923,9 +918,6 @@ function processIfcText(text: string, replacementMap?: Record<string, string>): 
       } else {
         if (matched) {
           finalMaterial = matched.Name;
-          if (matched.Name !== material) {
-            console.log(`Material ersetzt (Auto): "${material}" -> "${matched.Name}"`);
-          }
         }
       }
 
@@ -1216,36 +1208,18 @@ function parseQuantityRelationsFromInstances(instances: Map<number, { type: stri
 
     const params = splitIfcArguments(instance.args);
 
-    // Debug first few instances
-    if (debugCount < 3) {
-      console.log(`[DEBUG] IFCRELDEFINESBYQUANTITY #${id}: params.length=${params.length}`);
-      console.log(`[DEBUG] Args raw: ${instance.args}`);
-      console.log(`[DEBUG] Parsed Params:`, params);
-      debugCount++;
-    }
-
     // IfcRelDefinesByQuantity(GlobalId, OwnerHistory, Name, Description, RelatedObjects, RelatingQuantity)
     // Index 4: RelatedObjects
     // Index 5: RelatingQuantity (QuantitySet)
 
-    if (params.length < 6) {
-      if (debugCount < 5) console.log(`[DEBUG] Skipped #${id} - params < 6`);
-      continue;
-    }
+    if (params.length < 6) continue;
 
     const qMatch = params[5].match(/#(\d+)/);
-    if (!qMatch) {
-      if (debugCount < 5) console.log(`[DEBUG] Skipped #${id} - no RelatingQuantity match in ${params[5]}`);
-      continue;
-    }
+    if (!qMatch) continue;
     const quantitySetId = parseInt(qMatch[1]);
 
     const relatedObjectsStr = params[4];
     const elementMatches = Array.from(relatedObjectsStr.matchAll(/#(\d+)/g));
-
-    if (elementMatches.length === 0 && debugCount < 5) {
-      console.log(`[DEBUG] Skipped #${id} - no RelatedObjects found in ${relatedObjectsStr}`);
-    }
 
     for (const elemMatch of elementMatches) {
       relations.push({ elementId: parseInt(elemMatch[1]), quantityId: quantitySetId });

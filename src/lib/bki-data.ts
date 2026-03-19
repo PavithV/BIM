@@ -8,6 +8,6 @@ export const BKI_COSTS: Record<string, { name: string, unit: 'm2' | 'm3', priceP
     "350": { name: "Decken", unit: "m2", pricePerUnit: 487 },
     "360": { name: "Dächer", unit: "m2", pricePerUnit: 522 },
     "370": { name: "Infrastrukturanlagen", unit: "m2", pricePerUnit: 150 }, // Fallback
-    "380": { name: "Baukonstruktive Einbauten", unit: "m2", pricePerUnit: 150 }, // Fallback
-    "390": { name: "Sonstige Maßnahmen", unit: "m2", pricePerUnit: 100 }
+    "380": { name: "Baukonstruktive Einbauten", unit: "m2", pricePerUnit: 3 }, // Fallback
+    "390": { name: "Sonstige Maßnahmen", unit: "m2", pricePerUnit: 74 }
 };

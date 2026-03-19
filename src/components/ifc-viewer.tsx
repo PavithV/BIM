@@ -170,7 +170,6 @@ export function IfcViewer({ ifcFile, ifcContent, ifcUrl, ifcStoragePath, onModel
           filename = ifcFile.name;
         }
         else if (ifcStoragePath) {
-          console.log('[IfcViewer] Lade von Supabase:', ifcStoragePath);
           const { data, error } = await supabase.storage.from('ifc-models').download(ifcStoragePath);
           if (error || !data) throw error || new Error('Keine Daten von Supabase');
           blobToLoad = data;
@@ -190,7 +189,6 @@ export function IfcViewer({ ifcFile, ifcContent, ifcUrl, ifcStoragePath, onModel
         const headerCheck = await blobToLoad.slice(0, 50).text();
 
         if (headerCheck.startsWith('data:')) {
-          console.log('[IfcViewer] Data-URI (Base64) erkannt. Starte Umwandlung in Binärdaten...');
           const fullText = await blobToLoad.text();
           // Format ist meist: "data:application/octet-stream;base64,....."
           const parts = fullText.split(',');
@@ -203,9 +201,6 @@ export function IfcViewer({ ifcFile, ifcContent, ifcUrl, ifcStoragePath, onModel
             }
             // Ersetze den Blob durch den "echten" decodierten Blob
             blobToLoad = new Blob([bytes], { type: 'application/x-step' });
-            console.log('[IfcViewer] Umwandlung erfolgreich. Neue Größe:', blobToLoad.size);
-          } else {
-            console.warn('[IfcViewer] Data-URI Format unerwartet, versuche Original...');
           }
         }
         // ---------------------------------------------------------
@@ -213,7 +208,6 @@ export function IfcViewer({ ifcFile, ifcContent, ifcUrl, ifcStoragePath, onModel
         const modelUrl = URL.createObjectURL(blobToLoad);
         currentUrlRef.current = modelUrl;
 
-        console.log(`[IfcViewer] Lade URL: ${modelUrl}`);
         const model = await viewer.IFC.loadIfcUrl(modelUrl, true);
 
         if (isActive && model) {
