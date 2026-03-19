@@ -123,31 +123,34 @@ function mapElementToKG(el: CompactElement): string | undefined {
         case type === 'IFCFOOTING':
             return '320';
 
-        // ── Fenster ──
-        case type === 'IFCWINDOW':
+        // ── Fenster & Türen ──
+        case type === 'IFCWINDOW' || type === 'IFCDOOR':
             return isExternal(el) ? '334' : '344';
 
-        // ── Türen ──
-        case type === 'IFCDOOR':
-            return isExternal(el) ? '334' : '344';
-
-        // ── Stützen / Bauteile ──
+        // ── Stützen ──
         case type === 'IFCCOLUMN' || type === 'IFCMEMBER':
             return isExternal(el) ? '330' : '340';
 
-        // ── Träger ──
+        // ── Träger / Balken / Unterzüge (Fachliche Korrektur) ──
         case type === 'IFCBEAM':
-            return '340';
+            if (searchText.includes('dach') || searchText.includes('roof') || searchText.includes('sparren')) return '360';
+            return '350'; // Meistens Unterzüge unter Decken
 
-        // ── Treppen / Rampen / Geländer ──
-        case type === 'IFCSTAIR' || type === 'IFCRAMP' || type === 'IFCRAILING':
-            return '370';
+        // ── Treppen / Rampen (Fachliche Korrektur auf KG 350) ──
+        case type === 'IFCSTAIR' || type === 'IFCRAMP':
+            return '350';
 
-        // ── Verkleidungen / Beläge ──
+        // ── Geländer ──
+        case type === 'IFCRAILING':
+            return '390'; // Sonstige Maßnahmen (oft separat ausgeschrieben)
+
+        // ── Verkleidungen / Beläge (Verfeinert) ──
         case type === 'IFCCOVERING':
             if (searchText.includes('dach') || searchText.includes('roof')) return '360';
-            if (searchText.includes('fassade') || searchText.includes('facade')) return '330';
+            if (searchText.includes('fassade') || searchText.includes('facade') || searchText.includes('wdvs')) return '330';
             if (searchText.includes('boden') || searchText.includes('floor') || searchText.includes('estrich')) return '350';
+            if (searchText.includes('wand') || searchText.includes('wall') || searchText.includes('putz')) return isExternal(el) ? '330' : '340';
+            if (searchText.includes('decke') || searchText.includes('ceiling')) return '350';
             return '370';
 
         // ── Generische Elemente (Fallback-Heuristik) ──
@@ -159,6 +162,8 @@ function mapElementToKG(el: CompactElement): string | undefined {
             if (searchText.includes('fenster') || searchText.includes('window')) return isExternal(el) ? '334' : '344';
             if (searchText.includes('tür') || searchText.includes('door') || searchText.includes('tuer')) return isExternal(el) ? '334' : '344';
             if (searchText.includes('stütze') || searchText.includes('column') || searchText.includes('stuetze')) return isExternal(el) ? '330' : '340';
+            if (searchText.includes('träger') || searchText.includes('beam') || searchText.includes('unterzug')) return '350';
+            if (searchText.includes('treppe') || searchText.includes('stair')) return '350';
             return undefined;
 
         default:
