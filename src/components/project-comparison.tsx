@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend, Cell } from 'recharts';
 import { ChartContainer, ChartConfig } from '@/components/ui/chart';
-import { TrendingUp, TrendingDown, ArrowRight, Euro, Leaf, Package, Co2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowRight, Euro, Leaf, Package } from 'lucide-react';
 import type { IFCModel } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 
@@ -508,13 +508,12 @@ export function ProjectComparison({
           {comparisonData.differences && (
             <div className="pt-4 border-t">
               <div
-                className={`flex items-center gap-2 ${
-                  comparisonData.differences.sustainabilityScore.absolute > 0
+                className={`flex items-center gap-2 ${comparisonData.differences.sustainabilityScore.absolute > 0
                     ? 'text-green-600'
                     : comparisonData.differences.sustainabilityScore.absolute < 0
-                    ? 'text-red-600'
-                    : 'text-muted-foreground'
-                }`}
+                      ? 'text-red-600'
+                      : 'text-muted-foreground'
+                  }`}
               >
                 {comparisonData.differences.sustainabilityScore.absolute > 0 ? (
                   <TrendingUp className="w-5 h-5" />
@@ -535,8 +534,8 @@ export function ProjectComparison({
                     {comparisonData.differences.sustainabilityScore.absolute > 0
                       ? 'Projekt B ist nachhaltiger'
                       : comparisonData.differences.sustainabilityScore.absolute < 0
-                      ? 'Projekt A ist nachhaltiger'
-                      : 'Beide Projekte haben den gleichen Nachhaltigkeitswert'}
+                        ? 'Projekt A ist nachhaltiger'
+                        : 'Beide Projekte haben den gleichen Nachhaltigkeitswert'}
                   </p>
                 </div>
               </div>

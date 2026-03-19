@@ -139,7 +139,7 @@ export const config = {
 
                     // CRITICAL: Override user.id with the Supabase UUID so the JWT/session
                     // uses the correct ID (not the KIT OIDC sub).
-                    user.id = userId;
+                    user.id = userId || undefined;
 
                     // Upsert user data to Supabase public.users
                     console.log("KIT Login - Resolved Supabase UUID:", userId);

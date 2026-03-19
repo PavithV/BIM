@@ -7,10 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import dynamic from 'next/dynamic';
 import { AnalysisPanel } from '@/components/analysis-panel';
 import { ChatAssistant } from '@/components/chat-assistant';
-import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2, Euro, Leaf, Layers, GitCompare, FilePlus, Sparkles } from 'lucide-react';
+import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2, Euro, Leaf, Layers, GitCompare, FilePlus, Sparkles, ShieldCheck, LayoutGrid } from 'lucide-react';
 import { Button } from './ui/button';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { getStartingPrompts, getAIChatFeedback, getIfcAnalysis, getCostEstimation, checkMaterialReplacements, fetchUserProjects, createSignedUploadUrl, createIfcModelRecord, insertMessage, fetchMessagesForProject, updateIfcModel } from '@/app/actions';
 import { MaterialReviewModal, type MaterialReplacement } from './material-review-modal';
 import { parseIFC, toJSONString } from '@/utils/ifcParser';
@@ -19,9 +21,12 @@ import { useRouter } from 'next/navigation';
 import { ProjectSelector } from './project-selector';
 import { ProjectComparison } from './project-comparison';
 import { ModelTree, type SpatialNode } from '@/components/model-tree';
+import { ModelChecksTab } from '@/components/model-checks-tab';
+import { Din277Tab } from '@/components/din277-tab';
 import type { IFCModel } from '@/lib/types';
 import { cn, downloadCsv } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import type { FullModelAnalysis } from '@/utils/modelChecker';
 import { AI_MODELS, DEFAULT_MODEL, type AIModelId } from '@/ai/models';
 
 export type Message = {
@@ -63,6 +68,9 @@ export default function Dashboard() {
   const [pendingReplacements, setPendingReplacements] = useState<MaterialReplacement[]>([]);
   const [pendingAction, setPendingAction] = useState<{ type: 'analysis' | 'chat', data: any } | null>(null);
 
+  const [modelAnalysis, setModelAnalysis] = useState<FullModelAnalysis | null>(null);
+  const [isModelAnalysisLoading, setIsModelAnalysisLoading] = useState(false);
+
   const { user, signOut } = useSupabaseAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -76,6 +84,11 @@ export default function Dashboard() {
     setModelStructure(structure);
     setSidebarTab('structure');
   }, []);
+
+  // Reset model analysis when project changes
+  useEffect(() => {
+    setModelAnalysis(null);
+  }, [activeProject?.id]);
 
   // --- MESSAGES FETCHING ---
   const fetchMessages = useCallback(async () => {
@@ -557,192 +570,325 @@ export default function Dashboard() {
     downloadCsv([header, ...rows], `${activeProject.fileName}_material_pass.csv`);
   };
 
-  return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      {/* Sidebar */}
-      <aside className={cn("w-80 border-r bg-card flex flex-col transition-all duration-300 ease-in-out shrink-0", !isSidebarOpen && "-ml-80")}>
-        <div className="p-4 border-b flex items-center gap-2">
-          <Building className="w-6 h-6 text-primary" />
-          <h1 className="font-bold text-lg font-headline">BIMCoach Studio</h1>
-        </div>
+  // --- MODEL CHECKS & DIN 277 ---
+  const runModelAnalysis = useCallback(async () => {
+    if (!activeProject) return;
+    setIsModelAnalysisLoading(true);
+    setModelAnalysis(null);
+    try {
+      // Lade IFC-Datei als Binär-Daten (Uint8Array), um Text-Encoding-Roundtrip zu vermeiden
+      let data: Uint8Array;
 
-        <div className="flex-1 overflow-hidden p-4 flex flex-col gap-4">
-          <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
-            <div className="flex items-center gap-2 mb-2 bg-muted/50 p-1 rounded-lg shrink-0">
-              <Button
-                variant={sidebarTab === 'projects' ? 'default' : 'ghost'}
-                size="sm"
-                className="flex-1 h-7 text-xs"
-                onClick={() => setSidebarTab('projects')}
-              >
-                Projekte
-              </Button>
-              <Button
-                variant={sidebarTab === 'structure' ? 'default' : 'ghost'}
-                size="sm"
-                className="flex-1 h-7 text-xs"
-                onClick={() => setSidebarTab('structure')}
-                disabled={!modelStructure}
-              >
-                Struktur
-              </Button>
-            </div>
+      if (activeProject.fileStoragePath) {
+        // Direkt als Blob/ArrayBuffer von Storage laden
+        const { data: blob, error } = await supabase.storage
+          .from('ifc-models')
+          .download(activeProject.fileStoragePath);
+        if (error || !blob) throw new Error('Datei konnte nicht geladen werden: ' + (error?.message || ''));
+        const arrayBuffer = await blob.arrayBuffer();
+        data = new Uint8Array(arrayBuffer);
+      } else {
+        // Fallback: loadIfcFileContent (Text) -> Uint8Array
+        const fileContent = await loadIfcFileContent(activeProject);
+        const encoder = new TextEncoder();
+        data = encoder.encode(fileContent);
+      }
+
+      // Entferne BOM falls vorhanden
+      if (data.length >= 3 && data[0] === 0xEF && data[1] === 0xBB && data[2] === 0xBF) {
+        data = data.slice(3);
+      }
+
+      // Dynamisch web-ifc importieren
+      const WebIFC = await import('web-ifc');
+      const ifcAPI = new WebIFC.IfcAPI();
+
+      const wasmPath = (window as any).WEBIFC_PATH
+        || (window as any).webIfcWasmPath
+        || (window as any).ifcjsWasmPath
+        || '/wasm/';
+
+      ifcAPI.SetWasmPath(wasmPath);
+      if (typeof (ifcAPI as any).Init === 'function') {
+        await (ifcAPI as any).Init();
+      }
+
+      // Prüfe ob WASM geladen wurde
+      const wasmModule = (ifcAPI as any).wasmModule;
+      if (!wasmModule) {
+        throw new Error('WASM-Modul konnte nicht initialisiert werden.');
+      }
+
+      console.log('[ModelAnalysis] Opening model, data size:', data.length);
+
+      const modelID = await ifcAPI.OpenModel(data, {
+        COORDINATE_TO_ORIGIN: false,
+        USE_FAST_BOOLS: false,
+      });
+
+      console.log('[ModelAnalysis] Model opened, ID:', modelID);
+
+      // Diagnose: Prüfe ob Typen korrekt aufgelöst werden
+      console.log('[ModelAnalysis] WebIFC.IFCSPACE =', WebIFC.IFCSPACE);
+      console.log('[ModelAnalysis] WebIFC.IFCWALL =', WebIFC.IFCWALL);
+      console.log('[ModelAnalysis] WebIFC.IFCPROJECT =', WebIFC.IFCPROJECT);
+
+      try {
+        const { runFullAnalysis } = await import('@/utils/modelChecker');
+        const analysisResult = await runFullAnalysis(ifcAPI, modelID, WebIFC, data);
+        console.log('[ModelAnalysis] Result:', JSON.stringify(analysisResult, null, 2).slice(0, 500));
+        setModelAnalysis(analysisResult);
+        toast({ title: 'Modellprüfung abgeschlossen' });
+      } finally {
+        await ifcAPI.CloseModel(modelID);
+      }
+    } catch (error: any) {
+      console.error('Model analysis error:', error);
+      toast({
+        title: 'Fehler bei Modellprüfung',
+        description: error.message || 'Unbekannter Fehler',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsModelAnalysisLoading(false);
+    }
+  }, [activeProject, loadIfcFileContent, toast]);
+
+  // Auto-run model analysis on project change
+  const lastAnalyzedProjectId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (activeProject && activeProject.id !== lastAnalyzedProjectId.current) {
+      lastAnalyzedProjectId.current = activeProject.id;
+      runModelAnalysis();
+    }
+  }, [activeProject, runModelAnalysis]);
+
+  return (
+    <div className="flex h-screen bg-background overflow-hidden relative">
+      <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+        {/* Sidebar */}
+        {isSidebarOpen && (
+          <>
+            <ResizablePanel defaultSize={20} minSize={15} maxSize={30} collapsible className="border-r bg-card flex flex-col">
+              <aside className="w-full h-full flex flex-col">
+                <div className="p-4 border-b flex items-center gap-2">
+                  <Building className="w-6 h-6 text-primary" />
+                  <h1 className="font-bold text-lg font-headline">BIMCoach Studio</h1>
+                </div>
+
+                <div className="flex-1 overflow-hidden p-4 flex flex-col gap-4">
+                  <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
+                    <div className="flex items-center gap-2 mb-2 bg-muted/50 p-1 rounded-lg shrink-0">
+                      <Button
+                        variant={sidebarTab === 'projects' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="flex-1 h-7 text-xs"
+                        onClick={() => setSidebarTab('projects')}
+                      >
+                        Projekte
+                      </Button>
+                      <Button
+                        variant={sidebarTab === 'structure' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="flex-1 h-7 text-xs"
+                        onClick={() => setSidebarTab('structure')}
+                        disabled={!modelStructure}
+                      >
+                        Struktur
+                      </Button>
+                    </div>
+
+                    <div className="flex-1 overflow-hidden relative">
+                      {sidebarTab === 'projects' ? (
+                        <ProjectSelector
+                          projects={projects}
+                          isLoading={isProjectsLoading}
+                          onSelectProject={(p) => {
+                            setActiveProject(p);
+                            setModelStructure(null); // Reset structure on project switch
+                            setSelectedElementId(null);
+                          }}
+                          onUploadNew={handleFileUploaded}
+                          onDeleteProject={async () => { await fetchProjects(); if (projects.length <= 1) setActiveProject(null); }}
+                          activeProjectId={activeProject?.id}
+                        />
+                      ) : (
+                        <ModelTree
+                          tree={modelStructure}
+                          onSelect={(id) => setSelectedElementId(id)}
+                          selectedId={selectedElementId}
+                        />
+                      )}
+                    </div>
+                  </div>
+                  {/* Comparison... */}
+                  {projects.filter(p => p.analysisData).length >= 2 && (
+                    <div className="pt-2 border-t">
+                      <Sheet>
+                        <SheetTrigger asChild><Button variant="outline" className="w-full justify-start gap-2"><GitCompare className="w-4 h-4" /> Projekte vergleichen</Button></SheetTrigger>
+                        <SheetContent side="right" className="w-[90vw] sm:w-[80vw] overflow-y-auto">
+                          <SheetHeader><SheetTitle>Projektvergleich</SheetTitle></SheetHeader>
+                          <div className="mt-6">
+                            <ProjectComparison projects={projects.filter(p => p.analysisData)} projectA={comparisonProjectA} projectB={comparisonProjectB} onSelectProjectA={setComparisonProjectA} onSelectProjectB={setComparisonProjectB} />
+                          </div>
+                        </SheetContent>
+                      </Sheet>
+                    </div>
+                  )}
+                </div>
+                <div className="p-4 border-t">
+                  <div className="flex items-center gap-3 mb-4 p-2 rounded-lg bg-muted/50">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">{user?.email?.charAt(0).toUpperCase()}</div>
+                    <div className="overflow-hidden"><p className="text-sm font-medium truncate">{user?.email}</p></div>
+                  </div>
+                  <Button variant="outline" className="w-full justify-start gap-2" onClick={handleSignOut}><LogOut className="w-4 h-4" /> Abmelden</Button>
+                </div>
+              </aside>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+          </>
+        )}
+
+        {/* Main Content */}
+        <ResizablePanel defaultSize={isSidebarOpen ? 80 : 100} className="flex flex-col min-w-0 h-full">
+          <main className="flex-1 flex flex-col min-w-0 transition-all duration-300 h-full">
+            <header className="h-14 border-b flex items-center px-4 gap-4 bg-background z-10">
+              <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(!isSidebarOpen)}>{isSidebarOpen ? <PanelLeft className="w-5 h-5" /> : <Menu className="w-5 h-5" />}</Button>
+              {activeProject ? (
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <span className="font-medium truncate">{activeProject.fileName}</span>
+                  {activeProject.analysisData && <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">Analysiert</span>}
+                </div>
+              ) : <span className="text-muted-foreground">Kein Projekt ausgewählt</span>}
+              <div className="ml-auto flex items-center gap-2">
+                <Select value={selectedModel} onValueChange={(v) => setSelectedModel(v as AIModelId)}>
+                  <SelectTrigger className="w-[180px] h-8 text-xs">
+                    <Sparkles className="w-3 h-3 mr-1 text-primary" />
+                    <SelectValue placeholder="Modell wählen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AI_MODELS.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {activeProject && (
+                  <Button variant="ghost" size="sm" onClick={handleDownloadUpdatedIfc} disabled={!activeProject.replacements || isProcessing}>
+                    <Layers className="w-4 h-4 mr-2" /> Download IFC
+                  </Button>
+                )}
+                <ThemeToggle />
+              </div>
+            </header>
 
             <div className="flex-1 overflow-hidden relative">
-              {sidebarTab === 'projects' ? (
-                <ProjectSelector
-                  projects={projects}
-                  isLoading={isProjectsLoading}
-                  onSelectProject={(p) => {
-                    setActiveProject(p);
-                    setModelStructure(null); // Reset structure on project switch
-                    setSelectedElementId(null);
-                  }}
-                  onUploadNew={handleFileUploaded}
-                  onDeleteProject={async () => { await fetchProjects(); if (projects.length <= 1) setActiveProject(null); }}
-                  activeProjectId={activeProject?.id}
-                />
+              {activeProject ? (
+                <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+                  {/* Middle Column: Viewer and Analyses */}
+                  <ResizablePanel defaultSize={70} className="flex flex-col min-w-0">
+                    <ResizablePanelGroup direction="vertical" className="h-full w-full">
+                      {/* Top: 3D Viewer */}
+                      <ResizablePanel defaultSize={60} minSize={30} className="relative bg-muted/10">
+                        <div className="absolute inset-0 p-0 overflow-hidden">
+                          <IfcViewer
+                            ifcStoragePath={activeProject.fileStoragePath || undefined}
+                            ifcUrl={!activeProject.fileStoragePath && activeProject.fileUrl ? activeProject.fileUrl : undefined}
+                            ifcContent={!activeProject.fileStoragePath && !activeProject.fileUrl ? activeProject.fileContent : undefined}
+                            key={activeProject.id}
+                            onElementSelected={(id) => setSelectedElementId(id)}
+                            selectedElementId={selectedElementId}
+                            onModelLoaded={handleModelLoaded}
+                          />
+                        </div>
+                      </ResizablePanel>
+
+                      <ResizableHandle withHandle />
+
+                      {/* Bottom: Tools (Tabs) */}
+                      <ResizablePanel defaultSize={40} minSize={10} collapsible className="bg-background flex flex-col border-t shadow-sm z-10">
+                        <div className="h-full flex flex-col bg-card/50 overflow-y-auto p-8 space-y-12">
+                          <div className="space-y-6">
+                            {/* ... Analysis UI (identisch zu deinem Code) ... */}
+                            <div className="max-w-5xl mx-auto space-y-6">
+                              <div className="flex items-center justify-between">
+                                <div><h2 className="text-2xl font-bold font-headline mb-1">Nachhaltigkeitsanalyse</h2></div>
+                                <Button onClick={() => runAnalysis(activeProject)} disabled={isProcessing}>{isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Leaf className="w-4 h-4" />} {activeProject.analysisData ? "Aktualisieren" : "Starten"}</Button>
+                              </div>
+                              {activeProject.analysisData && <AnalysisPanel project={activeProject} isProcessing={isProcessing} onRunAnalysis={() => runAnalysis(activeProject)} onRunCostEstimation={runCostEstimation} onExport={handleExportMaterialPass} onDownloadExchangedIfc={handleDownloadUpdatedIfc} />}
+                            </div>
+                          </div>
+
+
+                          <div className="space-y-6 border-t pt-8">
+                            <div className="max-w-5xl mx-auto space-y-6">
+                              <div className="flex items-center justify-between">
+                                <div><h2 className="text-2xl font-bold font-headline mb-1">Modellprüfung</h2></div>
+                                <Button onClick={runModelAnalysis} disabled={isModelAnalysisLoading}>
+                                  {isModelAnalysisLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                                  {modelAnalysis ? ' Aktualisieren' : ' Starten'}
+                                </Button>
+                              </div>
+                              {isModelAnalysisLoading && (
+                                <div className="flex flex-col items-center justify-center py-12">
+                                  <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+                                  <p className="font-semibold">Modell wird analysiert...</p>
+                                  <p className="text-muted-foreground text-sm">IFC-Datei wird geladen und geprüft.</p>
+                                </div>
+                              )}
+                              {!isModelAnalysisLoading && <ModelChecksTab result={modelAnalysis?.modelCheck ?? null} />}
+                            </div>
+                          </div>
+
+                          <div className="space-y-6 border-t pt-8">
+                            <div className="max-w-5xl mx-auto space-y-6">
+                              <div className="flex items-center justify-between">
+                                <div><h2 className="text-2xl font-bold font-headline mb-1">DIN 277 Flächenauswertung</h2></div>
+                                {!modelAnalysis && (
+                                  <Button onClick={runModelAnalysis} disabled={isModelAnalysisLoading}>
+                                    {isModelAnalysisLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LayoutGrid className="w-4 h-4" />}
+                                    {' Auswertung starten'}
+                                  </Button>
+                                )}
+                              </div>
+                              {isModelAnalysisLoading && (
+                                <div className="flex flex-col items-center justify-center py-12">
+                                  <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+                                  <p className="font-semibold">Flächenauswertung wird erstellt...</p>
+                                </div>
+                              )}
+                              {!isModelAnalysisLoading && <Din277Tab result={modelAnalysis?.din277 ?? null} />}
+                            </div>
+                          </div>
+                        </div>
+                      </ResizablePanel>
+                    </ResizablePanelGroup>
+                  </ResizablePanel>
+
+                  <ResizableHandle withHandle />
+
+                  {/* Right Column: AI Chat */}
+                  <ResizablePanel defaultSize={30} minSize={20} maxSize={40} collapsible className="bg-background flex flex-col border-l shadow-sm z-10">
+                    <div className="px-4 py-3 border-b shrink-0 bg-card flex items-center justify-between">
+                      <span className="font-semibold text-sm flex items-center gap-2 font-headline"><Bot className="w-4 h-4 text-primary" /> KI Coach</span>
+                    </div>
+                    <div className="flex-1 overflow-hidden m-0 flex flex-col">
+                      <ChatAssistant activeProject={activeProject} activeMessages={activeMessages} isLoading={isLoading || messagesLoading} onSendMessage={handleSendMessage} startingPrompts={startingPrompts} />
+                    </div>
+                  </ResizablePanel>
+                </ResizablePanelGroup>
               ) : (
-                <ModelTree
-                  tree={modelStructure}
-                  onSelect={(id) => setSelectedElementId(id)}
-                  selectedId={selectedElementId}
-                />
+                <div className="h-full flex flex-col items-center justify-center text-center p-8 text-muted-foreground">
+                  <Building className="w-16 h-16 mb-4 opacity-20" />
+                  <h2 className="text-2xl font-semibold text-foreground">Willkommen</h2>
+                  <p className="mb-8">Bitte Projekt auswählen oder hochladen.</p>
+                  <Button size="lg" onClick={() => (document.querySelector('input[type="file"]') as HTMLElement)?.click()}><FilePlus className="w-5 h-5 mr-2" /> Neues Projekt</Button>
+                </div>
               )}
             </div>
-          </div>
-          {/* Comparison... */}
-          {projects.filter(p => p.analysisData).length >= 2 && (
-            <div className="pt-2 border-t">
-              <Sheet>
-                <SheetTrigger asChild><Button variant="outline" className="w-full justify-start gap-2"><GitCompare className="w-4 h-4" /> Projekte vergleichen</Button></SheetTrigger>
-                <SheetContent side="right" className="w-[90vw] sm:w-[80vw] overflow-y-auto">
-                  <SheetHeader><SheetTitle>Projektvergleich</SheetTitle></SheetHeader>
-                  <div className="mt-6">
-                    <ProjectComparison projects={projects.filter(p => p.analysisData)} projectA={comparisonProjectA} projectB={comparisonProjectB} onProjectAChange={setComparisonProjectA} onProjectBChange={setComparisonProjectB} />
-                  </div>
-                </SheetContent>
-              </Sheet>
-            </div>
-          )}
-        </div>
-        <div className="p-4 border-t">
-          <div className="flex items-center gap-3 mb-4 p-2 rounded-lg bg-muted/50">
-            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">{user?.email?.charAt(0).toUpperCase()}</div>
-            <div className="overflow-hidden"><p className="text-sm font-medium truncate">{user?.email}</p></div>
-          </div>
-          <Button variant="outline" className="w-full justify-start gap-2" onClick={handleSignOut}><LogOut className="w-4 h-4" /> Abmelden</Button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-        <header className="h-14 border-b flex items-center px-4 gap-4 bg-background z-10">
-          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(!isSidebarOpen)}>{isSidebarOpen ? <PanelLeft className="w-5 h-5" /> : <Menu className="w-5 h-5" />}</Button>
-          {activeProject ? (
-            <div className="flex items-center gap-2 overflow-hidden">
-              <span className="font-medium truncate">{activeProject.fileName}</span>
-              {activeProject.analysisData && <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">Analysiert</span>}
-            </div>
-          ) : <span className="text-muted-foreground">Kein Projekt ausgewählt</span>}
-          <div className="ml-auto flex items-center gap-2">
-            <Select value={selectedModel} onValueChange={(v) => setSelectedModel(v as AIModelId)}>
-              <SelectTrigger className="w-[180px] h-8 text-xs">
-                <Sparkles className="w-3 h-3 mr-1 text-primary" />
-                <SelectValue placeholder="Modell wählen" />
-              </SelectTrigger>
-              <SelectContent>
-                {AI_MODELS.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {activeProject && (
-              <Button variant="ghost" size="sm" onClick={handleDownloadUpdatedIfc} disabled={!activeProject.replacements || isProcessing}>
-                <Layers className="w-4 h-4 mr-2" /> Download IFC
-              </Button>
-            )}
-          </div>
-        </header>
-
-        <div className="flex-1 overflow-hidden relative flex flex-col lg:flex-row">
-          {activeProject ? (
-            <>
-              {/* Left Column: 3D Viewer (Always visible) */}
-              <div className="flex-1 relative border-r bg-muted/10 h-[50vh] lg:h-full lg:w-[60%]">
-                <div className="absolute inset-0 p-0 overflow-hidden">
-                  <IfcViewer
-                    ifcStoragePath={activeProject.fileStoragePath || undefined}
-                    ifcUrl={!activeProject.fileStoragePath && activeProject.fileUrl ? activeProject.fileUrl : undefined}
-                    ifcContent={!activeProject.fileStoragePath && !activeProject.fileUrl ? activeProject.fileContent : undefined}
-                    key={activeProject.id}
-                    onElementSelected={(id) => setSelectedElementId(id)}
-                    selectedElementId={selectedElementId}
-                    onModelLoaded={handleModelLoaded}
-                  />
-                </div>
-              </div>
-
-              {/* Right Column: Tools (Tabs) */}
-              <div className="h-[50vh] lg:h-full lg:w-[40%] bg-background flex flex-col border-l shadow-sm z-10">
-                <Tabs defaultValue="analysis" className="h-full flex flex-col">
-                  <div className="px-4 pt-2 border-b shrink-0 bg-card">
-                    <TabsList className="w-full justify-start overflow-x-auto">
-                      <TabsTrigger value="analysis" className="gap-2"><BarChart3 className="w-4 h-4" /> Analyse</TabsTrigger>
-                      <TabsTrigger value="costs" className="gap-2"><Euro className="w-4 h-4" /> Kosten</TabsTrigger>
-                      <TabsTrigger value="chat" className="gap-2"><Bot className="w-4 h-4" /> KI-Assistent</TabsTrigger>
-                    </TabsList>
-                  </div>
-
-                  <div className="flex-1 overflow-hidden relative bg-card/50">
-                    <TabsContent value="analysis" className="h-full m-0 p-6 overflow-y-auto">
-                      {/* ... Analysis UI (identisch zu deinem Code) ... */}
-                      <div className="max-w-5xl mx-auto space-y-6">
-                        <div className="flex items-center justify-between">
-                          <div><h2 className="text-2xl font-bold font-headline mb-1">Nachhaltigkeitsanalyse</h2></div>
-                          <Button onClick={() => runAnalysis(activeProject)} disabled={isProcessing}>{isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Leaf className="w-4 h-4" />} {activeProject.analysisData ? "Aktualisieren" : "Starten"}</Button>
-                        </div>
-                        {activeProject.analysisData && <AnalysisPanel project={activeProject} isProcessing={isProcessing} onRunAnalysis={() => runAnalysis(activeProject)} onRunCostEstimation={runCostEstimation} onExport={handleExportMaterialPass} onDownloadExchangedIfc={handleDownloadUpdatedIfc} />}
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="costs" className="h-full m-0 p-6 overflow-y-auto">
-                      {/* ... Costs UI (identisch) ... */}
-                      <div className="max-w-4xl mx-auto space-y-6">
-                        <h2 className="text-2xl font-bold font-headline mb-1">Kostenschätzung</h2>
-                        {!activeProject.analysisData ? <div className="p-8 bg-yellow-50 text-yellow-800 rounded">Zuerst Analyse durchführen.</div> :
-                          !activeProject.costEstimationData ? (
-                            <form onSubmit={(e) => { e.preventDefault(); const area = parseFloat(new FormData(e.currentTarget).get('area') as string); if (area > 0) runCostEstimation(area); }} className="grid gap-4 p-6 border rounded max-w-md mx-auto">
-                              <h3 className="font-semibold">BGF eingeben</h3>
-                              <input name="area" type="number" className="border p-2 rounded" placeholder="m²" required />
-                              <Button type="submit" disabled={isProcessing}>Berechnen</Button>
-                            </form>
-                          ) : (
-                            <div className="text-center p-6 bg-primary/10 rounded">
-                              <h3>Gesamtkosten: {activeProject.costEstimationData.totalEstimatedCost}</h3>
-                              <Button variant="outline" onClick={() => setActiveProject(p => p ? { ...p, costEstimationData: null } : null)}>Neu</Button>
-                            </div>
-                          )}
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="chat" className="h-full m-0 flex flex-col">
-                      <ChatAssistant activeProject={activeProject} activeMessages={activeMessages} isLoading={isLoading || messagesLoading} onSendMessage={handleSendMessage} startingPrompts={startingPrompts} />
-                    </TabsContent>
-                  </div>
-                </Tabs>
-              </div>
-            </>
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center p-8 text-muted-foreground">
-              <Building className="w-16 h-16 mb-4 opacity-20" />
-              <h2 className="text-2xl font-semibold text-foreground">Willkommen</h2>
-              <p className="mb-8">Bitte Projekt auswählen oder hochladen.</p>
-              <Button size="lg" onClick={() => (document.querySelector('input[type="file"]') as HTMLElement)?.click()}><FilePlus className="w-5 h-5 mr-2" /> Neues Projekt</Button>
-            </div>
-          )}
-        </div>
-      </main>
+          </main>
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
       <MaterialReviewModal isOpen={materialReviewOpen} onOpenChange={setMaterialReviewOpen} replacements={pendingReplacements} onConfirm={handleReviewConfirm} />
     </div>
