@@ -19,7 +19,8 @@ export const DIN276_LABELS: Record<string, string> = {
     '344': 'Innentüren und -fenster',
     '350': 'Decken',
     '360': 'Dächer',
-    '370': 'Baukonstruktive Einbauten',
+    '370': 'Infrastrukturanlagen',
+    '380': 'Baukonstruktive Einbauten',
     '390': 'Sonstige Maßnahmen',
 };
 

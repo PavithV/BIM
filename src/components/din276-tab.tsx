@@ -37,6 +37,7 @@ const KG_COLORS: Record<string, string> = {
     '350': 'bg-purple-100 text-purple-700 border-purple-300',
     '360': 'bg-rose-100 text-rose-700 border-rose-300',
     '370': 'bg-emerald-100 text-emerald-700 border-emerald-300',
+    '380': 'bg-teal-100 text-teal-700 border-teal-300',
     '390': 'bg-gray-100 text-gray-700 border-gray-300',
 };
 
