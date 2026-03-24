@@ -797,18 +797,6 @@ export default function Dashboard() {
                       <ResizablePanel defaultSize={40} minSize={10} collapsible className="bg-background flex flex-col border-t shadow-sm z-10">
                         <div className="h-full flex flex-col bg-card/50 overflow-y-auto p-8 space-y-12">
                           <div className="space-y-6">
-                            {/* ... Analysis UI (identisch zu deinem Code) ... */}
-                            <div className="max-w-5xl mx-auto space-y-6">
-                              <div className="flex items-center justify-between">
-                                <div><h2 className="text-2xl font-bold font-headline mb-1">Nachhaltigkeitsanalyse</h2></div>
-                                <Button onClick={() => runAnalysis(activeProject)} disabled={isProcessing}>{isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Leaf className="w-4 h-4" />} {activeProject.analysisData ? "Aktualisieren" : "Starten"}</Button>
-                              </div>
-                              {activeProject.analysisData && <AnalysisPanel project={activeProject} isProcessing={isProcessing} onRunAnalysis={() => runAnalysis(activeProject)} onRunCostEstimation={runCostEstimation} onExport={handleExportMaterialPass} onDownloadExchangedIfc={handleDownloadUpdatedIfc} />}
-                            </div>
-                          </div>
-
-
-                          <div className="space-y-6 border-t pt-8">
                             <div className="max-w-5xl mx-auto space-y-6">
                               <div className="flex items-center justify-between">
                                 <div><h2 className="text-2xl font-bold font-headline mb-1">Modellprüfung</h2></div>
@@ -825,6 +813,17 @@ export default function Dashboard() {
                                 </div>
                               )}
                               {!isModelAnalysisLoading && <ModelChecksTab result={modelAnalysis?.modelCheck ?? null} />}
+                            </div>
+                          </div>
+
+                          <div className="space-y-6 border-t pt-8">
+                            {/* ... Analysis UI (identisch zu deinem Code) ... */}
+                            <div className="max-w-5xl mx-auto space-y-6">
+                              <div className="flex items-center justify-between">
+                                <div><h2 className="text-2xl font-bold font-headline mb-1">Nachhaltigkeitsanalyse</h2></div>
+                                <Button onClick={() => runAnalysis(activeProject)} disabled={isProcessing}>{isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Leaf className="w-4 h-4" />} {activeProject.analysisData ? "Aktualisieren" : "Starten"}</Button>
+                              </div>
+                              {activeProject.analysisData && <AnalysisPanel project={activeProject} isProcessing={isProcessing} onRunAnalysis={() => runAnalysis(activeProject)} onRunCostEstimation={runCostEstimation} onExport={handleExportMaterialPass} onDownloadExchangedIfc={handleDownloadUpdatedIfc} />}
                             </div>
                           </div>
 

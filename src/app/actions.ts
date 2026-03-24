@@ -6,7 +6,7 @@ import { generateAnalysisFromIfc } from '@/ai/flows/generate-analysis-from-ifc';
 import { estimateCostsFromMaterials } from '@/ai/flows/estimate-costs-from-materials';
 import type { AnalysisResult, CostEstimationResult, GenerateAnalysisFromIfcInput, MaterialCompositionInput } from '@/lib/types';
 import { ZodError } from 'zod';
-import { compressIfcFile, getProposedMaterialReplacements, type MaterialReplacement } from '@/utils/ifcCompressor';
+import { compressIfcFile, getProposedMaterialReplacements, loadDatabase, type MaterialReplacement } from '@/utils/ifcCompressor';
 import { createClient } from '@/lib/supabase/server';
 
 import { auth } from '@/auth';
@@ -85,6 +85,16 @@ export async function checkMaterialReplacements(ifcContent: string): Promise<{ r
   } catch (error) {
     console.error('Error in checkMaterialReplacements:', error);
     return { error: 'Fehler beim Überprüfen der Materialien.' };
+  }
+}
+
+export async function getOBDMaterialNames(): Promise<{ names?: string[], error?: string }> {
+  try {
+    const db = loadDatabase();
+    return { names: Object.values(db).map(d => d.Name) };
+  } catch (error) {
+    console.error('Error in getOBDMaterialNames:', error);
+    return { error: 'Fehler beim Laden der Ökobaudat Materialien.' };
   }
 }
 

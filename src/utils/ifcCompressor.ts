@@ -1577,7 +1577,7 @@ function networkGetConstituents(id: number, map: Map<number, number[]>) { return
 /**
  * Datenbank & Matching (Unverändert)
  */
-function loadDatabase(): Record<string, { Name: string; GWP_Wert: number; Preis_pro_m3: number }> {
+export function loadDatabase(): Record<string, { Name: string; GWP_Wert: number; Preis_pro_m3: number }> {
   const defaultNames = [
     'Stahlbeton (C25/30)', 'Mauerziegel', 'Kalksandstein', 'Holz', 'Dämmung', 'Glas', 'Alu', 'Estrich', 'Gipskarton'
   ];

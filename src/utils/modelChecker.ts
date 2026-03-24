@@ -8,6 +8,7 @@
 
 import { toCompactModel } from './ifcParser';
 import { assignDIN276CostGroups, calculateDIN276Quantities, type Din276QuantityResult } from './din276Mapper';
+import { getOBDMaterialNames } from '@/app/actions';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -29,6 +30,10 @@ export interface ModelCheckResult {
   spaceCount: number;
   unnamedSpaceCount: number;
   materialChecks: MaterialCheckEntry[];
+  totalIfcMaterials: number;
+  obdMatchCount: number;
+  matchingMaterials: string[];
+  unmatchedMaterials: string[];
 }
 
 /** DIN 277 Flächenkategorie */
@@ -259,6 +264,45 @@ export async function runModelChecks(
     }
   }
 
+  // 4. OBD Material Matching Check (1:1)
+  let totalIfcMaterials = 0;
+  let obdMatchCount = 0;
+  const matchingMaterials: string[] = [];
+  const unmatchedMaterials: string[] = [];
+
+  try {
+    const obdRes = await getOBDMaterialNames();
+    const obdNames = obdRes.names || [];
+
+    // Hole alle Materialien im Modell
+    const materialLineIDs = toIterable(await ifcAPI.GetLineIDsWithType(modelID, WebIFC.IFCMATERIAL));
+    const uniqueIfcMaterials = new Set<string>();
+
+    for (const mid of materialLineIDs) {
+      try {
+        const mat = await ifcAPI.GetLine(modelID, mid);
+        const name = unwrap(mat.Name);
+        if (name && name.trim() !== '') {
+          uniqueIfcMaterials.add(name.trim());
+        }
+      } catch (e) { }
+    }
+
+    totalIfcMaterials = uniqueIfcMaterials.size;
+
+    // Einfacher 1:1 Abgleich
+    for (const matName of uniqueIfcMaterials) {
+      if (obdNames.includes(matName)) {
+        matchingMaterials.push(matName);
+        obdMatchCount++;
+      } else {
+        unmatchedMaterials.push(matName);
+      }
+    }
+  } catch (e) {
+    console.warn('[ModelChecker] Fehler beim OBD Material-Check:', e);
+  }
+
   return {
     ifcVersion,
     creationDate,
@@ -267,6 +311,10 @@ export async function runModelChecks(
     spaceCount,
     unnamedSpaceCount,
     materialChecks: Array.from(materialCheckMap.values()),
+    totalIfcMaterials,
+    obdMatchCount,
+    matchingMaterials,
+    unmatchedMaterials,
   };
 }
 

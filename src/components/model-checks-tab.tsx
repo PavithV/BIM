@@ -11,6 +11,7 @@ import {
   CalendarDays,
   DoorOpen,
   Layers,
+  Database,
 } from 'lucide-react';
 import type { ModelCheckResult } from '@/utils/modelChecker';
 import { useState } from 'react';
@@ -170,6 +171,52 @@ export function ModelChecksTab({ result }: ModelChecksTabProps) {
                   </div>
                 );
               })}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* OBD Match Check */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div className="flex items-center gap-3">
+            <Database className="w-5 h-5 text-primary shrink-0" />
+            <CardTitle className="text-sm font-medium">Ökobaudat Verknüpfung</CardTitle>
+          </div>
+          <StatusIcon status={result.totalIfcMaterials === 0 ? 'warn' : result.obdMatchCount === result.totalIfcMaterials ? 'ok' : result.obdMatchCount > 0 ? 'warn' : 'error'} />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {result.totalIfcMaterials === 0 ? (
+            <p className="text-sm text-muted-foreground">Keine Materialien im Modell gefunden.</p>
+          ) : (
+            <>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">1:1 Übereinstimmung:</span>
+                <span>
+                  <span className="font-medium">{result.obdMatchCount}</span>
+                  <span className="text-muted-foreground"> / {result.totalIfcMaterials} Materialien</span>
+                </span>
+              </div>
+              <Progress value={Math.round((result.obdMatchCount / result.totalIfcMaterials) * 100)} className="h-2" />
+
+              <div className="space-y-2 mt-4">
+                {result.matchingMaterials?.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-green-600">Verknüpft ({result.matchingMaterials.length}):</p>
+                    <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2 max-h-24 overflow-y-auto">
+                      {result.matchingMaterials.join(', ')}
+                    </div>
+                  </div>
+                )}
+                {result.unmatchedMaterials?.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-yellow-600">Nicht verknüpft ({result.unmatchedMaterials.length}):</p>
+                    <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2 max-h-24 overflow-y-auto">
+                      {result.unmatchedMaterials.join(', ')}
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </CardContent>
