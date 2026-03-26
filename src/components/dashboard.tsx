@@ -287,7 +287,12 @@ export default function Dashboard() {
     if (type === 'analysis') {
       const { project, fileContent } = data;
       try {
-        const analysisResult = await getIfcAnalysis({ ifcFileContent: fileContent, replacementMap, model: selectedModel });
+        const formData = new FormData();
+        formData.append('ifcFileContent', fileContent);
+        if (replacementMap) formData.append('replacementMap', JSON.stringify(replacementMap));
+        if (selectedModel) formData.append('model', selectedModel);
+
+        const analysisResult = await getIfcAnalysis(formData);
         if (analysisResult.analysis) {
           await updateIfcModel(project.id, { analysisData: analysisResult.analysis, costEstimationData: null });
 
@@ -406,7 +411,13 @@ export default function Dashboard() {
 
       // Fallback: Keine Replacements gefunden -> Direkt ausführen
       let replacementMap = project.replacements || undefined; // Should be empty/undefined here anyway
-      const analysisResult = await getIfcAnalysis({ ifcFileContent: fileContent, replacementMap, model: selectedModel });
+
+      const formData = new FormData();
+      formData.append('ifcFileContent', fileContent);
+      if (replacementMap) formData.append('replacementMap', JSON.stringify(replacementMap));
+      if (selectedModel) formData.append('model', selectedModel);
+
+      const analysisResult = await getIfcAnalysis(formData);
 
       if (analysisResult.analysis) {
         await updateIfcModel(project.id, { analysisData: analysisResult.analysis, costEstimationData: null });

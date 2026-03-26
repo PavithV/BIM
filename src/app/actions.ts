@@ -7,6 +7,7 @@ import { estimateCostsFromMaterials } from '@/ai/flows/estimate-costs-from-mater
 import type { AnalysisResult, CostEstimationResult, GenerateAnalysisFromIfcInput, MaterialCompositionInput } from '@/lib/types';
 import { ZodError } from 'zod';
 import { compressIfcFile, getProposedMaterialReplacements, loadDatabase, type MaterialReplacement } from '@/utils/ifcCompressor';
+import { loadOBDDatabase } from '@/utils/obdService';
 import { createClient } from '@/lib/supabase/server';
 
 import { auth } from '@/auth';
@@ -90,8 +91,8 @@ export async function checkMaterialReplacements(ifcContent: string): Promise<{ r
 
 export async function getOBDMaterialNames(): Promise<{ names?: string[], error?: string }> {
   try {
-    const db = loadDatabase();
-    return { names: Object.values(db).map(d => d.Name) };
+    const obdEntries = loadOBDDatabase();
+    return { names: obdEntries.map(e => e.name) };
   } catch (error) {
     console.error('Error in getOBDMaterialNames:', error);
     return { error: 'Fehler beim Laden der Ökobaudat Materialien.' };
@@ -120,23 +121,30 @@ export async function getAIChatFeedback(input: AIChatFeedbackInput & { replaceme
   }
 }
 
-export async function getIfcAnalysis(input: GenerateAnalysisFromIfcInput & { replacementMap?: Record<string, string>; model?: string }): Promise<{ analysis?: AnalysisResult; error?: string }> {
+export async function getIfcAnalysis(formData: FormData): Promise<{ analysis?: AnalysisResult; error?: string }> {
   try {
     await requireAuth();
 
+    const ifcFileContent = formData.get('ifcFileContent') as string;
+    const model = formData.get('model') as string | undefined || undefined;
+    const replacementMapStr = formData.get('replacementMap') as string | undefined;
+    const replacementMap = replacementMapStr ? JSON.parse(replacementMapStr) : undefined;
+
+    if (!ifcFileContent) {
+      return { error: 'Keine IFC-Daten gefunden.' };
+    }
+
     // Komprimiere IFC-Datei vor dem Senden an die KI
-    const compressedIfcContent = compressIfcFile(input.ifcFileContent, input.replacementMap);
+    const compressedIfcContent = compressIfcFile(ifcFileContent, replacementMap);
 
     const result = await generateAnalysisFromIfc({
       ifcFileContent: compressedIfcContent,
-      model: input.model,
+      model,
+      replacementMap,
     });
     return { analysis: result };
   } catch (error: any) {
     console.error('Error in getIfcAnalysis:', error);
-    if (error instanceof ZodError) {
-      return { error: 'Invalid input for IFC analysis.' };
-    }
     return { error: getDetailedErrorMessage(error) };
   }
 }
