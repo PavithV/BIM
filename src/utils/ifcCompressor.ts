@@ -182,7 +182,27 @@ export function getProposedMaterialReplacements(ifcContent: string): MaterialRep
   for (const matName of sortedMaterials) {
     // OLD: const matched = matchMaterial(matName, db);
     // NEW: Find ALL matches
-    const allMatches = matchMaterials(matName, db);
+    let allMatches = matchMaterials(matName, db);
+
+    // Spezieller Fix für Beton/Stahlbeton: Wenn die C-Klasse im Materialnamen steckt,
+    // priorisieren wir DB-Treffer mit exakt derselben C-Klasse und bevorzugen OBD-Namen
+    // ("Beton der Druckfestigkeitsklasse Cxx/yy") statt generischer Defaults.
+    if (/stahlbeton/i.test(matName) || /bewehrt/i.test(matName)) {
+      const token = extractConcreteClassToken(matName);
+      if (token) {
+        // Nicht nur "matchMaterials" verwenden: Dort würden "Stahlbeton ..." und
+        // "Beton der Druckfestigkeitsklasse ..." ggf. nie als Match erkannt,
+        // weil der Wortteil ("stahlbeton" vs "beton ...") unterschiedlich ist.
+        // Deshalb: direkt alle DB-Einträge zur gleichen C-Klasse sammeln.
+        const classMatches = Object.values(db).filter((entry) => {
+          return extractConcreteClassToken(entry.Name) === token;
+        });
+
+        if (classMatches.length > 0) {
+          allMatches = sortConcreteClassMatches(matName, classMatches);
+        }
+      }
+    }
 
     // Sort matches by relevance? 
     // For now, matchMaterials implementation will handle some order or we sort by simple logic (e.g. length diff) 
@@ -1615,7 +1635,9 @@ export function loadDatabase(): Record<string, { Name: string; GWP_Wert: number;
 }
 
 function matchMaterial(material: string, db: Record<string, { Name: string; GWP_Wert: number; Preis_pro_m3: number }>): { Name: string; GWP_Wert: number; Preis_pro_m3: number } | undefined {
-  const normalize = (s: string) => (s || '').toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9]/g, '').trim();
+  // Wichtig: Wir entfernen nur Klammern-Zeichen, nicht den Inhalt.
+  // Sonst wird z.B. "Stahlbeton (C25/30)" fälschlich zu "stahlbeton" und matcht dann jede C-Klasse.
+  const normalize = (s: string) => (s || '').toLowerCase().replace(/[()]/g, '').replace(/[^a-z0-9]/g, '').trim();
   const normMat = normalize(material);
   const dbEntries = Object.values(db);
 
@@ -1633,7 +1655,9 @@ function matchMaterial(material: string, db: Record<string, { Name: string; GWP_
  * Findet ALLE passenden Materialien in der DB
  */
 function matchMaterials(material: string, db: Record<string, { Name: string; GWP_Wert: number; Preis_pro_m3: number }>): Array<{ Name: string; GWP_Wert: number; Preis_pro_m3: number }> {
-  const normalize = (s: string) => (s || '').toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z0-9]/g, '').trim();
+  // Wichtig: Wir entfernen nur Klammern-Zeichen, nicht den Inhalt.
+  // Sonst wird z.B. "Stahlbeton (C25/30)" fälschlich zu "stahlbeton" und matcht dann jede C-Klasse.
+  const normalize = (s: string) => (s || '').toLowerCase().replace(/[()]/g, '').replace(/[^a-z0-9]/g, '').trim();
   const normMat = normalize(material);
   const dbEntries = Object.values(db);
   const matches: Array<{ Name: string; GWP_Wert: number; Preis_pro_m3: number }> = [];
@@ -1656,6 +1680,39 @@ function matchMaterials(material: string, db: Record<string, { Name: string; GWP
   // Actually, usually "Stahlbeton" is better than "Beton".
 
   return matches;
+}
+
+function extractConcreteClassToken(materialName: string): string | null {
+  // z.B. "C20/25", "C 30/37", "c25/30"
+  const m = (materialName || '').match(/C\s*(\d{1,2})\s*\/\s*(\d{1,2})/i);
+  if (!m) return null;
+  const a = String(parseInt(m[1], 10));
+  const b = String(parseInt(m[2], 10));
+  return `${a}/${b}`;
+}
+
+function sortConcreteClassMatches(
+  originalName: string,
+  matches: Array<{ Name: string; GWP_Wert: number; Preis_pro_m3: number }>,
+): Array<{ Name: string; GWP_Wert: number; Preis_pro_m3: number }> {
+  const originalToken = extractConcreteClassToken(originalName);
+  const score = (candName: string): number => {
+    const candToken = extractConcreteClassToken(candName);
+    let s = 0;
+
+    // Primär: gleiche C-Klasse priorisieren
+    if (originalToken && candToken && candToken === originalToken) s += 1000;
+
+    // Sekundär: OBD-spezifische Bezeichnungen (Druckfestigkeitsklasse) bevorzugen
+    if (/druckfestigkeitsklasse/i.test(candName)) s += 200;
+
+    // Tertiär: längere Namen sind meist spezifischer
+    s += Math.min(200, candName.length);
+
+    return s;
+  };
+
+  return [...matches].sort((a, b) => score(b.Name) - score(a.Name));
 }
 
 function aggregateAndFormat(rows: Array<{ Typ: string; Material: string; Volumen_m3: number; Flaeche_m2: number; Total_CO2: number; Total_Cost: number }>): string {

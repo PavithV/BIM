@@ -67,3 +67,16 @@ export const GenerateAnalysisFromIfcInputSchema = z.object({
   ifcFileContent: z.string().describe('The full text content of the IFC model file.'),
 });
 export type GenerateAnalysisFromIfcInput = z.infer<typeof GenerateAnalysisFromIfcInputSchema>;
+
+/**
+ * Geparster Eintrag aus der OBD.csv (Ökobaudat), gefiltert auf Modul A1-A3.
+ */
+export interface OBDEntry {
+  name: string;             // "Name (de)"
+  bezugsgroesse: number;    // "Bezugsgroesse" (z.B. 1)
+  bezugseinheit: string;    // "Bezugseinheit" (m3, kg, m2)
+  rohdichte: number | null; // "Rohdichte (kg/m3)", null wenn leer
+  gwp: number;              // "GWP" Wert für Modul A1-A3
+  penrt: number;            // "PENRT" Primärenergie nicht erneuerbar
+  ap: number;               // "AP" Versauerungspotenzial
+}
