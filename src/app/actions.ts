@@ -140,7 +140,6 @@ export async function getIfcAnalysis(formData: FormData): Promise<{ analysis?: A
     const result = await generateAnalysisFromIfc({
       ifcFileContent: compressedIfcContent,
       model,
-      replacementMap,
     });
     return { analysis: result };
   } catch (error: any) {

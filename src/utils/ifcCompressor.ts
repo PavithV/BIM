@@ -562,6 +562,29 @@ function computeGeometryVolume(
             result.volume += geo.volume;
             result.area += geo.area;
           }
+        } else if (itemType === 'IFCFACETEDBREP') {
+          // Some exporters represent coverings as FacetedBrep. Without this branch, we
+          // end up with volume/area = 0 -> GWP becomes 0.
+          const geo = computeFromFacetedBrep(itemId, instances);
+          if (geo.volume !== 0 || geo.area !== 0) {
+            result.volume += geo.volume;
+            result.area += geo.area;
+          }
+        } else if (itemType === 'IFCSHELLBASEDSURFACEMODEL') {
+          const geo = computeFromShellBasedSurfaceModel(itemId, instances);
+          if (geo.volume !== 0 || geo.area !== 0) {
+            result.volume += geo.volume;
+            result.area += geo.area;
+          }
+        } else if (itemType === 'IFCMAPPEDITEM') {
+          // Doors/Windows are often exported via mapped representations:
+          // IfcDoor -> IfcProductDefinitionShape -> IfcRepresentationMap/IfcMappedItem.
+          // Our parser must follow the mapping source until real geometric items appear.
+          const geo = computeFromMappedItem(itemId, instances, 0);
+          if (geo.volume !== 0 || geo.area !== 0) {
+            result.volume += geo.volume;
+            result.area += geo.area;
+          }
         } else if (itemType === 'IFCBOOLEANCLIPPINGRESULT') {
           // Try to extract from the first operand (usually the base solid)
           const boolParams = splitIfcArguments(itemInst.args);
@@ -592,6 +615,258 @@ function computeGeometryVolume(
   }
 
   return result;
+}
+
+type Vec3 = { x: number; y: number; z: number };
+
+function vecSub(a: Vec3, b: Vec3): Vec3 {
+  return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
+}
+
+function vecDot(a: Vec3, b: Vec3): number {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+function vecCross(a: Vec3, b: Vec3): Vec3 {
+  return {
+    x: a.y * b.z - a.z * b.y,
+    y: a.z * b.x - a.x * b.z,
+    z: a.x * b.y - a.y * b.x,
+  };
+}
+
+function vecNorm(a: Vec3): number {
+  return Math.sqrt(vecDot(a, a));
+}
+
+function parseIfcCartesianPointArgs(args: string): Vec3 {
+  // Expected: IFCCARTESIANPOINT((x,y,z)) or IFCCARTESIANPOINT((x,y))
+  const nums = Array.from(args.matchAll(/([-+]?(?:\d+\.?\d*|\.\d+)(?:[Ee][-+]?\d+)?)/g)).map(m => parseFloat(m[1]));
+  const x = nums[0] ?? 0;
+  const y = nums[1] ?? 0;
+  const z = nums[2] ?? 0;
+  return { x, y, z };
+}
+
+function computeFromFacetedBrep(
+  brepId: number,
+  instances: Map<number, { type: string; args: string }>
+): { volume: number; area: number } {
+  const brep = instances.get(brepId);
+  if (!brep) return { volume: 0, area: 0 };
+
+  // IFCFACETEDBREP(Outer : IfcClosedShell, ... )
+  const closedShellMatch = brep.args.match(/#(\d+)/);
+  if (!closedShellMatch) return { volume: 0, area: 0 };
+  const closedShellId = parseInt(closedShellMatch[1]);
+  return computeFromClosedShell(closedShellId, instances);
+}
+
+function computeFromClosedShell(
+  closedShellId: number,
+  instances: Map<number, { type: string; args: string }>
+): { volume: number; area: number } {
+  const shell = instances.get(closedShellId);
+  if (!shell) return { volume: 0, area: 0 };
+
+  // IFCCLOSEDSHELL((#face1,#face2,...))
+  const faceIds = Array.from(shell.args.matchAll(/#(\d+)/g)).map(m => parseInt(m[1]));
+  if (faceIds.length === 0) return { volume: 0, area: 0 };
+
+  let signedVolume = 0;
+  let surfaceArea = 0;
+
+  for (const faceId of faceIds) {
+    const face = instances.get(faceId);
+    if (!face) continue;
+
+    // IFCFACE((#outerBound))
+    const outerBoundIdMatch = face.args.match(/#(\d+)/);
+    if (!outerBoundIdMatch) continue;
+    const outerBoundId = parseInt(outerBoundIdMatch[1]);
+
+    const outerBound = instances.get(outerBoundId);
+    if (!outerBound) continue;
+
+    // IFCFACEOUTERBOUND(#polyLoop, .T./.F.)
+    const polyLoopIdMatch = outerBound.args.match(/#(\d+)/);
+    if (!polyLoopIdMatch) continue;
+    const polyLoopId = parseInt(polyLoopIdMatch[1]);
+
+    const polyLoop = instances.get(polyLoopId);
+    if (!polyLoop) continue;
+
+    const pointIds = Array.from(polyLoop.args.matchAll(/#(\d+)/g)).map(m => parseInt(m[1]));
+    if (pointIds.length < 3) continue;
+
+    const points: Vec3[] = [];
+    for (const ptId of pointIds) {
+      const pt = instances.get(ptId);
+      if (!pt || pt.type.toUpperCase() !== 'IFCCARTESIANPOINT') continue;
+      points.push(parseIfcCartesianPointArgs(pt.args));
+    }
+
+    if (points.length < 3) continue;
+
+    // Triangulate polygon as triangle fan (p0, pi, pi+1)
+    const p0 = points[0];
+    for (let i = 1; i < points.length - 1; i++) {
+      const a = p0;
+      const b = points[i];
+      const c = points[i + 1];
+
+      // Surface area triangle
+      const ab = vecSub(b, a);
+      const ac = vecSub(c, a);
+      const cross = vecCross(ab, ac);
+      const triArea = 0.5 * vecNorm(cross);
+      surfaceArea += triArea;
+
+      // Signed volume contribution for the tetrahedron with origin at (0,0,0)
+      // V = 1/6 * dot(a x b, c)
+      signedVolume += vecDot(vecCross(a, b), c) / 6;
+    }
+  }
+
+  return { volume: Math.abs(signedVolume), area: surfaceArea };
+}
+
+function computeFromShellBasedSurfaceModel(
+  shellBasedId: number,
+  instances: Map<number, { type: string; args: string }>
+): { volume: number; area: number } {
+  const model = instances.get(shellBasedId);
+  if (!model) return { volume: 0, area: 0 };
+
+  // IFCSHELLBASEDSURFACEMODEL((#1480,...))
+  const ids = Array.from(model.args.matchAll(/#(\d+)/g)).map(m => parseInt(m[1]));
+  let volume = 0;
+  let area = 0;
+
+  for (const id of ids) {
+    const inst = instances.get(id);
+    if (!inst) continue;
+    const t = inst.type.toUpperCase();
+
+    if (t === 'IFCCLOSEDSHELL') {
+      const geo = computeFromClosedShell(id, instances);
+      volume += geo.volume;
+      area += geo.area;
+    } else if (t === 'IFCFACETEDBREP') {
+      const geo = computeFromFacetedBrep(id, instances);
+      volume += geo.volume;
+      area += geo.area;
+    }
+  }
+
+  return { volume, area };
+}
+
+function computeFromMappedItem(
+  mappedItemId: number,
+  instances: Map<number, { type: string; args: string }>,
+  depth: number,
+): { volume: number; area: number } {
+  if (depth > 5) return { volume: 0, area: 0 };
+
+  const mappedItem = instances.get(mappedItemId);
+  if (!mappedItem) return { volume: 0, area: 0 };
+
+  const params = splitIfcArguments(mappedItem.args);
+  // IFCMAPPEDITEM(MappingSource, MappingTarget)
+  const mappingSourceIdMatch = params[0]?.match(/#(\d+)/);
+  if (!mappingSourceIdMatch) return { volume: 0, area: 0 };
+  const mappingSourceId = parseInt(mappingSourceIdMatch[1]);
+
+  const mappingSource = instances.get(mappingSourceId);
+  if (!mappingSource) return { volume: 0, area: 0 };
+
+  if (mappingSource.type.toUpperCase() !== 'IFCREPRESENTATIONMAP') {
+    return { volume: 0, area: 0 };
+  }
+
+  // IFCRepresentationMap(MappingOrigin, MappedRepresentation)
+  const mapParams = splitIfcArguments(mappingSource.args);
+  const mappedRepIdMatch = mapParams[1]?.match(/#(\d+)/) ?? mapParams.join(',').match(/#(\d+)/g)?.[1]?.match(/#(\d+)/);
+  // Fallback: if parsing is weird, take the 2nd # occurrence.
+  let mappedRepId: number | null = null;
+  if (mapParams[1]?.includes('#')) {
+    const m = mapParams[1].match(/#(\d+)/);
+    mappedRepId = m ? parseInt(m[1]) : null;
+  }
+  if (mappedRepId === null) {
+    const ids = Array.from(mappingSource.args.matchAll(/#(\d+)/g)).map(m => parseInt(m[1]));
+    mappedRepId = ids.length >= 2 ? ids[1] : null;
+  }
+  if (mappedRepId === null) return { volume: 0, area: 0 };
+
+  const mappedRep = instances.get(mappedRepId);
+  if (!mappedRep || mappedRep.type.toUpperCase() !== 'IFCSHAPEREPRESENTATION') {
+    return { volume: 0, area: 0 };
+  }
+
+  // IFCSHAPEREPRESENTATION(..., Items)
+  const repParams = splitIfcArguments(mappedRep.args);
+  if (repParams.length < 4) return { volume: 0, area: 0 };
+  const itemsList = repParams[3];
+  const itemRefs = Array.from(itemsList.matchAll(/#(\d+)/g)).map(m => parseInt(m[1]));
+
+  let volume = 0;
+  let area = 0;
+
+  for (const itemId of itemRefs) {
+    const itemInst = instances.get(itemId);
+    if (!itemInst) continue;
+    const t = itemInst.type.toUpperCase();
+
+    if (t === 'IFCEXTRUDEDAREASOLID') {
+      const geo = computeFromExtrudedAreaSolid(itemId, instances);
+      volume += geo.volume;
+      area += geo.area;
+    } else if (t === 'IFCFACETEDBREP') {
+      const geo = computeFromFacetedBrep(itemId, instances);
+      volume += geo.volume;
+      area += geo.area;
+    } else if (t === 'IFCSHELLBASEDSURFACEMODEL') {
+      // Windows often use SurfaceModel representations (shell-based surfaces).
+      // Those may contain IFCCLOSEDSHELLs which we can evaluate.
+      const geo = computeFromShellBasedSurfaceModel(itemId, instances);
+      volume += geo.volume;
+      area += geo.area;
+    } else if (t === 'IFCBOOLEANCLIPPINGRESULT') {
+      // Reuse boolean strategy: evaluate from the first operand if it is a supported solid.
+      const boolParams = splitIfcArguments(itemInst.args);
+      if (boolParams.length >= 2) {
+        const firstOpMatch = boolParams[1]?.match(/#(\d+)/);
+        if (firstOpMatch) {
+          const firstOpId = parseInt(firstOpMatch[1]);
+          const firstOp = instances.get(firstOpId);
+          if (firstOp) {
+            const ft = firstOp.type.toUpperCase();
+            if (ft === 'IFCEXTRUDEDAREASOLID') {
+              const geo = computeFromExtrudedAreaSolid(firstOpId, instances);
+              volume += geo.volume;
+              area += geo.area;
+            } else if (ft === 'IFCFACETEDBREP') {
+              const geo = computeFromFacetedBrep(firstOpId, instances);
+              volume += geo.volume;
+              area += geo.area;
+            } else if (ft === 'IFCMAPPEDITEM') {
+              const geo = computeFromMappedItem(firstOpId, instances, depth + 1);
+              volume += geo.volume;
+              area += geo.area;
+            }
+          }
+        }
+      }
+    } else if (t === 'IFCMAPPEDITEM') {
+      const geo = computeFromMappedItem(itemId, instances, depth + 1);
+      volume += geo.volume;
+      area += geo.area;
+    }
+  }
+
+  return { volume, area };
 }
 
 /**

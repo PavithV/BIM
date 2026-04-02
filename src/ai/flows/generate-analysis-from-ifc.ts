@@ -55,7 +55,9 @@ export async function generateAnalysisFromIfc(input: {
   // 1. Deterministische Berechnung
   // -----------------------------------------------------------------------
   const obdEntries = loadOBDDatabase();
-  const lca: LCAResult = calculateLCA(input.ifcFileContent, obdEntries, input.replacementMap);
+  // replacementMap wird bereits in compressIfcFile() auf die Materialnamen im erzeugten CSV angewendet.
+  // Daher darf es hier nicht nochmal auf die CSV-Materialnamen angewendet werden (sonst droht Doppel-Mapping).
+  const lca: LCAResult = calculateLCA(input.ifcFileContent, obdEntries);
 
   console.log('[LCA] GWP total:', lca.gwpTotal, 'kg CO₂-Äq.');
   console.log('[LCA] GWP/m²:', lca.gwpPerM2, 'kg CO₂-Äq./m²');
