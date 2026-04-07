@@ -2,7 +2,7 @@
 
 BIMCoach Studio ist eine moderne Webanwendung zur Analyse und Optimierung von BIM-Modellen (Building Information Modeling). Die Plattform ermöglicht Architekten und Ingenieuren, IFC-Dateien hochzuladen, in 3D zu visualisieren und mithilfe von KI detaillierte Nachhaltigkeits- und Kostenanalysen durchzuführen.
 
-![BIMCoach Studio Banner](https://placehold.co/1200x400/2563eb/ffffff?text=BIMCoach+Studio)
+![BIMCoach Screenshot](./BimCoachScreen.png)
 
 ## 🚀 Features
 
