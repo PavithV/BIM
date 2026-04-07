@@ -10,8 +10,10 @@ import { ChartConfig, ChartContainer } from '@/components/ui/chart';
 import type { IFCModel } from '@/lib/types';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { tr, type Language } from '@/lib/i18n';
 
 interface AnalysisPanelProps {
+  language: Language;
   project: IFCModel | null;
   isProcessing: boolean;
   onRunAnalysis: () => void;
@@ -33,14 +35,24 @@ const RatingIcon = ({ rating }: { rating: string }) => {
   }
 };
 
-export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostEstimation, onExport, onDownloadExchangedIfc }: AnalysisPanelProps) {
+function translateIndicatorName(language: Language, name: string): string {
+  if (language === 'de') return name;
+  const map: Record<string, string> = {
+    'Erderwärmungspotenzial (GWP)': 'Global warming potential (GWP)',
+    'Primärenergie nicht erneuerbar (PENRT)': 'Non-renewable primary energy (PENRT)',
+    'GWP Gesamt': 'Total GWP',
+  };
+  return map[name] ?? name;
+}
+
+export function AnalysisPanel({ language, project, isProcessing, onRunAnalysis, onRunCostEstimation, onExport, onDownloadExchangedIfc }: AnalysisPanelProps) {
 
   if (isProcessing && !project?.analysisData) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
         <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-        <p className="font-semibold">Analyse wird durchgeführt...</p>
-        <p className="text-muted-foreground text-sm">Dies kann einen Moment dauern.</p>
+        <p className="font-semibold">{tr(language, 'Analyse wird durchgeführt...', 'Analysis is running...')}</p>
+        <p className="text-muted-foreground text-sm">{tr(language, 'Dies kann einen Moment dauern.', 'This may take a moment.')}</p>
       </div>
     );
   }
@@ -49,11 +61,11 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
         <BarChart3 className="w-12 h-12 text-muted-foreground/50 mb-4" />
-        <h3 className="font-semibold text-lg">Analyse bereit</h3>
-        <p className="text-muted-foreground text-sm mb-4">Starten Sie die KI-Analyse für dieses Modell.</p>
+        <h3 className="font-semibold text-lg">{tr(language, 'Analyse bereit', 'Analysis ready')}</h3>
+        <p className="text-muted-foreground text-sm mb-4">{tr(language, 'Starten Sie die KI-Analyse für dieses Modell.', 'Start the AI analysis for this model.')}</p>
         <Button onClick={onRunAnalysis} disabled={isProcessing}>
           {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Leaf className="mr-2 h-4 w-4" />}
-          Nachhaltigkeitsanalyse starten
+          {tr(language, 'Nachhaltigkeitsanalyse starten', 'Start sustainability analysis')}
         </Button>
       </div>
     );
@@ -70,7 +82,7 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
     <div className="w-full mt-4 space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline text-lg">Zusammenfassung</CardTitle>
+          <CardTitle className="font-headline text-lg">{tr(language, 'Zusammenfassung', 'Summary')}</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground leading-relaxed">{analysisData.summary}</p>
@@ -81,7 +93,7 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
         {analysisData.indicators.map((indicator, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">{indicator.name}</CardTitle>
+              <CardTitle className="text-sm font-medium">{translateIndicatorName(language, indicator.name)}</CardTitle>
               <RatingIcon rating={indicator.rating} />
             </CardHeader>
             <CardContent>
@@ -94,7 +106,7 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
 
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline text-lg">Materialzusammensetzung (Massen-%)</CardTitle>
+          <CardTitle className="font-headline text-lg">{tr(language, 'Materialzusammensetzung (Massen-%)', 'Material composition (mass %)')}</CardTitle>
         </CardHeader>
         <CardContent className="pl-0">
           <ChartContainer config={chartConfig} className="h-[250px] w-full">
@@ -115,13 +127,13 @@ export function AnalysisPanel({ project, isProcessing, onRunAnalysis, onRunCostE
 
       <Button onClick={onExport} className="w-full">
         <FileText className="mr-2 h-4 w-4" />
-        Materialpass exportieren
+        {tr(language, 'Materialpass exportieren', 'Export material passport')}
       </Button>
 
       {onDownloadExchangedIfc && (
         <Button onClick={onDownloadExchangedIfc} variant="outline" className="w-full mt-2">
           <TrendingUp className="mr-2 h-4 w-4 transform rotate-45" />
-          Aktualisierte IFC herunterladen
+          {tr(language, 'Aktualisierte IFC herunterladen', 'Download updated IFC')}
         </Button>
       )}
     </div>

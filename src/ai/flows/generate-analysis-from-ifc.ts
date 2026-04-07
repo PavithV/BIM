@@ -13,6 +13,7 @@ import { AnalysisResult, AnalysisResultSchema } from '@/lib/types';
 import { DEFAULT_MODEL } from '@/ai/models';
 import { loadOBDDatabase } from '@/utils/obdService';
 import { calculateLCA, type LCAResult } from '@/utils/sustainabilityCalculator';
+import { aiLanguageLabel, type Language } from '@/lib/i18n';
 
 // ---------------------------------------------------------------------------
 // Hilfsfunktion: Rating aus GWP/m² ableiten
@@ -48,8 +49,9 @@ const CHART_COLORS = [
 export async function generateAnalysisFromIfc(input: {
   ifcFileContent: string;
   model?: string;
-  replacementMap?: Record<string, string>;
+  language?: Language;
 }): Promise<AnalysisResult> {
+  const language: Language = input.language ?? 'de';
 
   // -----------------------------------------------------------------------
   // 1. Deterministische Berechnung
@@ -69,21 +71,21 @@ export async function generateAnalysisFromIfc(input: {
   // -----------------------------------------------------------------------
   const indicators: AnalysisResult['indicators'] = [
     {
-      name: 'Erderwärmungspotenzial (GWP)',
+      name: language === 'en' ? 'Global warming potential (GWP)' : 'Erderwärmungspotenzial (GWP)',
       value: lca.gwpPerM2.toFixed(2),
       unit: 'kg CO₂-Äq./m²',
       a: 'A1-A3',
       rating: rateGWP(lca.gwpPerM2),
     },
     {
-      name: 'Primärenergie nicht erneuerbar (PENRT)',
+      name: language === 'en' ? 'Non-renewable primary energy (PENRT)' : 'Primärenergie nicht erneuerbar (PENRT)',
       value: lca.penrtPerM2.toFixed(2),
       unit: 'MJ/m²',
       a: 'A1-A3',
       rating: ratePENRT(lca.penrtPerM2),
     },
     {
-      name: 'GWP Gesamt',
+      name: language === 'en' ? 'Total GWP' : 'GWP Gesamt',
       value: lca.gwpTotal.toFixed(0),
       unit: 'kg CO₂-Äq.',
       a: 'A1-A3',
@@ -107,7 +109,7 @@ export async function generateAnalysisFromIfc(input: {
 
   if (otherMass > 0 && totalMass > 0) {
     materialComposition.push({
-      name: 'Sonstige',
+      name: language === 'en' ? 'Other' : 'Sonstige',
       value: Math.round((otherMass / totalMass) * 1000) / 10,
       fill: 'hsl(var(--chart-5))',
     });
@@ -122,30 +124,33 @@ export async function generateAnalysisFromIfc(input: {
     .join('\n');
 
   const unmatchedText = lca.unmatchedMaterials.length > 0
-    ? `\nNicht zugeordnete Materialien: ${lca.unmatchedMaterials.join(', ')}`
+    ? (language === 'en'
+      ? `\nUnmatched materials: ${lca.unmatchedMaterials.join(', ')}`
+      : `\nNicht zugeordnete Materialien: ${lca.unmatchedMaterials.join(', ')}`)
     : '';
 
-  const summaryPrompt = `Sie sind ein Experte für nachhaltiges Bauen und Ökobilanzierung nach EN 15978. Schreiben Sie eine kurze, fachlich korrekte Zusammenfassung (3-5 Sätze) auf Deutsch zu folgender berechneter Ökobilanz eines Gebäudemodells.
+  const languageName = aiLanguageLabel(language);
+  const summaryPrompt = `You are an expert in sustainable construction and life-cycle assessment according to EN 15978. Write a short and technically correct summary (3-5 sentences) in ${languageName} for the following calculated building LCA.
 
-**Berechnete Kennzahlen (Modul A1-A3):**
+**Calculated indicators (Module A1-A3):**
 - GWP: ${lca.gwpPerM2.toFixed(2)} kg CO₂-Äq./m² (Gesamt: ${lca.gwpTotal.toFixed(0)} kg CO₂-Äq.)
 - PENRT: ${lca.penrtPerM2.toFixed(2)} MJ/m² (Gesamt: ${lca.penrtTotal.toFixed(0)} MJ)
 - Geschätzte BGF: ${lca.floorArea.toFixed(0)} m²
 
-**Top-Materialien nach Masse:**
+**Top materials by mass:**
 ${materialListText}
 ${unmatchedText}
 
-Bewerten Sie den GWP-Wert im Kontext üblicher Benchmarks (QNG/DGNB: ca. 8-10 kg CO₂-Äq./m² für Wohngebäude ist gut, >14 ist kritisch).
-Heben Sie Materialien mit hohem CO₂-Beitrag hervor und nennen Sie konkrete Verbesserungsvorschläge.
-Antworten Sie NUR mit dem reinen Zusammenfassungstext, KEIN JSON, KEINE Überschriften.`;
+Assess the GWP value in the context of typical benchmarks (QNG/DGNB: roughly 8-10 kg CO₂-eq./m² for residential buildings is good, >14 is critical).
+Highlight materials with high CO₂ impact and provide concrete improvement suggestions.
+Return ONLY plain summary text, NO JSON, NO headings.`;
 
   let summary = '';
   try {
     const completion = await ai.chat.completions.create({
       model: input.model ?? DEFAULT_MODEL,
       messages: [
-        { role: 'system', content: 'Sie sind ein Experte für nachhaltiges Bauen. Antworten Sie prägnant und fachlich auf Deutsch.' },
+        { role: 'system', content: `You are an expert in sustainable construction. Reply concisely and technically in ${languageName}.` },
         { role: 'user', content: summaryPrompt },
       ],
     });
@@ -164,11 +169,17 @@ Antworten Sie NUR mit dem reinen Zusammenfassungstext, KEIN JSON, KEINE Übersch
     }
   } catch (error) {
     console.error('[LCA] LLM summary generation failed:', error);
-    summary = `Die Ökobilanz des Gebäudes ergibt ein GWP von ${lca.gwpPerM2.toFixed(2)} kg CO₂-Äq./m² (A1-A3) bei einer geschätzten BGF von ${lca.floorArea.toFixed(0)} m². ` +
-      `Insgesamt wurden ${lca.materialBreakdown.length} Materialien analysiert. ` +
-      (lca.unmatchedMaterials.length > 0
-        ? `${lca.unmatchedMaterials.length} Materialien konnten nicht der Ökobaudat zugeordnet werden.`
-        : 'Alle Materialien konnten der Ökobaudat zugeordnet werden.');
+    summary = language === 'en'
+      ? `The building LCA results in a GWP of ${lca.gwpPerM2.toFixed(2)} kg CO₂-eq./m² (A1-A3) with an estimated gross floor area of ${lca.floorArea.toFixed(0)} m². ` +
+        `A total of ${lca.materialBreakdown.length} materials were analyzed. ` +
+        (lca.unmatchedMaterials.length > 0
+          ? `${lca.unmatchedMaterials.length} materials could not be matched to Ökobaudat.`
+          : 'All materials could be matched to Ökobaudat.')
+      : `Die Ökobilanz des Gebäudes ergibt ein GWP von ${lca.gwpPerM2.toFixed(2)} kg CO₂-Äq./m² (A1-A3) bei einer geschätzten BGF von ${lca.floorArea.toFixed(0)} m². ` +
+        `Insgesamt wurden ${lca.materialBreakdown.length} Materialien analysiert. ` +
+        (lca.unmatchedMaterials.length > 0
+          ? `${lca.unmatchedMaterials.length} Materialien konnten nicht der Ökobaudat zugeordnet werden.`
+          : 'Alle Materialien konnten der Ökobaudat zugeordnet werden.');
   }
 
   // -----------------------------------------------------------------------

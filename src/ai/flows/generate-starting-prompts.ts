@@ -10,16 +10,19 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { DEFAULT_MODEL } from '@/ai/models';
+import { aiLanguageLabel, type Language } from '@/lib/i18n';
 
 const StartingPromptsOutputSchema = z.object({
   prompts: z.array(z.string()).describe('Eine Liste von vorgeschlagenen Eingabeaufforderungen.'),
 });
 export type StartingPromptsOutput = z.infer<typeof StartingPromptsOutputSchema>;
 
-export async function generateStartingPrompts(options?: { model?: string }): Promise<StartingPromptsOutput> {
-  const prompt = `Sie sind ein KI-Assistent für Architekturstudenten. Antworten Sie immer auf Deutsch und im JSON-Format.
+export async function generateStartingPrompts(options?: { model?: string; language?: Language }): Promise<StartingPromptsOutput> {
+  const language: Language = options?.language ?? 'de';
+  const languageName = aiLanguageLabel(language);
+  const prompt = `You are an AI assistant for architecture students. Always answer in ${languageName} and JSON format.
 
-Sie sind ein KI-Assistent, der Architekturstudenten bei der Analyse und Bewertung ihrer Gebäudeentwürfe (IFC-Modelle) unterstützt. Stellen Sie eine Liste von vorgeschlagenen Eingabeaufforderungen auf Deutsch bereit, die ein neuer Benutzer verwenden kann, um schnell mit der Plattform zu interagieren und ihre Funktionen zu erkunden. Die Eingabeaufforderungen sollten für Nachhaltigkeit, Energieeffizienz, Barrierefreiheit und technische Standards relevant sein. Geben Sie sie als JSON-Array von Zeichenfolgen zurück.
+You help architecture students analyze and evaluate IFC building designs. Provide a list of suggested prompts in ${languageName} that a new user can use to quickly explore the platform features. Prompts should be relevant to sustainability, energy efficiency, accessibility, and technical standards. Return a JSON array of strings.
 
 Beispiel-Prompts:
 [
@@ -30,7 +33,7 @@ Beispiel-Prompts:
   "Erstelle einen Materialpass für dieses Projekt."
 ]
 
-Geben Sie die Liste der vorgeschlagenen Eingabeaufforderungen in einem JSON-Format zurück:
+Return the list in this JSON format:
 {
   "prompts": ["...", "...", "..."]
 }`;
@@ -38,7 +41,7 @@ Geben Sie die Liste der vorgeschlagenen Eingabeaufforderungen in einem JSON-Form
   const completion = await ai.chat.completions.create({
     model: options?.model ?? DEFAULT_MODEL,
     messages: [
-      { role: "system", content: "Sie sind ein KI-Assistent für Architekturstudenten. Antworten Sie immer auf Deutsch und im JSON-Format." },
+      { role: "system", content: `You are an AI assistant for architecture students. Always respond in ${languageName} and JSON format.` },
       { role: "user", content: prompt }
     ],
     response_format: { type: "json_object" },
