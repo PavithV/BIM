@@ -29,6 +29,7 @@ import { cn, downloadCsv } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { FullModelAnalysis } from '@/utils/modelChecker';
 import { AI_MODELS, DEFAULT_MODEL, type AIModelId } from '@/ai/models';
+import { tr, type Language } from '@/lib/i18n';
 
 export type Message = {
   id: string;
@@ -44,7 +45,7 @@ const IfcViewer = dynamic(
     loading: () => (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
         <Loader2 className="w-8 h-8 animate-spin mb-2" />
-        <p>Lade 3D-Engine...</p>
+        <p>Lade 3D-Engine / Loading 3D engine...</p>
       </div>
     )
   }
@@ -79,6 +80,7 @@ export default function Dashboard() {
   const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<AIModelId>(DEFAULT_MODEL);
+  const [language, setLanguage] = useState<Language>('de');
 
   // Callback to prevent infinite re-renders
   const handleModelLoaded = useCallback((structure: SpatialNode) => {
@@ -167,8 +169,8 @@ export default function Dashboard() {
     } catch (error: any) {
       console.error("Error fetching projects: ", error);
       toast({
-        title: "Fehler beim Laden der Projekte",
-        description: error.message || "Ihre Projekte konnten nicht geladen werden.", // Use error.message if available
+        title: tr(language, "Fehler beim Laden der Projekte", "Error loading projects"),
+        description: error.message || tr(language, "Ihre Projekte konnten nicht geladen werden.", "Your projects could not be loaded."),
         variant: "destructive",
       });
     } finally {
@@ -194,18 +196,27 @@ export default function Dashboard() {
 
 
   useEffect(() => {
+    const saved = window.localStorage.getItem('app-language');
+    if (saved === 'de' || saved === 'en') setLanguage(saved);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem('app-language', language);
+  }, [language]);
+
+  useEffect(() => {
     async function fetchPrompts() {
-      const result = await getStartingPrompts();
+      const result = await getStartingPrompts({ language });
       if (result.prompts) setStartingPrompts(result.prompts);
     }
     fetchPrompts();
-  }, []);
+  }, [language]);
 
   // --- COST ESTIMATION ---
   const runCostEstimation = useCallback(async (totalArea: number) => {
     const project = activeProject;
     if (!project?.analysisData?.materialComposition || !user) {
-      toast({ title: "Fehler", description: "Materialdaten nicht verfügbar.", variant: "destructive" });
+      toast({ title: tr(language, "Fehler", "Error"), description: tr(language, "Materialdaten nicht verfügbar.", "Material data not available."), variant: "destructive" });
       return;
     }
     setIsProcessing(true);
@@ -221,17 +232,17 @@ export default function Dashboard() {
 
         if (updateResult.error) throw new Error(updateResult.error);
         await fetchProjects();
-        toast({ title: "Erfolg", description: "Kostenschätzung erstellt." });
+        toast({ title: tr(language, "Erfolg", "Success"), description: tr(language, "Kostenschätzung erstellt.", "Cost estimation created.") });
       } else {
-        toast({ title: "Fehler", description: result.error || "Unbekannter Fehler", variant: "destructive" });
+        toast({ title: tr(language, "Fehler", "Error"), description: result.error || tr(language, "Unbekannter Fehler", "Unknown error"), variant: "destructive" });
       }
     } catch (error) {
       console.error("Error cost estimation:", error);
-      toast({ title: "Fehler", description: "Unerwarteter Fehler.", variant: "destructive" });
+      toast({ title: tr(language, "Fehler", "Error"), description: tr(language, "Unerwarteter Fehler.", "Unexpected error."), variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
-  }, [user, toast, fetchProjects, activeProject]);
+  }, [user, toast, fetchProjects, activeProject, selectedModel]);
 
 
   // --- FILE LOADING ---
@@ -291,6 +302,7 @@ export default function Dashboard() {
         formData.append('ifcFileContent', fileContent);
         if (replacementMap) formData.append('replacementMap', JSON.stringify(replacementMap));
         if (selectedModel) formData.append('model', selectedModel);
+        formData.append('language', language);
 
         const analysisResult = await getIfcAnalysis(formData);
         if (analysisResult.analysis) {
@@ -298,13 +310,13 @@ export default function Dashboard() {
 
           setActiveProject(prev => prev ? { ...prev, analysisData: analysisResult.analysis || null, costEstimationData: null } : null);
           await fetchProjects();
-          toast({ title: "Analyse abgeschlossen" });
+          toast({ title: tr(language, "Analyse abgeschlossen", "Analysis completed") });
         } else {
-          toast({ title: "Fehler", description: analysisResult?.error, variant: "destructive" });
+          toast({ title: tr(language, "Fehler", "Error"), description: analysisResult?.error, variant: "destructive" });
         }
       } catch (error) {
         console.error("Analysis error:", error);
-        toast({ title: "Fehler", variant: "destructive" });
+        toast({ title: tr(language, "Fehler", "Error"), variant: "destructive" });
       } finally {
         setIsProcessing(false);
         setPendingAction(null);
@@ -313,8 +325,8 @@ export default function Dashboard() {
       const { ifcToSend, userQuestion } = data;
       setIsLoading(true);
       try {
-        const result = await getAIChatFeedback({ ifcModelData: ifcToSend, userQuestion, replacementMap, model: selectedModel });
-        const content = result.feedback || result.error || 'Fehler aufgetreten.';
+        const result = await getAIChatFeedback({ ifcModelData: ifcToSend, userQuestion, replacementMap, model: selectedModel, language });
+        const content = result.feedback || result.error || tr(language, 'Fehler aufgetreten.', 'An error occurred.');
 
         await insertMessage({
           ifc_model_id: activeProject.id, role: 'assistant', content
@@ -357,10 +369,10 @@ export default function Dashboard() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast({ title: "Download gestartet" });
+      toast({ title: tr(language, "Download gestartet", "Download started") });
     } catch (error) {
       console.error("Download error:", error);
-      toast({ title: "Fehler", variant: "destructive" });
+      toast({ title: tr(language, "Fehler", "Error"), variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -416,6 +428,7 @@ export default function Dashboard() {
       formData.append('ifcFileContent', fileContent);
       if (replacementMap) formData.append('replacementMap', JSON.stringify(replacementMap));
       if (selectedModel) formData.append('model', selectedModel);
+      formData.append('language', language);
 
       const analysisResult = await getIfcAnalysis(formData);
 
@@ -423,17 +436,17 @@ export default function Dashboard() {
         await updateIfcModel(project.id, { analysisData: analysisResult.analysis, costEstimationData: null });
         setActiveProject(prev => prev ? { ...prev, analysisData: analysisResult.analysis || null, costEstimationData: null } : null);
         fetchProjects();
-        toast({ title: "Analyse abgeschlossen" });
+        toast({ title: tr(language, "Analyse abgeschlossen", "Analysis completed") });
       } else {
-        toast({ title: "Fehler", description: analysisResult?.error, variant: "destructive" });
+        toast({ title: tr(language, "Fehler", "Error"), description: analysisResult?.error, variant: "destructive" });
       }
     } catch (error) {
       console.error("Run analysis error:", error);
-      toast({ title: "Fehler", variant: "destructive" });
+      toast({ title: tr(language, "Fehler", "Error"), variant: "destructive" });
     } finally {
       if (!materialReviewOpen) setIsProcessing(false);
     }
-  }, [user, toast, fetchProjects, loadIfcFileContent, materialReviewOpen]);
+  }, [user, toast, fetchProjects, loadIfcFileContent, materialReviewOpen, selectedModel, language]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -480,8 +493,8 @@ export default function Dashboard() {
       }
 
       // 2. AI Response
-      const result = await getAIChatFeedback({ ifcModelData: ifcToSend, userQuestion, replacementMap, model: selectedModel });
-      const content = result.feedback || result.error || 'Fehler.';
+      const result = await getAIChatFeedback({ ifcModelData: ifcToSend, userQuestion, replacementMap, model: selectedModel, language });
+      const content = result.feedback || result.error || tr(language, 'Fehler.', 'Error.');
 
       const aiMsgResult = await insertMessage({
         ifc_model_id: activeProject.id, role: 'assistant', content
@@ -501,7 +514,7 @@ export default function Dashboard() {
 
     } catch (error) {
       console.error("Chat error:", error);
-      toast({ title: "Fehler", description: "Nachricht konnte nicht gesendet werden.", variant: "destructive" });
+      toast({ title: tr(language, "Fehler", "Error"), description: tr(language, "Nachricht konnte nicht gesendet werden.", "Message could not be sent."), variant: "destructive" });
     } finally {
       if (!materialReviewOpen) setIsLoading(false);
     }
@@ -544,12 +557,12 @@ export default function Dashboard() {
       await fetchProjects(true);
       setSelectedElementId(null);
 
-      toast({ title: "Projekt erfolgreich hochgeladen" });
+      toast({ title: tr(language, "Projekt erfolgreich hochgeladen", "Project uploaded successfully") });
 
     } catch (error: any) {
       console.error("Upload error:", error);
       toast({
-        title: "Fehler beim Upload",
+        title: tr(language, "Fehler beim Upload", "Upload error"),
         description: error.message,
         variant: "destructive"
       });
@@ -637,21 +650,21 @@ export default function Dashboard() {
         const { runFullAnalysis } = await import('@/utils/modelChecker');
         const analysisResult = await runFullAnalysis(ifcAPI, modelID, WebIFC, data);
         setModelAnalysis(analysisResult);
-        toast({ title: 'Modellprüfung abgeschlossen' });
+        toast({ title: tr(language, 'Modellprüfung abgeschlossen', 'Model check completed') });
       } finally {
         await ifcAPI.CloseModel(modelID);
       }
     } catch (error: any) {
       console.error('Model analysis error:', error);
       toast({
-        title: 'Fehler bei Modellprüfung',
-        description: error.message || 'Unbekannter Fehler',
+        title: tr(language, 'Fehler bei Modellprüfung', 'Model check error'),
+        description: error.message || tr(language, 'Unbekannter Fehler', 'Unknown error'),
         variant: 'destructive',
       });
     } finally {
       setIsModelAnalysisLoading(false);
     }
-  }, [activeProject, loadIfcFileContent, toast]);
+  }, [activeProject, loadIfcFileContent, toast, language]);
 
   // Auto-run model analysis on project change
   const lastAnalyzedProjectId = useRef<string | null>(null);
@@ -685,7 +698,7 @@ export default function Dashboard() {
                         className="flex-1 h-7 text-xs"
                         onClick={() => setSidebarTab('projects')}
                       >
-                        Projekte
+                        {tr(language, 'Projekte', 'Projects')}
                       </Button>
                       <Button
                         variant={sidebarTab === 'structure' ? 'default' : 'ghost'}
@@ -694,13 +707,14 @@ export default function Dashboard() {
                         onClick={() => setSidebarTab('structure')}
                         disabled={!modelStructure}
                       >
-                        Struktur
+                        {tr(language, 'Struktur', 'Structure')}
                       </Button>
                     </div>
 
                     <div className="flex-1 overflow-hidden relative">
                       {sidebarTab === 'projects' ? (
                         <ProjectSelector
+                          language={language}
                           projects={projects}
                           isLoading={isProjectsLoading}
                           onSelectProject={(p) => {
@@ -725,9 +739,9 @@ export default function Dashboard() {
                   {projects.filter(p => p.analysisData).length >= 2 && (
                     <div className="pt-2 border-t">
                       <Sheet>
-                        <SheetTrigger asChild><Button variant="outline" className="w-full justify-start gap-2"><GitCompare className="w-4 h-4" /> Projekte vergleichen</Button></SheetTrigger>
+                        <SheetTrigger asChild><Button variant="outline" className="w-full justify-start gap-2"><GitCompare className="w-4 h-4" /> {tr(language, 'Projekte vergleichen', 'Compare projects')}</Button></SheetTrigger>
                         <SheetContent side="right" className="w-[90vw] sm:w-[80vw] overflow-y-auto">
-                          <SheetHeader><SheetTitle>Projektvergleich</SheetTitle></SheetHeader>
+                          <SheetHeader><SheetTitle>{tr(language, 'Projektvergleich', 'Project comparison')}</SheetTitle></SheetHeader>
                           <div className="mt-6">
                             <ProjectComparison projects={projects.filter(p => p.analysisData)} projectA={comparisonProjectA} projectB={comparisonProjectB} onSelectProjectA={setComparisonProjectA} onSelectProjectB={setComparisonProjectB} />
                           </div>
@@ -741,7 +755,7 @@ export default function Dashboard() {
                     <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">{user?.email?.charAt(0).toUpperCase()}</div>
                     <div className="overflow-hidden"><p className="text-sm font-medium truncate">{user?.email}</p></div>
                   </div>
-                  <Button variant="outline" className="w-full justify-start gap-2" onClick={handleSignOut}><LogOut className="w-4 h-4" /> Abmelden</Button>
+                  <Button variant="outline" className="w-full justify-start gap-2" onClick={handleSignOut}><LogOut className="w-4 h-4" /> {tr(language, 'Abmelden', 'Sign out')}</Button>
                 </div>
               </aside>
             </ResizablePanel>
@@ -757,14 +771,23 @@ export default function Dashboard() {
               {activeProject ? (
                 <div className="flex items-center gap-2 overflow-hidden">
                   <span className="font-medium truncate">{activeProject.fileName}</span>
-                  {activeProject.analysisData && <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">Analysiert</span>}
+                  {activeProject.analysisData && <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">{tr(language, 'Analysiert', 'Analyzed')}</span>}
                 </div>
-              ) : <span className="text-muted-foreground">Kein Projekt ausgewählt</span>}
+              ) : <span className="text-muted-foreground">{tr(language, 'Kein Projekt ausgewählt', 'No project selected')}</span>}
               <div className="ml-auto flex items-center gap-2">
+                <Select value={language} onValueChange={(v) => setLanguage(v as Language)}>
+                  <SelectTrigger className="w-[120px] h-8 text-xs">
+                    <SelectValue placeholder="Sprache" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="de">Deutsch</SelectItem>
+                    <SelectItem value="en">English</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Select value={selectedModel} onValueChange={(v) => setSelectedModel(v as AIModelId)}>
                   <SelectTrigger className="w-[180px] h-8 text-xs">
                     <Sparkles className="w-3 h-3 mr-1 text-primary" />
-                    <SelectValue placeholder="Modell wählen" />
+                    <SelectValue placeholder={tr(language, "Modell wählen", "Choose model")} />
                   </SelectTrigger>
                   <SelectContent>
                     {AI_MODELS.map((m) => (
@@ -774,7 +797,7 @@ export default function Dashboard() {
                 </Select>
                 {activeProject && (
                   <Button variant="ghost" size="sm" onClick={handleDownloadUpdatedIfc} disabled={!activeProject.replacements || isProcessing}>
-                    <Layers className="w-4 h-4 mr-2" /> Download IFC
+                    <Layers className="w-4 h-4 mr-2" /> {tr(language, 'IFC herunterladen', 'Download IFC')}
                   </Button>
                 )}
                 <ThemeToggle />
@@ -791,6 +814,7 @@ export default function Dashboard() {
                       <ResizablePanel defaultSize={60} minSize={30} className="relative bg-muted/10">
                         <div className="absolute inset-0 p-0 overflow-hidden">
                           <IfcViewer
+                            language={language}
                             ifcStoragePath={activeProject.fileStoragePath || undefined}
                             ifcUrl={!activeProject.fileStoragePath && activeProject.fileUrl ? activeProject.fileUrl : undefined}
                             ifcContent={!activeProject.fileStoragePath && !activeProject.fileUrl ? activeProject.fileContent : undefined}
@@ -810,20 +834,20 @@ export default function Dashboard() {
                           <div className="space-y-6">
                             <div className="max-w-5xl mx-auto space-y-6">
                               <div className="flex items-center justify-between">
-                                <div><h2 className="text-2xl font-bold font-headline mb-1">Modellprüfung</h2></div>
+                                <div><h2 className="text-2xl font-bold font-headline mb-1">{tr(language, 'Modellprüfung', 'Model check')}</h2></div>
                                 <Button onClick={runModelAnalysis} disabled={isModelAnalysisLoading}>
                                   {isModelAnalysisLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                                  {modelAnalysis ? ' Aktualisieren' : ' Starten'}
+                                  {modelAnalysis ? tr(language, ' Aktualisieren', ' Refresh') : tr(language, ' Starten', ' Start')}
                                 </Button>
                               </div>
                               {isModelAnalysisLoading && (
                                 <div className="flex flex-col items-center justify-center py-12">
                                   <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-                                  <p className="font-semibold">Modell wird analysiert...</p>
-                                  <p className="text-muted-foreground text-sm">IFC-Datei wird geladen und geprüft.</p>
+                                  <p className="font-semibold">{tr(language, 'Modell wird analysiert...', 'Model is being analyzed...')}</p>
+                                  <p className="text-muted-foreground text-sm">{tr(language, 'IFC-Datei wird geladen und geprüft.', 'IFC file is loading and being checked.')}</p>
                                 </div>
                               )}
-                              {!isModelAnalysisLoading && <ModelChecksTab result={modelAnalysis?.modelCheck ?? null} />}
+                              {!isModelAnalysisLoading && <ModelChecksTab language={language} result={modelAnalysis?.modelCheck ?? null} />}
                             </div>
                           </div>
 
@@ -831,52 +855,52 @@ export default function Dashboard() {
                             {/* ... Analysis UI (identisch zu deinem Code) ... */}
                             <div className="max-w-5xl mx-auto space-y-6">
                               <div className="flex items-center justify-between">
-                                <div><h2 className="text-2xl font-bold font-headline mb-1">Nachhaltigkeitsanalyse</h2></div>
-                                <Button onClick={() => runAnalysis(activeProject)} disabled={isProcessing}>{isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Leaf className="w-4 h-4" />} {activeProject.analysisData ? "Aktualisieren" : "Starten"}</Button>
+                                <div><h2 className="text-2xl font-bold font-headline mb-1">{tr(language, 'Nachhaltigkeitsanalyse', 'Sustainability analysis')}</h2></div>
+                                <Button onClick={() => runAnalysis(activeProject)} disabled={isProcessing}>{isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Leaf className="w-4 h-4" />} {activeProject.analysisData ? tr(language, "Aktualisieren", "Refresh") : tr(language, "Starten", "Start")}</Button>
                               </div>
-                              {activeProject.analysisData && <AnalysisPanel project={activeProject} isProcessing={isProcessing} onRunAnalysis={() => runAnalysis(activeProject)} onRunCostEstimation={runCostEstimation} onExport={handleExportMaterialPass} onDownloadExchangedIfc={handleDownloadUpdatedIfc} />}
+                              {activeProject.analysisData && <AnalysisPanel language={language} project={activeProject} isProcessing={isProcessing} onRunAnalysis={() => runAnalysis(activeProject)} onRunCostEstimation={runCostEstimation} onExport={handleExportMaterialPass} onDownloadExchangedIfc={handleDownloadUpdatedIfc} />}
                             </div>
                           </div>
 
                           <div className="space-y-6 border-t pt-8">
                             <div className="max-w-5xl mx-auto space-y-6">
                               <div className="flex items-center justify-between">
-                                <div><h2 className="text-2xl font-bold font-headline mb-1">DIN 277 Flächenauswertung</h2></div>
+                                <div><h2 className="text-2xl font-bold font-headline mb-1">{tr(language, 'DIN 277 Flächenauswertung', 'DIN 277 area evaluation')}</h2></div>
                                 {!modelAnalysis && (
                                   <Button onClick={runModelAnalysis} disabled={isModelAnalysisLoading}>
                                     {isModelAnalysisLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LayoutGrid className="w-4 h-4" />}
-                                    {' Auswertung starten'}
+                                    {tr(language, ' Auswertung starten', ' Start evaluation')}
                                   </Button>
                                 )}
                               </div>
                               {isModelAnalysisLoading && (
                                 <div className="flex flex-col items-center justify-center py-12">
                                   <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-                                  <p className="font-semibold">Flächenauswertung wird erstellt...</p>
+                                  <p className="font-semibold">{tr(language, 'Flächenauswertung wird erstellt...', 'Area evaluation is being generated...')}</p>
                                 </div>
                               )}
-                              {!isModelAnalysisLoading && <Din277Tab result={modelAnalysis?.din277 ?? null} />}
+                              {!isModelAnalysisLoading && <Din277Tab language={language} result={modelAnalysis?.din277 ?? null} />}
                             </div>
                           </div>
 
                           <div className="space-y-6 border-t pt-8">
                             <div className="max-w-5xl mx-auto space-y-6">
                               <div className="flex items-center justify-between">
-                                <div><h2 className="text-2xl font-bold font-headline mb-1">DIN 276 Mengenauswertung</h2></div>
+                                <div><h2 className="text-2xl font-bold font-headline mb-1">{tr(language, 'DIN 276 Mengenauswertung', 'DIN 276 quantity evaluation')}</h2></div>
                                 {!modelAnalysis && (
                                   <Button onClick={runModelAnalysis} disabled={isModelAnalysisLoading}>
                                     {isModelAnalysisLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
-                                    {' Auswertung starten'}
+                                    {tr(language, ' Auswertung starten', ' Start evaluation')}
                                   </Button>
                                 )}
                               </div>
                               {isModelAnalysisLoading && (
                                 <div className="flex flex-col items-center justify-center py-12">
                                   <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-                                  <p className="font-semibold">Mengenauswertung wird erstellt...</p>
+                                  <p className="font-semibold">{tr(language, 'Mengenauswertung wird erstellt...', 'Quantity evaluation is being generated...')}</p>
                                 </div>
                               )}
-                              {!isModelAnalysisLoading && <Din276Tab result={modelAnalysis?.din276 ?? null} />}
+                              {!isModelAnalysisLoading && <Din276Tab language={language} result={modelAnalysis?.din276 ?? null} />}
                             </div>
                           </div>
                         </div>
@@ -889,19 +913,19 @@ export default function Dashboard() {
                   {/* Right Column: AI Chat */}
                   <ResizablePanel defaultSize={30} minSize={20} maxSize={40} collapsible className="bg-background flex flex-col border-l shadow-sm z-10">
                     <div className="px-4 py-3 border-b shrink-0 bg-card flex items-center justify-between">
-                      <span className="font-semibold text-sm flex items-center gap-2 font-headline"><Bot className="w-4 h-4 text-primary" /> KI Coach</span>
+                      <span className="font-semibold text-sm flex items-center gap-2 font-headline"><Bot className="w-4 h-4 text-primary" /> {tr(language, 'KI Coach', 'AI Coach')}</span>
                     </div>
                     <div className="flex-1 overflow-hidden m-0 flex flex-col">
-                      <ChatAssistant activeProject={activeProject} activeMessages={activeMessages} isLoading={isLoading || messagesLoading} onSendMessage={handleSendMessage} startingPrompts={startingPrompts} />
+                      <ChatAssistant language={language} activeProject={activeProject} activeMessages={activeMessages} isLoading={isLoading || messagesLoading} onSendMessage={handleSendMessage} startingPrompts={startingPrompts} />
                     </div>
                   </ResizablePanel>
                 </ResizablePanelGroup>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 text-muted-foreground">
                   <Building className="w-16 h-16 mb-4 opacity-20" />
-                  <h2 className="text-2xl font-semibold text-foreground">Willkommen</h2>
-                  <p className="mb-8">Bitte Projekt auswählen oder hochladen.</p>
-                  <Button size="lg" onClick={() => (document.querySelector('input[type="file"]') as HTMLElement)?.click()}><FilePlus className="w-5 h-5 mr-2" /> Neues Projekt</Button>
+                  <h2 className="text-2xl font-semibold text-foreground">{tr(language, 'Willkommen', 'Welcome')}</h2>
+                  <p className="mb-8">{tr(language, 'Bitte Projekt auswählen oder hochladen.', 'Please select or upload a project.')}</p>
+                  <Button size="lg" onClick={() => (document.querySelector('input[type="file"]') as HTMLElement)?.click()}><FilePlus className="w-5 h-5 mr-2" /> {tr(language, 'Neues Projekt', 'New project')}</Button>
                 </div>
               )}
             </div>
@@ -909,7 +933,7 @@ export default function Dashboard() {
         </ResizablePanel>
       </ResizablePanelGroup>
 
-      <MaterialReviewModal isOpen={materialReviewOpen} onOpenChange={setMaterialReviewOpen} replacements={pendingReplacements} onConfirm={handleReviewConfirm} />
+      <MaterialReviewModal language={language} isOpen={materialReviewOpen} onOpenChange={setMaterialReviewOpen} replacements={pendingReplacements} onConfirm={handleReviewConfirm} />
     </div>
   );
 }

@@ -18,8 +18,10 @@ import {
 } from '@/components/ui/table';
 import { Layers, Info } from 'lucide-react';
 import type { Din276QuantityResult, Din276CostGroupResult } from '@/utils/din276Mapper';
+import { tr, type Language } from '@/lib/i18n';
 
 interface Din276TabProps {
+    language: Language;
     result: Din276QuantityResult | null;
 }
 
@@ -45,14 +47,32 @@ function kgColor(kg: string): string {
     return KG_COLORS[kg] ?? 'bg-muted text-muted-foreground border-border';
 }
 
-export function Din276Tab({ result }: Din276TabProps) {
+function translateKgLabel(language: Language, label: string): string {
+    if (language === 'de') return label;
+    const map: Record<string, string> = {
+        'Baugrube / Erdbau': 'Excavation / earthworks',
+        'Gründung': 'Foundation',
+        'Außenwände': 'Exterior walls',
+        'Außentüren und -fenster': 'Exterior doors and windows',
+        'Innenwände': 'Interior walls',
+        'Innentüren und -fenster': 'Interior doors and windows',
+        'Decken': 'Slabs and ceilings',
+        'Dächer': 'Roofs',
+        'Infrastrukturanlagen': 'Infrastructure systems',
+        'Baukonstruktive Einbauten': 'Structural built-in components',
+        'Sonstige Maßnahmen': 'Other measures',
+    };
+    return map[label] ?? label;
+}
+
+export function Din276Tab({ language, result }: Din276TabProps) {
     if (!result) {
         return (
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
                 <Layers className="w-12 h-12 text-muted-foreground/50 mb-4" />
-                <h3 className="font-semibold text-lg">DIN 276 Mengenauswertung</h3>
+                <h3 className="font-semibold text-lg">{tr(language, 'DIN 276 Mengenauswertung', 'DIN 276 quantity evaluation')}</h3>
                 <p className="text-muted-foreground text-sm mt-1">
-                    Starten Sie die Modellprüfung, um die DIN 276 Auswertung hier anzuzeigen.
+                    {tr(language, 'Starten Sie die Modellprüfung, um die DIN 276 Auswertung hier anzuzeigen.', 'Run the model check to display DIN 276 evaluation here.')}
                 </p>
             </div>
         );
@@ -62,10 +82,9 @@ export function Din276Tab({ result }: Din276TabProps) {
         return (
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
                 <Info className="w-12 h-12 text-yellow-500/70 mb-4" />
-                <h3 className="font-semibold text-lg">Keine zuordenbaren Bauteile</h3>
+                <h3 className="font-semibold text-lg">{tr(language, 'Keine zuordenbaren Bauteile', 'No assignable components')}</h3>
                 <p className="text-muted-foreground text-sm mt-1 max-w-md">
-                    Das IFC-Modell enthält keine Bauteile, die automatisch einer DIN 276 Kostengruppe
-                    zugeordnet werden konnten.
+                    {tr(language, 'Das IFC-Modell enthält keine Bauteile, die automatisch einer DIN 276 Kostengruppe zugeordnet werden konnten.', 'The IFC model contains no components that could be assigned automatically to a DIN 276 cost group.')}
                 </p>
             </div>
         );
@@ -77,15 +96,15 @@ export function Din276Tab({ result }: Din276TabProps) {
             <Card className="border-primary/20 bg-primary/5">
                 <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium text-primary">
-                        Geschätzte Baukosten (KG 300)
+                        {tr(language, 'Geschätzte Baukosten (KG 300)', 'Estimated construction costs (KG 300)')}
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <p className="text-3xl font-bold text-primary">
-                        {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(result.totalCost)}
+                        {new Intl.NumberFormat(language === 'en' ? 'en-US' : 'de-DE', { style: 'currency', currency: 'EUR' }).format(result.totalCost)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                        Basierend auf statistischen BKI-Mittelwerten
+                        {tr(language, 'Basierend auf statistischen BKI-Mittelwerten', 'Based on statistical BKI averages')}
                     </p>
                 </CardContent>
             </Card>
@@ -94,30 +113,30 @@ export function Din276Tab({ result }: Din276TabProps) {
             <Card>
                 <CardHeader>
                     <CardTitle className="text-sm font-medium">
-                        Mengenübersicht nach DIN 276
+                        {tr(language, 'Mengenübersicht nach DIN 276', 'Quantity overview according to DIN 276')}
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-2 gap-3">
                         <div className="rounded-lg border p-3">
                             <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                                Gesamtfläche
+                                {tr(language, 'Gesamtfläche', 'Total area')}
                             </p>
                             <p className="text-lg font-bold">{fmt(result.totalArea, 'm²')}</p>
                         </div>
                         <div className="rounded-lg border p-3">
                             <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                                Gesamtvolumen
+                                {tr(language, 'Gesamtvolumen', 'Total volume')}
                             </p>
                             <p className="text-lg font-bold">{fmt(result.totalVolume, 'm³')}</p>
                         </div>
                         <div className="rounded-lg border p-3 col-span-2">
                             <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                                Kostengruppen
+                                {tr(language, 'Kostengruppen', 'Cost groups')}
                             </p>
                             <p className="text-lg font-bold">{result.groups.length}</p>
                             <p className="text-xs text-muted-foreground">
-                                {result.groups.reduce((s, g) => s + g.elementCount, 0)} Bauteile zugeordnet
+                                {result.groups.reduce((s, g) => s + g.elementCount, 0)} {tr(language, 'Bauteile zugeordnet', 'components assigned')}
                             </p>
                         </div>
                     </div>
@@ -128,13 +147,13 @@ export function Din276Tab({ result }: Din276TabProps) {
             <Card>
                 <CardHeader>
                     <CardTitle className="text-sm font-medium">
-                        Kostengruppen-Details
+                        {tr(language, 'Kostengruppen-Details', 'Cost group details')}
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0 pb-2">
                     <Accordion type="multiple" className="w-full">
                         {result.groups.map((group) => (
-                            <CostGroupItem key={group.kg} group={group} />
+                            <CostGroupItem language={language} key={group.kg} group={group} />
                         ))}
                     </Accordion>
                 </CardContent>
@@ -143,7 +162,7 @@ export function Din276Tab({ result }: Din276TabProps) {
     );
 }
 
-function CostGroupItem({ group }: { group: Din276CostGroupResult }) {
+function CostGroupItem({ language, group }: { language: Language; group: Din276CostGroupResult }) {
     return (
         <AccordionItem value={group.kg} className="border-b last:border-b-0">
             <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/30">
@@ -152,9 +171,9 @@ function CostGroupItem({ group }: { group: Din276CostGroupResult }) {
                         KG {group.kg}
                     </Badge>
                     <div className="flex-1 min-w-0">
-                        <span className="font-medium text-sm">{group.label}</span>
+                        <span className="font-medium text-sm">{translateKgLabel(language, group.label)}</span>
                         <span className="text-xs text-muted-foreground ml-2">
-                            ({group.elementCount} {group.elementCount === 1 ? 'Bauteil' : 'Bauteile'})
+                            ({group.elementCount} {group.elementCount === 1 ? tr(language, 'Bauteil', 'component') : tr(language, 'Bauteile', 'components')})
                         </span>
                     </div>
                     <div className="flex items-center gap-4 text-xs tabular-nums shrink-0">
@@ -162,7 +181,7 @@ function CostGroupItem({ group }: { group: Din276CostGroupResult }) {
                             {group.unitPrice > 0 ? `${group.unitPrice} €/${group.unit}` : '—'}
                         </div>
                         <div className="font-medium text-right w-24 text-primary">
-                            {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(group.totalCost)}
+                            {new Intl.NumberFormat(language === 'en' ? 'en-US' : 'de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(group.totalCost)}
                         </div>
                         <div className="text-muted-foreground text-right w-24">
                             {group.totalArea > 0 && <span>{fmt(group.totalArea, 'm²')}</span>}
@@ -177,11 +196,11 @@ function CostGroupItem({ group }: { group: Din276CostGroupResult }) {
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="w-[60px]">ID</TableHead>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Typ</TableHead>
-                                <TableHead>Material</TableHead>
-                                <TableHead className="text-right">Fläche</TableHead>
-                                <TableHead className="text-right">Volumen</TableHead>
+                                <TableHead>{tr(language, 'Name', 'Name')}</TableHead>
+                                <TableHead>{tr(language, 'Typ', 'Type')}</TableHead>
+                                <TableHead>{tr(language, 'Material', 'Material')}</TableHead>
+                                <TableHead className="text-right">{tr(language, 'Fläche', 'Area')}</TableHead>
+                                <TableHead className="text-right">{tr(language, 'Volumen', 'Volume')}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>

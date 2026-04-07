@@ -15,8 +15,10 @@ import {
 } from 'lucide-react';
 import type { ModelCheckResult } from '@/utils/modelChecker';
 import { useState } from 'react';
+import { tr, type Language } from '@/lib/i18n';
 
 interface ModelChecksTabProps {
+  language: Language;
   result: ModelCheckResult | null;
 }
 
@@ -31,16 +33,16 @@ function StatusIcon({ status }: { status: 'ok' | 'warn' | 'error' }) {
   }
 }
 
-export function ModelChecksTab({ result }: ModelChecksTabProps) {
+export function ModelChecksTab({ language, result }: ModelChecksTabProps) {
   const [expandedType, setExpandedType] = useState<string | null>(null);
 
   if (!result) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
         <Layers className="w-12 h-12 text-muted-foreground/50 mb-4" />
-        <h3 className="font-semibold text-lg">Modellprüfung</h3>
+        <h3 className="font-semibold text-lg">{tr(language, 'Modellprüfung', 'Model check')}</h3>
         <p className="text-muted-foreground text-sm mt-1">
-          Starten Sie die Modellprüfung, um die Ergebnisse hier anzuzeigen.
+          {tr(language, 'Starten Sie die Modellprüfung, um die Ergebnisse hier anzuzeigen.', 'Run the model check to display results here.')}
         </p>
       </div>
     );
@@ -55,14 +57,14 @@ export function ModelChecksTab({ result }: ModelChecksTabProps) {
       <Card>
         <CardHeader className="flex flex-row items-center gap-3 pb-2">
           <FileCode2 className="w-5 h-5 text-primary shrink-0" />
-          <CardTitle className="text-sm font-medium">IFC-Version & Metadaten</CardTitle>
+          <CardTitle className="text-sm font-medium">{tr(language, 'IFC-Version & Metadaten', 'IFC version & metadata')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-            <span className="text-muted-foreground">Schema:</span>
-            <span className="font-medium">{result.ifcVersion ?? 'Unbekannt'}</span>
+            <span className="text-muted-foreground">{tr(language, 'Schema:', 'Schema:')}</span>
+            <span className="font-medium">{result.ifcVersion ?? tr(language, 'Unbekannt', 'Unknown')}</span>
 
-            <span className="text-muted-foreground">Projekt:</span>
+            <span className="text-muted-foreground">{tr(language, 'Projekt:', 'Project:')}</span>
             <span className="font-medium">{result.projectName ?? '—'}</span>
           </div>
           {result.creationDate && (
@@ -79,7 +81,7 @@ export function ModelChecksTab({ result }: ModelChecksTabProps) {
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div className="flex items-center gap-3">
             <DoorOpen className="w-5 h-5 text-primary shrink-0" />
-            <CardTitle className="text-sm font-medium">Räume (IfcSpace)</CardTitle>
+            <CardTitle className="text-sm font-medium">{tr(language, 'Räume (IfcSpace)', 'Spaces (IfcSpace)')}</CardTitle>
           </div>
           <StatusIcon
             status={
@@ -95,26 +97,26 @@ export function ModelChecksTab({ result }: ModelChecksTabProps) {
           {result.spacesExist ? (
             <div className="space-y-1">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Räume gefunden:</span>
+                <span className="text-muted-foreground">{tr(language, 'Räume gefunden:', 'Spaces found:')}</span>
                 <Badge variant="secondary">{result.spaceCount}</Badge>
               </div>
               {result.unnamedSpaceCount > 0 && (
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-yellow-600">Ohne Namen:</span>
+                  <span className="text-yellow-600">{tr(language, 'Ohne Namen:', 'Without names:')}</span>
                   <Badge variant="outline" className="border-yellow-500 text-yellow-600">
                     {result.unnamedSpaceCount}
                   </Badge>
                 </div>
               )}
               {result.unnamedSpaceCount === 0 && (
-                <p className="text-xs text-green-600 mt-1">Alle Räume haben einen Namen ✓</p>
+                <p className="text-xs text-green-600 mt-1">{tr(language, 'Alle Räume haben einen Namen ✓', 'All spaces have a name ✓')}</p>
               )}
             </div>
           ) : (
             <div className="text-sm text-destructive">
-              <p className="font-medium">Keine Räume (IfcSpace) im Modell vorhanden!</p>
+              <p className="font-medium">{tr(language, 'Keine Räume (IfcSpace) im Modell vorhanden!', 'No spaces (IfcSpace) found in model!')}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Für eine DIN 277 Auswertung werden IfcSpace-Entitäten benötigt.
+                {tr(language, 'Für eine DIN 277 Auswertung werden IfcSpace-Entitäten benötigt.', 'IfcSpace entities are required for DIN 277 evaluation.')}
               </p>
             </div>
           )}
@@ -126,20 +128,20 @@ export function ModelChecksTab({ result }: ModelChecksTabProps) {
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div className="flex items-center gap-3">
             <Layers className="w-5 h-5 text-primary shrink-0" />
-            <CardTitle className="text-sm font-medium">Materialzuordnung</CardTitle>
+            <CardTitle className="text-sm font-medium">{tr(language, 'Materialzuordnung', 'Material assignment')}</CardTitle>
           </div>
           <StatusIcon status={totalWithout === 0 ? 'ok' : totalWithout > totalElements * 0.3 ? 'error' : 'warn'} />
         </CardHeader>
         <CardContent className="space-y-3">
           {totalElements === 0 ? (
-            <p className="text-sm text-muted-foreground">Keine prüfbaren Bauteile gefunden.</p>
+            <p className="text-sm text-muted-foreground">{tr(language, 'Keine prüfbaren Bauteile gefunden.', 'No checkable components found.')}</p>
           ) : (
             <>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Gesamt:</span>
+                <span className="text-muted-foreground">{tr(language, 'Gesamt:', 'Total:')}</span>
                 <span>
                   <span className="font-medium">{totalElements - totalWithout}</span>
-                  <span className="text-muted-foreground"> / {totalElements} mit Material</span>
+                  <span className="text-muted-foreground">{tr(language, ` / ${totalElements} mit Material`, ` / ${totalElements} with material`)}</span>
                 </span>
               </div>
 
@@ -163,7 +165,7 @@ export function ModelChecksTab({ result }: ModelChecksTabProps) {
                     {isExpanded && mc.idsWithoutMaterial.length > 0 && (
                       <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2 mt-1 max-h-24 overflow-y-auto">
                         <span className="font-medium text-yellow-600">
-                          Ohne Material (Express-IDs):
+                          {tr(language, 'Ohne Material (Express-IDs):', 'Without material (Express IDs):')}
                         </span>{' '}
                         {mc.idsWithoutMaterial.join(', ')}
                       </div>
@@ -181,20 +183,20 @@ export function ModelChecksTab({ result }: ModelChecksTabProps) {
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div className="flex items-center gap-3">
             <Database className="w-5 h-5 text-primary shrink-0" />
-            <CardTitle className="text-sm font-medium">Ökobaudat Verknüpfung</CardTitle>
+            <CardTitle className="text-sm font-medium">{tr(language, 'Ökobaudat Verknüpfung', 'Ökobaudat linkage')}</CardTitle>
           </div>
           <StatusIcon status={result.totalIfcMaterials === 0 ? 'warn' : result.obdMatchCount === result.totalIfcMaterials ? 'ok' : result.obdMatchCount > 0 ? 'warn' : 'error'} />
         </CardHeader>
         <CardContent className="space-y-3">
           {result.totalIfcMaterials === 0 ? (
-            <p className="text-sm text-muted-foreground">Keine Materialien im Modell gefunden.</p>
+            <p className="text-sm text-muted-foreground">{tr(language, 'Keine Materialien im Modell gefunden.', 'No materials found in model.')}</p>
           ) : (
             <>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">1:1 Übereinstimmung:</span>
+                <span className="text-muted-foreground">{tr(language, '1:1 Übereinstimmung:', '1:1 match:')}</span>
                 <span>
                   <span className="font-medium">{result.obdMatchCount}</span>
-                  <span className="text-muted-foreground"> / {result.totalIfcMaterials} Materialien</span>
+                  <span className="text-muted-foreground">{tr(language, ` / ${result.totalIfcMaterials} Materialien`, ` / ${result.totalIfcMaterials} materials`)}</span>
                 </span>
               </div>
               <Progress value={Math.round((result.obdMatchCount / result.totalIfcMaterials) * 100)} className="h-2" />
@@ -202,7 +204,7 @@ export function ModelChecksTab({ result }: ModelChecksTabProps) {
               <div className="space-y-2 mt-4">
                 {result.matchingMaterials?.length > 0 && (
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-green-600">Verknüpft ({result.matchingMaterials.length}):</p>
+                    <p className="text-xs font-medium text-green-600">{tr(language, `Verknüpft (${result.matchingMaterials.length}):`, `Linked (${result.matchingMaterials.length}):`)}</p>
                     <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2 max-h-24 overflow-y-auto">
                       {result.matchingMaterials.join(', ')}
                     </div>
@@ -210,7 +212,7 @@ export function ModelChecksTab({ result }: ModelChecksTabProps) {
                 )}
                 {result.unmatchedMaterials?.length > 0 && (
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-yellow-600">Nicht verknüpft ({result.unmatchedMaterials.length}):</p>
+                    <p className="text-xs font-medium text-yellow-600">{tr(language, `Nicht verknüpft (${result.unmatchedMaterials.length}):`, `Not linked (${result.unmatchedMaterials.length}):`)}</p>
                     <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2 max-h-24 overflow-y-auto">
                       {result.unmatchedMaterials.join(', ')}
                     </div>

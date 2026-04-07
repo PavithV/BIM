@@ -9,6 +9,7 @@ import { ZodError } from 'zod';
 import { compressIfcFile, getProposedMaterialReplacements, loadDatabase, type MaterialReplacement } from '@/utils/ifcCompressor';
 import { loadOBDDatabase } from '@/utils/obdService';
 import { createClient } from '@/lib/supabase/server';
+import type { Language } from '@/lib/i18n';
 
 import { auth } from '@/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -69,7 +70,7 @@ function getDetailedErrorMessage(error: any): string {
   return 'Bei der Interaktion mit der KI ist ein unerwarteter Fehler aufgetreten. Bitte versuchen Sie es später erneut.';
 }
 
-export async function getStartingPrompts(options?: { model?: string }) {
+export async function getStartingPrompts(options?: { model?: string; language?: Language }) {
   try {
     const result = await generateStartingPrompts(options);
     return { prompts: result.prompts };
@@ -99,7 +100,7 @@ export async function getOBDMaterialNames(): Promise<{ names?: string[], error?:
   }
 }
 
-export async function getAIChatFeedback(input: AIChatFeedbackInput & { replacementMap?: Record<string, string>; model?: string }) {
+export async function getAIChatFeedback(input: AIChatFeedbackInput & { replacementMap?: Record<string, string>; model?: string; language?: Language }) {
   try {
     await requireAuth();
 
@@ -110,6 +111,7 @@ export async function getAIChatFeedback(input: AIChatFeedbackInput & { replaceme
       ...input,
       ifcModelData: compressedIfcData,
       model: input.model,
+      language: input.language,
     });
     return { feedback: result.feedback };
   } catch (error: any) {
@@ -127,6 +129,7 @@ export async function getIfcAnalysis(formData: FormData): Promise<{ analysis?: A
 
     const ifcFileContent = formData.get('ifcFileContent') as string;
     const model = formData.get('model') as string | undefined || undefined;
+    const language = (formData.get('language') as Language | null) ?? 'de';
     const replacementMapStr = formData.get('replacementMap') as string | undefined;
     const replacementMap = replacementMapStr ? JSON.parse(replacementMapStr) : undefined;
 
@@ -140,6 +143,7 @@ export async function getIfcAnalysis(formData: FormData): Promise<{ analysis?: A
     const result = await generateAnalysisFromIfc({
       ifcFileContent: compressedIfcContent,
       model,
+      language,
     });
     return { analysis: result };
   } catch (error: any) {

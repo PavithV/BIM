@@ -7,8 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { tr, type Language } from '@/lib/i18n';
 
 interface FileUploaderProps {
+  language: Language;
   // Wir brauchen den string-Parameter eigentlich gar nicht mehr, 
   // aber ich lasse ihn als 'null' kompatibel, damit du dashboard.tsx nicht sofort ändern musst.
   onFileUploaded: (file: File, data: string | null) => void;
@@ -17,7 +19,7 @@ interface FileUploaderProps {
   showCancelButton?: boolean;
 }
 
-export function FileUploader({ onFileUploaded, isUploading, onCancel, showCancelButton = false }: FileUploaderProps) {
+export function FileUploader({ language, onFileUploaded, isUploading, onCancel, showCancelButton = false }: FileUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   // isLoadingFile wird eigentlich nicht mehr gebraucht, da wir nicht mehr "readen"
@@ -29,8 +31,8 @@ export function FileUploader({ onFileUploaded, isUploading, onCancel, showCancel
         setFile(selectedFile);
       } else {
         toast({
-          title: 'Ungültiger Dateityp',
-          description: 'Bitte laden Sie eine gültige .ifc-Datei hoch.',
+          title: tr(language, 'Ungültiger Dateityp', 'Invalid file type'),
+          description: tr(language, 'Bitte laden Sie eine gültige .ifc-Datei hoch.', 'Please upload a valid .ifc file.'),
           variant: 'destructive',
         });
         setFile(null);
@@ -73,8 +75,8 @@ export function FileUploader({ onFileUploaded, isUploading, onCancel, showCancel
   return (
     <Card className="w-full max-w-lg mx-auto bg-card/80 backdrop-blur-sm border-dashed shadow-none">
       <CardHeader className="text-center">
-        <CardTitle className="text-xl font-headline">Neue Analyse starten</CardTitle>
-        <CardDescription>Laden Sie Ihr IFC-Modell hoch, um zu beginnen.</CardDescription>
+        <CardTitle className="text-xl font-headline">{tr(language, 'Neue Analyse starten', 'Start a new analysis')}</CardTitle>
+        <CardDescription>{tr(language, 'Laden Sie Ihr IFC-Modell hoch, um zu beginnen.', 'Upload your IFC model to begin.')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div
@@ -89,28 +91,28 @@ export function FileUploader({ onFileUploaded, isUploading, onCancel, showCancel
         >
           <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center justify-center">
             <UploadCloud className="w-10 h-10 text-muted-foreground mb-3" />
-            <p className="font-semibold text-sm">Ziehen Sie Ihre .ifc-Datei hierher</p>
-            <p className="text-xs text-muted-foreground mt-1">oder klicken Sie zum Durchsuchen</p>
+            <p className="font-semibold text-sm">{tr(language, 'Ziehen Sie Ihre .ifc-Datei hierher', 'Drag your .ifc file here')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{tr(language, 'oder klicken Sie zum Durchsuchen', 'or click to browse')}</p>
             <Input id="file-upload" type="file" className="hidden" accept=".ifc" onChange={handleFileChange} disabled={totalIsLoading} />
           </label>
         </div>
         {file && (
           <div className="text-center space-y-4 pt-2">
-            <p className="text-sm">Ausgewählt: <span className="font-semibold">{file.name}</span></p>
+            <p className="text-sm">{tr(language, 'Ausgewählt:', 'Selected:')} <span className="font-semibold">{file.name}</span></p>
             <Button className="w-full" onClick={handleSubmit} disabled={totalIsLoading}>
               {totalIsLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Verarbeite...
+                  {tr(language, 'Verarbeite...', 'Processing...')}
                 </>
-              ) : 'Projekt erstellen & analysieren'}
+              ) : tr(language, 'Projekt erstellen & analysieren', 'Create and analyze project')}
             </Button>
           </div>
         )}
         {showCancelButton && onCancel && (
           <Button variant="ghost" className="w-full" onClick={onCancel} disabled={totalIsLoading}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Zurück zur Projektliste
+            {tr(language, 'Zurück zur Projektliste', 'Back to project list')}
           </Button>
         )}
       </CardContent>

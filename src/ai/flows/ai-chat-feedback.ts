@@ -12,6 +12,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { DEFAULT_MODEL } from '@/ai/models';
+import { aiLanguageLabel, type Language } from '@/lib/i18n';
 
 const AIChatFeedbackInputSchema = z.object({
   ifcModelData: z
@@ -21,6 +22,7 @@ const AIChatFeedbackInputSchema = z.object({
     ),
   userQuestion: z.string().describe('Die Benutzerfrage zum IFC-Modell.'),
   model: z.string().optional().describe('Das zu verwendende KI-Modell.'),
+  language: z.enum(['de', 'en']).optional().describe('Antwortsprache der KI.'),
 });
 export type AIChatFeedbackInput = z.infer<typeof AIChatFeedbackInputSchema>;
 
@@ -30,13 +32,15 @@ const AIChatFeedbackOutputSchema = z.object({
 export type AIChatFeedbackOutput = z.infer<typeof AIChatFeedbackOutputSchema>;
 
 export async function aiChatFeedback(input: AIChatFeedbackInput): Promise<AIChatFeedbackOutput> {
-  const prompt = `Sie sind ein KI-Assistent, der Feedback zu IFC-Modellen gibt. Antworten Sie immer auf Deutsch und im JSON-Format. Nutzen Sie Ihr Wissen, um Fragen zum Modell zu beantworten und dabei Aspekte wie Nachhaltigkeit, Energieeffizienz und Barrierefreiheit einzubeziehen.
+  const language: Language = input.language ?? 'de';
+  const languageName = aiLanguageLabel(language);
+  const prompt = `You are an AI assistant giving feedback on IFC models. Answer in ${languageName} and JSON format. Use your expertise to answer model questions including sustainability, energy efficiency, and accessibility.
 
 IFC-Modelldaten: ${input.ifcModelData}
 
 Benutzerfrage: ${input.userQuestion}
 
-Geben Sie detailliertes und hilfreiches Feedback basierend auf der Frage des Benutzers. Antworten Sie im folgenden JSON-Format:
+Provide detailed and helpful feedback based on the user's question. Return in this JSON format:
 {
   "feedback": "Ihr Feedback-Text hier"
 }`;
@@ -44,7 +48,7 @@ Geben Sie detailliertes und hilfreiches Feedback basierend auf der Frage des Ben
   const completion = await ai.chat.completions.create({
     model: input.model ?? DEFAULT_MODEL,
     messages: [
-      { role: "system", content: "Sie sind ein KI-Assistent, der Feedback zu IFC-Modellen gibt. Antworten Sie immer auf Deutsch und im JSON-Format. Nutzen Sie Ihr Wissen, um Fragen zum Modell zu beantworten und dabei Aspekte wie Nachhaltigkeit, Energieeffizienz und Barrierefreiheit einzubeziehen." },
+      { role: "system", content: `You are an AI assistant for IFC model feedback. Always respond in ${languageName} and return valid JSON with key "feedback".` },
       { role: "user", content: prompt }
     ],
     response_format: { type: "json_object" },
