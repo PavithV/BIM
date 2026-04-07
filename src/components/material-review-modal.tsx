@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useState, useEffect } from "react"
 import { ArrowRight } from "lucide-react"
+import { tr, type Language } from '@/lib/i18n';
 import {
     Select,
     SelectContent,
@@ -28,6 +29,7 @@ export interface MaterialReplacement {
 }
 
 interface MaterialReviewModalProps {
+    language: Language
     isOpen: boolean
     onOpenChange: (open: boolean) => void
     replacements: MaterialReplacement[]
@@ -36,6 +38,7 @@ interface MaterialReviewModalProps {
 }
 
 export function MaterialReviewModal({
+    language,
     isOpen,
     onOpenChange,
     replacements,
@@ -94,19 +97,18 @@ export function MaterialReviewModal({
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
-                    <DialogTitle>Material-Ersetzungen prüfen</DialogTitle>
+                    <DialogTitle>{tr(language, 'Material-Ersetzungen prüfen', 'Review material replacements')}</DialogTitle>
                     <DialogDescription>
-                        Wir haben für einige Materialien aus Ihrer IFC-Datei bessere Übereinstimmungen in unserer Ökobilanz-Datenbank gefunden.
-                        Bitte wählen Sie aus, welche Ersetzungen durchgeführt werden sollen.
+                        {tr(language, 'Wir haben für einige Materialien aus Ihrer IFC-Datei bessere Übereinstimmungen in unserer Ökobilanz-Datenbank gefunden. Bitte wählen Sie aus, welche Ersetzungen durchgeführt werden sollen.', 'We found better matches in our LCA database for some materials from your IFC file. Please choose which replacements should be applied.')}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="py-4">
                     <div className="grid grid-cols-[1fr,auto,1fr,auto] gap-4 font-semibold text-sm mb-2 px-2 text-muted-foreground">
-                        <div>Original (IFC)</div>
+                        <div>{tr(language, 'Original (IFC)', 'Original (IFC)')}</div>
                         <div></div>
-                        <div>Vorschlag (Datenbank)</div>
-                        <div>Ersetzen?</div>
+                        <div>{tr(language, 'Vorschlag (Datenbank)', 'Suggestion (database)')}</div>
+                        <div>{tr(language, 'Ersetzen?', 'Replace?')}</div>
                     </div>
                     <ScrollArea className="h-[300px] rounded-md border p-2">
                         <div className="space-y-2">
@@ -124,7 +126,7 @@ export function MaterialReviewModal({
                                                 disabled={!selected[item.original]}
                                             >
                                                 <SelectTrigger className="h-8 w-full text-xs">
-                                                    <SelectValue placeholder="Wähle Material" />
+                                                    <SelectValue placeholder={tr(language, 'Wähle Material', 'Choose material')} />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {item.suggestions.map((s) => (
@@ -152,9 +154,9 @@ export function MaterialReviewModal({
                 </div>
 
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>Abbrechen</Button>
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>{tr(language, 'Abbrechen', 'Cancel')}</Button>
                     <Button onClick={handleConfirm} disabled={isProcessing}>
-                        {isProcessing ? 'Verarbeite...' : 'Auswahl bestätigen & Fortfahren'}
+                        {isProcessing ? tr(language, 'Verarbeite...', 'Processing...') : tr(language, 'Auswahl bestätigen & Fortfahren', 'Confirm selection & continue')}
                     </Button>
                 </DialogFooter>
             </DialogContent>
