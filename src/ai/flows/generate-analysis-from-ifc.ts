@@ -86,9 +86,9 @@ export async function generateAnalysisFromIfc(input: {
     },
     {
       name: language === 'en' ? 'Total GWP' : 'GWP Gesamt',
-      value: lca.gwpTotal.toFixed(0),
+      value: lca.gwpTotalAllModules.toFixed(0),
       unit: 'kg CO₂-Äq.',
-      a: 'A1-A3',
+      a: 'A-D',
       rating: rateGWP(lca.gwpPerM2),
     },
   ];
@@ -189,6 +189,7 @@ Return ONLY plain summary text, NO JSON, NO headings.`;
     summary,
     indicators,
     materialComposition,
+    materialModuleDetails: lca.materialModuleDetails,
   };
 
   // Validierung über Zod-Schema

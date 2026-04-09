@@ -11,6 +11,7 @@ import type { IFCModel } from '@/lib/types';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { tr, type Language } from '@/lib/i18n';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface AnalysisPanelProps {
   language: Language;
@@ -46,6 +47,7 @@ function translateIndicatorName(language: Language, name: string): string {
 }
 
 export function AnalysisPanel({ language, project, isProcessing, onRunAnalysis, onRunCostEstimation, onExport, onDownloadExchangedIfc }: AnalysisPanelProps) {
+  const [selectedModuleMaterial, setSelectedModuleMaterial] = useState<string>('');
 
   if (isProcessing && !project?.analysisData) {
     return (
@@ -78,6 +80,9 @@ export function AnalysisPanel({ language, project, isProcessing, onRunAnalysis, 
     return acc;
   }, {} as ChartConfig);
 
+  const moduleDetails = analysisData.materialModuleDetails || [];
+  const selectedDetail = moduleDetails.find((d) => d.matchedOBD === selectedModuleMaterial) || moduleDetails[0];
+
   return (
     <div className="w-full mt-4 space-y-4">
       <Card>
@@ -103,6 +108,44 @@ export function AnalysisPanel({ language, project, isProcessing, onRunAnalysis, 
           </Card>
         ))}
       </div>
+
+      {moduleDetails.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-headline text-lg">{tr(language, 'GWP-Module je Material (A-D)', 'GWP modules per material (A-D)')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Select value={selectedDetail?.matchedOBD || ''} onValueChange={setSelectedModuleMaterial}>
+              <SelectTrigger>
+                <SelectValue placeholder={tr(language, 'Material auswählen', 'Select material')} />
+              </SelectTrigger>
+              <SelectContent>
+                {moduleDetails.map((d) => (
+                  <SelectItem key={d.matchedOBD || d.material} value={d.matchedOBD || d.material}>
+                    {d.material}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedDetail && (
+              <div className="text-sm space-y-2">
+                <p><span className="font-medium">{tr(language, 'Verwendete Module:', 'Used modules:')}</span> {selectedDetail.usedModules.join(', ') || '-'}</p>
+                <p><span className="font-medium">{tr(language, 'Fehlende typische Module:', 'Missing typical modules:')}</span> {selectedDetail.missingTypicalModules.join(', ') || '-'}</p>
+                <p className="font-medium">{tr(language, 'GWP nach Modul:', 'GWP by module:')}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(selectedDetail.gwpByModule)
+                    .sort((a, b) => a[0].localeCompare(b[0]))
+                    .map(([module, value]) => (
+                      <div key={module} className="rounded border p-2 text-xs">
+                        <span className="font-semibold">{module}</span>: {value.toFixed(2)} kg CO₂-Äq.
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

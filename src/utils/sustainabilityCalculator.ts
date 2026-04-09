@@ -24,12 +24,14 @@ export interface CalcElement {
 /** Ergebnis der LCA-Berechnung */
 export interface LCAResult {
     gwpTotal: number;          // kg CO₂-Äq.  gesamt
+    gwpTotalAllModules: number; // kg CO₂-Äq. gesamt (A-D)
     gwpPerM2: number;          // kg CO₂-Äq.  pro m² BGF
     penrtTotal: number;        // MJ  gesamt (Primärenergie nicht erneuerbar)
     penrtPerM2: number;        // MJ  pro m² BGF
     apTotal: number;           // kg SO₂-Äq.  gesamt
     floorArea: number;         // m² BGF (Näherung aus Slab-Flächen)
     materialBreakdown: MaterialBreakdownEntry[];
+    materialModuleDetails: MaterialModuleDetail[];
     unmatchedMaterials: string[];
 }
 
@@ -39,6 +41,16 @@ export interface MaterialBreakdownEntry {
     massKg: number;
     gwp: number;
     matchedOBD: string | null;
+}
+
+export interface MaterialModuleDetail {
+    material: string;
+    matchedOBD: string | null;
+    availableModules: string[];
+    usedModules: string[];
+    missingTypicalModules: string[];
+    elementCount: number;
+    gwpByModule: Record<string, number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +182,8 @@ function matchMaterialToOBD(
     return bestMatch;
 }
 
+const ALL_MODULES_TYPICAL = ['A1-A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'C1', 'C2', 'C3', 'C4', 'D'];
+
 // ---------------------------------------------------------------------------
 // GWP-Berechnung pro Element
 // ---------------------------------------------------------------------------
@@ -269,11 +283,13 @@ export function calculateLCA(
     const elements = parseCompressedCSV(compressedCSV);
 
     let gwpTotal = 0;
+    let gwpTotalAllModules = 0;
     let penrtTotal = 0;
     let apTotal = 0;
     let floorArea = 0;
 
     const materialAgg = new Map<string, MaterialBreakdownEntry>();
+    const moduleAgg = new Map<string, MaterialModuleDetail>();
     const unmatchedSet = new Set<string>();
 
     console.log('\n======================================================');
@@ -308,34 +324,71 @@ export function calculateLCA(
             continue;
         }
 
-        const impact = calcElementImpact(el, obdMatch);
-        gwpTotal += impact.gwp;
-        penrtTotal += impact.penrt;
-        apTotal += impact.ap;
+        const materialEntries = obdEntries.filter(e => e.name === obdMatch.name);
+        const a1a3Entry = materialEntries.find(e => e.modul === 'A1-A3');
+        const moduleEntries = materialEntries.filter(e => e.modul === 'A1-A3' || /^(A|B|C|D)/.test(e.modul));
+
+        const impactA1A3 = a1a3Entry ? calcElementImpact(el, a1a3Entry) : { gwp: 0, penrt: 0, ap: 0, massKg: el.volume * (obdMatch.rohdichte ?? getFallbackDensity(el.material)) };
+        gwpTotal += impactA1A3.gwp;
+        penrtTotal += impactA1A3.penrt;
+        apTotal += impactA1A3.ap;
+
+        let elementGwpAllModules = 0;
+        const gwpByModuleForElement: Record<string, number> = {};
+        for (const m of moduleEntries) {
+            const moduleImpact = calcElementImpact(el, m);
+            gwpByModuleForElement[m.modul] = (gwpByModuleForElement[m.modul] || 0) + moduleImpact.gwp;
+            elementGwpAllModules += moduleImpact.gwp;
+        }
+        gwpTotalAllModules += elementGwpAllModules;
 
         console.log(`[Berechnung] Element: ${el.type} | Material (IFC): '${el.material}'`);
         if (resolvedMaterial !== el.material) {
             console.log(`             Mapping durch Benutzer: -> '${resolvedMaterial}'`);
         }
         console.log(`             Gefundener OBD-Eintrag: '${obdMatch.name}'`);
-        console.log(`             OBD-Werte: Einheit=${obdMatch.bezugseinheit}, GWP-Faktor=${obdMatch.gwp}, Rohdichte=${obdMatch.rohdichte ?? 'Fallback (' + getFallbackDensity(el.material) + ')'}`);
-        console.log(`             IFC-Mengen: Volume=${el.volume.toFixed(4)}m³, Area=${el.area.toFixed(4)}m² -> Resultierende Masse=${impact.massKg.toFixed(2)}kg`);
-        console.log(`             => Berechnetes GWP für dieses Element: ${impact.gwp.toFixed(2)} kg CO₂-Äq.\n`);
+        console.log(`             OBD-Werte: Einheit=${obdMatch.bezugseinheit}, GWP-Faktor(A1-A3)=${a1a3Entry?.gwp ?? 0}, Rohdichte=${obdMatch.rohdichte ?? 'Fallback (' + getFallbackDensity(el.material) + ')'}`);
+        console.log(`             IFC-Mengen: Volume=${el.volume.toFixed(4)}m³, Area=${el.area.toFixed(4)}m² -> Resultierende Masse=${impactA1A3.massKg.toFixed(2)}kg`);
+        console.log(`             => Berechnetes GWP A1-A3: ${impactA1A3.gwp.toFixed(2)} kg CO₂-Äq. | A-D: ${elementGwpAllModules.toFixed(2)} kg CO₂-Äq.\n`);
 
         // Materialaggregation
         const key = obdMatch.name;
         const existing = materialAgg.get(key);
         if (existing) {
             existing.volumeM3 += el.volume;
-            existing.massKg += impact.massKg;
-            existing.gwp += impact.gwp;
+            existing.massKg += impactA1A3.massKg;
+            existing.gwp += impactA1A3.gwp;
         } else {
             materialAgg.set(key, {
                 name: el.material,
                 volumeM3: el.volume,
-                massKg: impact.massKg,
-                gwp: impact.gwp,
+                massKg: impactA1A3.massKg,
+                gwp: impactA1A3.gwp,
                 matchedOBD: obdMatch.name,
+            });
+        }
+
+        const moduleKey = obdMatch.name;
+        const existingModule = moduleAgg.get(moduleKey);
+        const availableModules = Array.from(new Set(moduleEntries.map(m => m.modul))).sort();
+        const missingTypicalModules = ALL_MODULES_TYPICAL.filter(m => !availableModules.includes(m));
+        if (existingModule) {
+            existingModule.elementCount += 1;
+            existingModule.usedModules = Array.from(new Set([...existingModule.usedModules, ...availableModules])).sort();
+            existingModule.availableModules = Array.from(new Set([...existingModule.availableModules, ...availableModules])).sort();
+            existingModule.missingTypicalModules = ALL_MODULES_TYPICAL.filter(m => !existingModule.availableModules.includes(m));
+            for (const [mod, val] of Object.entries(gwpByModuleForElement)) {
+                existingModule.gwpByModule[mod] = (existingModule.gwpByModule[mod] || 0) + val;
+            }
+        } else {
+            moduleAgg.set(moduleKey, {
+                material: el.material,
+                matchedOBD: obdMatch.name,
+                availableModules,
+                usedModules: [...availableModules],
+                missingTypicalModules,
+                elementCount: 1,
+                gwpByModule: { ...gwpByModuleForElement },
             });
         }
 
@@ -367,12 +420,14 @@ export function calculateLCA(
 
     return {
         gwpTotal: Math.round(gwpTotal * 100) / 100,
+        gwpTotalAllModules: Math.round(gwpTotalAllModules * 100) / 100,
         gwpPerM2: Math.round(gwpPerM2 * 100) / 100,
         penrtTotal: Math.round(penrtTotal * 100) / 100,
         penrtPerM2: Math.round(penrtPerM2 * 100) / 100,
         apTotal: Math.round(apTotal * 1000) / 1000,
         floorArea: Math.round(floorArea * 100) / 100,
         materialBreakdown: breakdown,
+        materialModuleDetails: Array.from(moduleAgg.values()).sort((a, b) => b.elementCount - a.elementCount),
         unmatchedMaterials: Array.from(unmatchedSet),
     };
 }
