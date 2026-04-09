@@ -54,10 +54,21 @@ const MaterialCompositionSchema = z.object({
   fill: z.string(),
 });
 
+const MaterialModuleDetailSchema = z.object({
+  material: z.string(),
+  matchedOBD: z.string().nullable(),
+  availableModules: z.array(z.string()),
+  usedModules: z.array(z.string()),
+  missingTypicalModules: z.array(z.string()),
+  elementCount: z.number(),
+  gwpByModule: z.record(z.number()),
+});
+
 export const AnalysisResultSchema = z.object({
   summary: z.string(),
   indicators: z.array(IndicatorSchema),
   materialComposition: z.array(MaterialCompositionSchema),
+  materialModuleDetails: z.array(MaterialModuleDetailSchema).optional(),
 });
 
 // TypeScript type inferred from the schema
@@ -73,6 +84,7 @@ export type GenerateAnalysisFromIfcInput = z.infer<typeof GenerateAnalysisFromIf
  */
 export interface OBDEntry {
   name: string;             // "Name (de)"
+  modul: string;            // "Modul" (z.B. A1-A3, A4, C3, D)
   bezugsgroesse: number;    // "Bezugsgroesse" (z.B. 1)
   bezugseinheit: string;    // "Bezugseinheit" (m3, kg, m2)
   rohdichte: number | null; // "Rohdichte (kg/m3)", null wenn leer

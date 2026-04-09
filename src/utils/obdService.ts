@@ -4,7 +4,7 @@
  * @fileOverview OBD.csv Parser (Ökobaudat)
  *
  * Liest die lokale OBD.csv ein, parst sie korrekt (Semikolon-Trennung,
- * deutsche Dezimalkommas) und filtert auf Modul A1-A3.
+ * deutsche Dezimalkommas) und liefert alle verfügbaren A-D Module.
  */
 
 import * as fs from 'fs';
@@ -27,7 +27,7 @@ function parseGermanFloat(raw: string | undefined): number {
 }
 
 /**
- * Lädt und parst die OBD.csv. Gibt nur Einträge mit Modul === "A1-A3" zurück.
+ * Lädt und parst die OBD.csv. Gibt Einträge für A-D Module zurück.
  * Ergebnis wird gecacht, sodass die Datei nur einmal gelesen wird.
  */
 export function loadOBDDatabase(): OBDEntry[] {
@@ -87,9 +87,9 @@ export function loadOBDDatabase(): OBDEntry[] {
     for (let i = 1; i < lines.length; i++) {
         const parts = lines[i].split(';');
 
-        // Nur Modul A1-A3
+        // Nur A-D Module
         const modul = parts[colModul]?.trim();
-        if (modul !== 'A1-A3') continue;
+        if (!modul || !/^[ABCD]/.test(modul)) continue;
 
         const name = parts[colName]?.trim();
         if (!name) continue;
@@ -114,6 +114,7 @@ export function loadOBDDatabase(): OBDEntry[] {
 
         entries.push({
             name,
+            modul,
             bezugsgroesse: isNaN(bezugsgroesse) || bezugsgroesse === 0 ? 1 : bezugsgroesse,
             bezugseinheit: bezugseinheit.toLowerCase(),
             rohdichte: isNaN(rohdichteRaw) ? null : rohdichteRaw,
@@ -122,8 +123,8 @@ export function loadOBDDatabase(): OBDEntry[] {
             ap: isNaN(ap) ? 0 : ap,
         });
     }
-
-    console.log(`[obdService] ${entries.length} OBD-Einträge geladen (Modul A1-A3).`);
+    const a1a3Count = entries.filter(e => e.modul === 'A1-A3').length;
+    console.log(`[obdService] ${entries.length} OBD-Einträge geladen (Module A-D), davon ${a1a3Count} mit A1-A3.`);
     cachedEntries = entries;
     return cachedEntries;
 }
