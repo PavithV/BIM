@@ -31,6 +31,86 @@ import type { FullModelAnalysis } from '@/utils/modelChecker';
 import { AI_MODELS, DEFAULT_MODEL, type AIModelId } from '@/ai/models';
 import { tr, type Language } from '@/lib/i18n';
 
+type ChatContextBucket = 'din277' | 'din276' | 'sustainability' | 'modelCheck';
+
+const CHAT_CONTEXT_KEYWORDS: Record<ChatContextBucket, RegExp[]> = {
+  din277: [
+    /\b(din\s*277|fl(ä|ae)?ch(e|en)|raum|r(ä|ae)um(e|en)?|nuf|vf|tf|bgf|nrf)\b/i,
+  ],
+  din276: [
+    /\b(din\s*276|kostengruppe(n)?|kosten|kostet|kg\s*\d{3}|baukosten|mengen|mengenauswertung)\b/i,
+  ],
+  sustainability: [
+    /\b(nachhaltig(keit)?|gwp|co2|co₂|oeko?baudat|ökobaudat|material(ien)?|energie|embodied carbon)\b/i,
+  ],
+  modelCheck: [
+    /\b(modellpr(ü|ue)fung|pr(ü|ue)fung|regel(n|werk)?|check(s)?|qa)\b/i,
+  ],
+};
+
+function detectRelevantContextBuckets(question: string): Set<ChatContextBucket> {
+  const normalizedQuestion = question.toLowerCase();
+  const matches = new Set<ChatContextBucket>();
+
+  (Object.keys(CHAT_CONTEXT_KEYWORDS) as ChatContextBucket[]).forEach((bucket) => {
+    const hasMatch = CHAT_CONTEXT_KEYWORDS[bucket].some((regex) => regex.test(normalizedQuestion));
+    if (hasMatch) matches.add(bucket);
+  });
+
+  return matches;
+}
+
+function buildQuestionScopedContext(
+  question: string,
+  modelAnalysis: FullModelAnalysis | null,
+  activeProject: IFCModel | null
+) {
+  const buckets = detectRelevantContextBuckets(question);
+  if (buckets.size === 0) return undefined;
+
+  const context: Record<string, unknown> = {};
+
+  if (buckets.has('din277') && modelAnalysis?.din277) {
+    context.din277 = {
+      summary: modelAnalysis.din277.summary,
+      spaces: modelAnalysis.din277.spaces.slice(0, 30),
+      totalSpaces: modelAnalysis.din277.spaces.length,
+    };
+  }
+
+  if (buckets.has('din276') && modelAnalysis?.din276) {
+    context.din276 = {
+      totalCost: modelAnalysis.din276.totalCost,
+      totalArea: modelAnalysis.din276.totalArea,
+      totalVolume: modelAnalysis.din276.totalVolume,
+      groups: modelAnalysis.din276.groups.map((group) => ({
+        kg: group.kg,
+        label: group.label,
+        totalCost: group.totalCost,
+        totalArea: group.totalArea,
+        totalVolume: group.totalVolume,
+        elementCount: group.elementCount,
+        elements: group.elements.slice(0, 20),
+      })),
+    };
+  }
+
+  if (buckets.has('sustainability') && activeProject?.analysisData) {
+    context.sustainability = {
+      summary: activeProject.analysisData.summary,
+      indicators: activeProject.analysisData.indicators,
+      materialComposition: activeProject.analysisData.materialComposition,
+    };
+  }
+
+  if (buckets.has('modelCheck') && modelAnalysis?.modelCheck) {
+    context.modelCheck = modelAnalysis.modelCheck;
+  }
+
+  if (Object.keys(context).length === 0) return { context: undefined, buckets };
+  return { context, buckets };
+}
+
 export type Message = {
   id: string;
   role: 'user' | 'assistant';
@@ -493,7 +573,32 @@ export default function Dashboard() {
       }
 
       // 2. AI Response
-      const result = await getAIChatFeedback({ ifcModelData: ifcToSend, userQuestion, replacementMap, model: selectedModel, language });
+      const questionScoped = buildQuestionScopedContext(userQuestion, modelAnalysis, activeProject);
+      const questionScopedContext = questionScoped?.context;
+      const matchedBuckets = Array.from(questionScoped?.buckets ?? []);
+      const hasDin276Context = Boolean(
+        questionScopedContext &&
+        typeof questionScopedContext === 'object' &&
+        'din276' in questionScopedContext
+      );
+
+      console.info('[ChatContextDebug] Client request context', {
+        question: userQuestion,
+        matchedBuckets,
+        hasModelAnalysis: Boolean(modelAnalysis),
+        hasDin276InModelAnalysis: Boolean(modelAnalysis?.din276),
+        hasDin276Context,
+        contextKeys: questionScopedContext ? Object.keys(questionScopedContext) : [],
+      });
+
+      const result = await getAIChatFeedback({
+        ifcModelData: ifcToSend,
+        userQuestion,
+        replacementMap,
+        model: selectedModel,
+        language,
+        uiContext: questionScopedContext ? JSON.stringify(questionScopedContext) : undefined,
+      });
       const content = result.feedback || result.error || tr(language, 'Fehler.', 'Error.');
 
       const aiMsgResult = await insertMessage({
