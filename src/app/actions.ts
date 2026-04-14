@@ -100,9 +100,17 @@ export async function getOBDMaterialNames(): Promise<{ names?: string[], error?:
   }
 }
 
-export async function getAIChatFeedback(input: AIChatFeedbackInput & { replacementMap?: Record<string, string>; model?: string; language?: Language }) {
+export async function getAIChatFeedback(input: AIChatFeedbackInput & { replacementMap?: Record<string, string>; model?: string; language?: Language; uiContext?: string }) {
   try {
     await requireAuth();
+
+    const uiContextPreview = input.uiContext ? input.uiContext.slice(0, 500) : null;
+    console.info('[ChatContextDebug] Server action input', {
+      question: input.userQuestion,
+      hasUiContext: Boolean(input.uiContext),
+      uiContextLength: input.uiContext?.length ?? 0,
+      uiContextPreview,
+    });
 
     // Komprimiere IFC-Datei vor dem Senden an die KI
     const compressedIfcData = compressIfcFile(input.ifcModelData, input.replacementMap);

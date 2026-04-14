@@ -21,6 +21,7 @@ const AIChatFeedbackInputSchema = z.object({
       'Die IFC-Modelldaten als Zeichenkette.'
     ),
   userQuestion: z.string().describe('Die Benutzerfrage zum IFC-Modell.'),
+  uiContext: z.string().optional().describe('Zusätzlicher, fragebezogener UI-Kontext aus dem mittleren Fenster (z. B. DIN 276/277 Daten).'),
   model: z.string().optional().describe('Das zu verwendende KI-Modell.'),
   language: z.enum(['de', 'en']).optional().describe('Antwortsprache der KI.'),
 });
@@ -34,11 +35,22 @@ export type AIChatFeedbackOutput = z.infer<typeof AIChatFeedbackOutputSchema>;
 export async function aiChatFeedback(input: AIChatFeedbackInput): Promise<AIChatFeedbackOutput> {
   const language: Language = input.language ?? 'de';
   const languageName = aiLanguageLabel(language);
+  console.info('[ChatContextDebug] AI flow input', {
+    question: input.userQuestion,
+    hasUiContext: Boolean(input.uiContext),
+    uiContextLength: input.uiContext?.length ?? 0,
+    uiContextPreview: input.uiContext ? input.uiContext.slice(0, 500) : null,
+  });
+
+  const uiContextBlock = input.uiContext
+    ? `\n\nFragebezogener UI-Kontext aus dem mittleren Fenster (verwende ihn nur, wenn er zur Frage passt): ${input.uiContext}`
+    : '';
   const prompt = `You are an AI assistant giving feedback on IFC models. Answer in ${languageName} and JSON format. Use your expertise to answer model questions including sustainability, energy efficiency, and accessibility.
 
 IFC-Modelldaten: ${input.ifcModelData}
 
 Benutzerfrage: ${input.userQuestion}
+${uiContextBlock}
 
 Provide detailed and helpful feedback based on the user's question. Return in this JSON format:
 {
