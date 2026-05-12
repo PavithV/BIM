@@ -13,7 +13,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { getStartingPrompts, getAIChatFeedback, getIfcAnalysis, getCostEstimation, checkMaterialReplacements, fetchUserProjects, createSignedUploadUrl, createIfcModelRecord, insertMessage, fetchMessagesForProject, updateIfcModel } from '@/app/actions';
+import { getStartingPrompts, getAIChatFeedback, getIfcAnalysis, getCostEstimation, checkMaterialReplacements, fetchUserProjects, createSignedUploadUrl, createSignedDownloadUrl, createIfcModelRecord, insertMessage, fetchMessagesForProject, updateIfcModel } from '@/app/actions';
 import { MaterialReviewModal, type MaterialReplacement } from './material-review-modal';
 import { parseIFC, toJSONString } from '@/utils/ifcParser';
 import { applyReplacementsToIfc } from '@/utils/ifc-modification';
@@ -719,12 +719,10 @@ export default function Dashboard() {
 
       if (activeProject.fileStoragePath) {
         // Direkt als ArrayBuffer von Storage laden (via Signed URL um Download-Fehler zu vermeiden)
-        const { data: urlData, error: urlError } = await supabase.storage
-          .from('ifc-models')
-          .createSignedUrl(activeProject.fileStoragePath, 3600);
-        if (urlError || !urlData?.signedUrl) throw new Error('Signed URL konnte nicht erstellt werden: ' + (urlError?.message || ''));
+        const { signedUrl, error: urlError } = await createSignedDownloadUrl(activeProject.fileStoragePath);
+        if (urlError || !signedUrl) throw new Error('Signed URL konnte nicht erstellt werden: ' + (urlError || ''));
         
-        const res = await fetch(urlData.signedUrl);
+        const res = await fetch(signedUrl);
         if (!res.ok) throw new Error('Fetch der Datei fehlgeschlagen: ' + res.statusText);
         const arrayBuffer = await res.arrayBuffer();
         data = new Uint8Array(arrayBuffer);

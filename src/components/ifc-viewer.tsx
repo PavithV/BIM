@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, AlertTriangle, Layers, X, Info } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
+import { createSignedDownloadUrl } from '@/app/actions';
 import * as THREE from 'three';
 import { tr, type Language } from '@/lib/i18n';
 
@@ -175,10 +175,10 @@ export function IfcViewer({ language, ifcFile, ifcContent, ifcUrl, ifcStoragePat
         if (ifcFile) {
           blobToLoad = ifcFile;
         } else if (ifcStoragePath) {
-          const { data, error } = await supabase.storage.from('ifc-models').createSignedUrl(ifcStoragePath, 3600);
+          const { signedUrl, error: urlError } = await createSignedDownloadUrl(ifcStoragePath);
           if (!isAlive()) return; // bail out if project changed during download
-          if (error || !data?.signedUrl) throw error || new Error('Keine URL von Supabase');
-          modelUrl = data.signedUrl;
+          if (urlError || !signedUrl) throw new Error(urlError || 'Keine URL von Supabase');
+          modelUrl = signedUrl;
         } else if (ifcUrl) {
           modelUrl = ifcUrl;
         } else if (ifcContent) {
