@@ -214,6 +214,36 @@ export async function createSignedUploadUrl(fileName: string, fileSize: number):
 }
 
 /**
+ * Creates a signed download URL so the browser can read files from Supabase Storage
+ * without needing direct storage RLS permissions.
+ */
+export async function createSignedDownloadUrl(storagePath: string): Promise<{ signedUrl?: string; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { error: 'Nicht authentifiziert' };
+
+  try {
+    // Security: ensure the user can only access their own files
+    if (!storagePath.startsWith(`users/${session.user.id}/`)) {
+      return { error: 'Zugriff verweigert.' };
+    }
+
+    const { data, error } = await supabaseAdmin.storage
+      .from('ifc-models')
+      .createSignedUrl(storagePath, 3600);
+
+    if (error) {
+      console.error('Error creating signed download URL:', error);
+      return { error: 'Signed URL konnte nicht erstellt werden.' };
+    }
+
+    return { signedUrl: data.signedUrl };
+  } catch (error) {
+    console.error('Unexpected error creating signed download URL:', error);
+    return { error: 'Ein unerwarteter Fehler ist aufgetreten.' };
+  }
+}
+
+/**
  * Creates a new ifc_models record in the database.
  */
 export async function createIfcModelRecord(input: {
