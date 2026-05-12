@@ -129,10 +129,15 @@ export function IfcViewer({ language, ifcFile, ifcContent, ifcUrl, ifcStoragePat
   useEffect(() => {
     if (!isViewerReady || !viewerRef.current) return;
 
-    const viewer = viewerRef.current;
     let isActive = true;
 
+    // Helper: check if viewer is still alive and this effect is still active
+    const isAlive = () => isActive && viewerRef.current?.IFC != null;
+
     const loadModel = async () => {
+      const viewer = viewerRef.current;
+      if (!viewer) return;
+
       setHasModel(false);
       setSelectedElement(null);
       setError(null);
@@ -142,14 +147,14 @@ export function IfcViewer({ language, ifcFile, ifcContent, ifcUrl, ifcStoragePat
         currentUrlRef.current = null;
       }
 
-      // Soft Cleanup
+      // Soft Cleanup — guard each call
       try {
-        const models = viewer.context.items.ifcModels;
+        const models = viewer.context?.items?.ifcModels;
         if (models && models.length > 0) {
           for (const model of models) {
-            viewer.context.scene.remove(model);
+            try { viewer.context.scene.remove(model); } catch { }
             if (model.modelID !== undefined) {
-              try { viewer.IFC.loader.ifcManager.close(model.modelID); } catch { }
+              try { viewer.IFC?.loader?.ifcManager?.close(model.modelID); } catch { }
             }
           }
           viewer.context.items.ifcModels = [];
@@ -165,60 +170,76 @@ export function IfcViewer({ language, ifcFile, ifcContent, ifcUrl, ifcStoragePat
 
       try {
         let blobToLoad: Blob | null = null;
-        let filename = 'model.ifc';
+        let modelUrl: string | null = null;
 
         if (ifcFile) {
           blobToLoad = ifcFile;
-          filename = ifcFile.name;
-        }
-        else if (ifcStoragePath) {
-          const { data, error } = await supabase.storage.from('ifc-models').download(ifcStoragePath);
-          if (error || !data) throw error || new Error('Keine Daten von Supabase');
-          blobToLoad = data;
-          filename = ifcStoragePath.split('/').pop() || 'model.ifc';
-        }
-        else if (ifcUrl) {
-          const res = await fetch(ifcUrl);
-          if (!res.ok) throw new Error('Fetch fehlgeschlagen');
-          blobToLoad = await res.blob();
-        }
-
-        if (!blobToLoad) throw new Error("Keine Datei gefunden.");
-
-        // ---------------------------------------------------------
-        // FIX: Base64 Data URI Check & Decode
-        // ---------------------------------------------------------
-        const headerCheck = await blobToLoad.slice(0, 50).text();
-
-        if (headerCheck.startsWith('data:')) {
-          const fullText = await blobToLoad.text();
-          // Format ist meist: "data:application/octet-stream;base64,....."
-          const parts = fullText.split(',');
-          if (parts.length === 2) {
-            const base64 = parts[1];
-            const binaryString = atob(base64); // Base64 decode
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-              bytes[i] = binaryString.charCodeAt(i);
+        } else if (ifcStoragePath) {
+          const { data, error } = await supabase.storage.from('ifc-models').createSignedUrl(ifcStoragePath, 3600);
+          if (!isAlive()) return; // bail out if project changed during download
+          if (error || !data?.signedUrl) throw error || new Error('Keine URL von Supabase');
+          modelUrl = data.signedUrl;
+        } else if (ifcUrl) {
+          modelUrl = ifcUrl;
+        } else if (ifcContent) {
+          if (ifcContent.startsWith('data:')) {
+            const parts = ifcContent.split(',');
+            if (parts.length === 2) {
+              const base64 = parts[1];
+              const binaryString = atob(base64);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              blobToLoad = new Blob([bytes], { type: 'application/x-step' });
             }
-            // Ersetze den Blob durch den "echten" decodierten Blob
-            blobToLoad = new Blob([bytes], { type: 'application/x-step' });
+          } else {
+            blobToLoad = new Blob([ifcContent], { type: 'application/x-step' });
           }
         }
-        // ---------------------------------------------------------
 
-        const modelUrl = URL.createObjectURL(blobToLoad);
-        currentUrlRef.current = modelUrl;
+        if (!blobToLoad && !modelUrl) throw new Error("Keine Datei gefunden.");
+        if (!isAlive()) return; // bail out before heavy processing
 
-        const model = await viewer.IFC.loadIfcUrl(modelUrl, true);
+        // Fallback for Base64 Data URI encoded as Blob (from previous logic)
+        if (blobToLoad) {
+          const headerCheck = await blobToLoad.slice(0, 50).text();
+          if (headerCheck.startsWith('data:')) {
+            const fullText = await blobToLoad.text();
+            const parts = fullText.split(',');
+            if (parts.length === 2) {
+              const base64 = parts[1];
+              const binaryString = atob(base64);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              blobToLoad = new Blob([bytes], { type: 'application/x-step' });
+            }
+          }
+          if (!isAlive()) return;
+          modelUrl = URL.createObjectURL(blobToLoad);
+          currentUrlRef.current = modelUrl;
+        }
 
-        if (isActive && model) {
+        // Critical: check viewer.IFC is not null right before the call
+        if (!viewerRef.current?.IFC) {
+          console.warn('[IfcViewer] Viewer disposed before loadIfcUrl — aborting');
+          if (modelUrl && modelUrl.startsWith('blob:')) URL.revokeObjectURL(modelUrl);
+          return;
+        }
+
+        const model = await viewerRef.current.IFC.loadIfcUrl(modelUrl as string, true);
+
+        if (isAlive() && model) {
           setHasModel(true);
           // Spatial Structure Extraction
-          if (onModelLoadedRef.current) {
+          if (onModelLoadedRef.current && viewerRef.current?.IFC) {
             try {
-              const structure = await viewer.IFC.getSpatialStructure(model.modelID);
-              onModelLoadedRef.current(structure);
+              const structure = await viewerRef.current.IFC.getSpatialStructure(model.modelID);
+              if (isAlive()) {
+                onModelLoadedRef.current(structure);
+              }
             } catch (e) {
               console.error("Structure extraction failed", e);
             }
@@ -226,8 +247,9 @@ export function IfcViewer({ language, ifcFile, ifcContent, ifcUrl, ifcStoragePat
         }
 
       } catch (e: any) {
-        console.error("[IfcViewer] Ladefehler:", e);
+        // Only show error if this effect is still active (not from a stale project)
         if (isActive) {
+          console.error("[IfcViewer] Ladefehler:", e);
           setError(e.message || "Modell konnte nicht geladen werden.");
         }
       } finally {
