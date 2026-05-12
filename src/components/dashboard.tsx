@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import dynamic from 'next/dynamic';
 import { AnalysisPanel } from '@/components/analysis-panel';
 import { ChatAssistant } from '@/components/chat-assistant';
-import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2, Euro, Leaf, Layers, GitCompare, FilePlus, Sparkles, ShieldCheck, LayoutGrid } from 'lucide-react';
+import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2, Euro, Leaf, Layers, GitCompare, FilePlus, Sparkles, ShieldCheck, LayoutGrid, Zap } from 'lucide-react';
 import { Button } from './ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
@@ -24,7 +24,8 @@ import { ModelTree, type SpatialNode } from '@/components/model-tree';
 import { ModelChecksTab } from '@/components/model-checks-tab';
 import { Din277Tab } from '@/components/din277-tab';
 import { Din276Tab } from '@/components/din276-tab';
-import type { IFCModel } from '@/lib/types';
+import { EnergyPassTab } from '@/components/energy-pass-tab';
+import type { IFCModel, EnergyPassData } from '@/lib/types';
 import { cn, downloadCsv } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { FullModelAnalysis } from '@/utils/modelChecker';
@@ -153,6 +154,11 @@ export default function Dashboard() {
   const [modelAnalysis, setModelAnalysis] = useState<FullModelAnalysis | null>(null);
   const [isModelAnalysisLoading, setIsModelAnalysisLoading] = useState(false);
 
+  const [energyPassData, setEnergyPassData] = useState<EnergyPassData | null>(null);
+  const [isEnergySimRunning, setIsEnergySimRunning] = useState(false);
+  const [energyPassNote, setEnergyPassNote] = useState<string | null>(null);
+  const [energySimError, setEnergySimError] = useState<{ message: string; hints: string[] } | null>(null);
+
   const { user, signOut } = useSupabaseAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -168,19 +174,26 @@ export default function Dashboard() {
     setSidebarTab('structure');
   }, []);
 
-  // Reset model analysis when project changes
+  // Reset model analysis and energy pass when project changes
   useEffect(() => {
     setModelAnalysis(null);
+    setEnergyPassData(null);
+    setEnergyPassNote(null);
   }, [activeProject?.id]);
 
   // --- MESSAGES FETCHING ---
+  // Use ref to avoid re-creating callback when activeProject object reference changes
+  const activeProjectRef = useRef(activeProject);
+  activeProjectRef.current = activeProject;
+
   const fetchMessages = useCallback(async () => {
-    if (!activeProject || !user) {
+    const project = activeProjectRef.current;
+    if (!project || !user) {
       setActiveMessages([]);
       return;
     }
     setMessagesLoading(true);
-    const result = await fetchMessagesForProject(activeProject.id);
+    const result = await fetchMessagesForProject(project.id);
 
     if (result.error) {
       console.error('Error fetching messages:', result.error);
@@ -188,21 +201,23 @@ export default function Dashboard() {
       setActiveMessages(result.messages as Message[] || []);
     }
     setMessagesLoading(false);
-  }, [activeProject, user]);
+  }, [user]);
 
+  // Depend on activeProject?.id (string) not the whole object to avoid loops
+  const activeProjectId = activeProject?.id;
   useEffect(() => {
-    if (!activeProject || !user) {
+    if (!activeProjectId || !user) {
       setActiveMessages([]);
       return;
     }
     fetchMessages();
     const channel = supabase
-      .channel(`messages:${activeProject.id}`)
+      .channel(`messages:${activeProjectId}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'messages',
-        filter: `ifc_model_id=eq.${activeProject.id}`
+        filter: `ifc_model_id=eq.${activeProjectId}`
       }, (payload) => {
         if (payload.eventType === 'INSERT') {
           const newMessage = payload.new as Message;
@@ -217,7 +232,7 @@ export default function Dashboard() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeProject, user, fetchMessages]);
+  }, [activeProjectId, user, fetchMessages]);
 
 
   // --- PROJECTS FETCHING ---
@@ -234,16 +249,13 @@ export default function Dashboard() {
         setProjects(userProjects);
 
         if (!skipActiveProjectUpdate) {
-          if (userProjects.length > 0) {
-            if (!activeProject) {
-              setActiveProject(userProjects[0]);
-            } else {
-              const updatedActiveProject = userProjects.find(p => p.id === activeProject.id);
-              setActiveProject(updatedActiveProject || userProjects[0]);
-            }
-          } else {
-            setActiveProject(null);
-          }
+          // Use functional setState to read current activeProject without adding it as a dependency
+          setActiveProject(current => {
+            if (userProjects.length === 0) return null;
+            if (!current) return userProjects[0];
+            const updated = userProjects.find(p => p.id === current.id);
+            return updated || userProjects[0];
+          });
         }
       }
     } catch (error: any) {
@@ -256,11 +268,11 @@ export default function Dashboard() {
     } finally {
       setIsProjectsLoading(false);
     }
-  }, [user, toast, activeProject?.id]);
+  }, [user, toast, language]);
 
   useEffect(() => {
     fetchProjects();
-  }, [user, fetchProjects]);
+  }, [fetchProjects]);
 
   // Auto-set comparison projects
   useEffect(() => {
@@ -703,16 +715,18 @@ export default function Dashboard() {
     setIsModelAnalysisLoading(true);
     setModelAnalysis(null);
     try {
-      // Lade IFC-Datei als Binär-Daten (Uint8Array), um Text-Encoding-Roundtrip zu vermeiden
       let data: Uint8Array;
 
       if (activeProject.fileStoragePath) {
-        // Direkt als Blob/ArrayBuffer von Storage laden
-        const { data: blob, error } = await supabase.storage
+        // Direkt als ArrayBuffer von Storage laden (via Signed URL um Download-Fehler zu vermeiden)
+        const { data: urlData, error: urlError } = await supabase.storage
           .from('ifc-models')
-          .download(activeProject.fileStoragePath);
-        if (error || !blob) throw new Error('Datei konnte nicht geladen werden: ' + (error?.message || ''));
-        const arrayBuffer = await blob.arrayBuffer();
+          .createSignedUrl(activeProject.fileStoragePath, 3600);
+        if (urlError || !urlData?.signedUrl) throw new Error('Signed URL konnte nicht erstellt werden: ' + (urlError?.message || ''));
+        
+        const res = await fetch(urlData.signedUrl);
+        if (!res.ok) throw new Error('Fetch der Datei fehlgeschlagen: ' + res.statusText);
+        const arrayBuffer = await res.arrayBuffer();
         data = new Uint8Array(arrayBuffer);
       } else {
         // Fallback: loadIfcFileContent (Text) -> Uint8Array
@@ -771,6 +785,47 @@ export default function Dashboard() {
     }
   }, [activeProject, loadIfcFileContent, toast, language]);
 
+  // --- ENERGYPLUS SIMULATION ---
+  const runEnergySimulation = useCallback(async (useDemoData = false) => {
+    if (!activeProject && !useDemoData) return;
+    setIsEnergySimRunning(true);
+    setEnergyPassNote(null);
+    setEnergySimError(null);
+    try {
+      const response = await fetch('/api/energyplus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: activeProject?.id,
+          fileStoragePath: activeProject?.fileStoragePath,
+          useDemoData,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setEnergyPassData(result.data as EnergyPassData);
+        if (result.note) setEnergyPassNote(result.note);
+        toast({ title: tr(language, 'Energiepass erstellt', 'Energy pass created') });
+      } else {
+        setEnergySimError({
+          message: result.error || tr(language, 'Simulation fehlgeschlagen', 'Simulation failed'),
+          hints: result.errorHints || [],
+        });
+      }
+    } catch (error: any) {
+      console.error('Energy simulation error:', error);
+      toast({
+        title: tr(language, 'Fehler', 'Error'),
+        description: error.message || tr(language, 'Unerwarteter Fehler', 'Unexpected error'),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsEnergySimRunning(false);
+    }
+  }, [activeProject, toast, language]);
+
   // Auto-run model analysis on project change
   const lastAnalyzedProjectId = useRef<string | null>(null);
 
@@ -826,6 +881,9 @@ export default function Dashboard() {
                             setActiveProject(p);
                             setModelStructure(null); // Reset structure on project switch
                             setSelectedElementId(null);
+                            setEnergyPassData(null);
+                            setEnergySimError(null);
+                            setEnergyPassNote(null);
                           }}
                           onUploadNew={handleFileUploaded}
                           onDeleteProject={async () => { await fetchProjects(); if (projects.length <= 1) setActiveProject(null); }}
@@ -1006,6 +1064,102 @@ export default function Dashboard() {
                                 </div>
                               )}
                               {!isModelAnalysisLoading && <Din276Tab language={language} result={modelAnalysis?.din276 ?? null} />}
+                            </div>
+                          </div>
+
+                          {/* Energiepass Section */}
+                          <div className="space-y-6 border-t pt-8">
+                            <div className="max-w-5xl mx-auto space-y-6">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h2 className="text-2xl font-bold font-headline mb-1">
+                                    {tr(language, 'Energiepass', 'Energy Performance Certificate')}
+                                  </h2>
+                                  <p className="text-sm text-muted-foreground">
+                                    {tr(language, 'EnergyPlus Jahressimulation nach GEG', 'EnergyPlus annual simulation per GEG')}
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => runEnergySimulation(true)}
+                                    disabled={isEnergySimRunning}
+                                  >
+                                    {tr(language, 'Demo-Daten', 'Demo data')}
+                                  </Button>
+                                  <Button
+                                    onClick={() => runEnergySimulation(false)}
+                                    disabled={isEnergySimRunning || !activeProject}
+                                  >
+                                    {isEnergySimRunning
+                                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                                      : <Zap className="w-4 h-4" />}
+                                    {energyPassData
+                                      ? tr(language, ' Aktualisieren', ' Refresh')
+                                      : tr(language, ' Simulation starten', ' Start simulation')}
+                                  </Button>
+                                </div>
+                              </div>
+                              {isEnergySimRunning && (
+                                <div className="flex flex-col items-center justify-center py-12">
+                                  <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+                                  <p className="font-semibold">
+                                    {tr(language, 'EnergyPlus Simulation läuft...', 'EnergyPlus simulation running...')}
+                                  </p>
+                                  <p className="text-muted-foreground text-sm">
+                                    {tr(language, 'Dies kann einige Minuten dauern.', 'This may take several minutes.')}
+                                  </p>
+                                </div>
+                              )}
+                              {energyPassNote && (
+                                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3 text-sm text-yellow-700 dark:text-yellow-400">
+                                  ℹ️ {energyPassNote}
+                                </div>
+                              )}
+                              {!isEnergySimRunning && energySimError && (
+                                <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-5 space-y-3">
+                                  <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                    </div>
+                                    <div>
+                                      <p className="font-semibold text-red-700 dark:text-red-400">
+                                        {tr(language, 'Simulation fehlgeschlagen', 'Simulation failed')}
+                                      </p>
+                                      <p className="text-sm text-red-600/80 dark:text-red-400/80 mt-1">
+                                        {energySimError.message}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {energySimError.hints.length > 0 && (
+                                    <div className="ml-13 pl-3 border-l-2 border-red-500/20 space-y-1.5">
+                                      <p className="text-xs font-medium text-red-600/70 dark:text-red-400/70 uppercase tracking-wide">
+                                        {tr(language, 'Mögliche Lösungen', 'Possible solutions')}
+                                      </p>
+                                      {energySimError.hints.map((hint, i) => (
+                                        <p key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                                          <span className="text-red-400 mt-0.5">•</span>
+                                          {hint}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {!isEnergySimRunning && energyPassData && (
+                                <EnergyPassTab language={language} data={energyPassData} />
+                              )}
+                              {!isEnergySimRunning && !energyPassData && !energySimError && (
+                                <div className="flex flex-col items-center justify-center py-12 text-center">
+                                  <Zap className="w-12 h-12 text-muted-foreground/40 mb-4" />
+                                  <p className="text-muted-foreground">
+                                    {tr(language,
+                                      'Starten Sie die EnergyPlus-Simulation oder nutzen Sie Demo-Daten, um den Energiepass zu erstellen.',
+                                      'Start the EnergyPlus simulation or use demo data to generate the energy certificate.')}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>

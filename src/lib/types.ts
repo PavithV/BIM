@@ -92,3 +92,29 @@ export interface OBDEntry {
   penrt: number;            // "PENRT" Primärenergie nicht erneuerbar
   ap: number;               // "AP" Versauerungspotenzial
 }
+
+// --- EnergyPlus / Energiepass Types ---
+
+export type EnergyEfficiencyClass = 'A+' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
+
+export interface EnergyMetric {
+  total: number;    // kWh
+  perArea: number;  // kWh/m²
+}
+
+export interface EnergyEndUse {
+  category: string;
+  value: number;    // kWh
+}
+
+export interface EnergyPassData {
+  siteEnergy: EnergyMetric;
+  sourceEnergy: EnergyMetric;
+  endUses: EnergyEndUse[];
+  buildingInfo: {
+    name: string;
+    area: number;         // m²
+    environment: string;  // e.g. "Aachen NW DEU"
+  };
+  efficiencyClass: EnergyEfficiencyClass;
+}
