@@ -1,13 +1,17 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { FileText } from 'lucide-react';
 import {
   Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell,
 } from 'recharts';
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import type { EnergyPassData, EnergyEfficiencyClass } from '@/lib/types';
 import { tr, type Language } from '@/lib/i18n';
+import { EnergyPassPdfPreview } from '@/components/energy-pass-pdf-preview';
+
 
 interface EnergyPassTabProps {
   language: Language;
@@ -155,7 +159,9 @@ function MetricCard({
    ---------------------------------------------------------------- */
 
 export function EnergyPassTab({ language, data }: EnergyPassTabProps) {
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false);
   const activeColor = getClassColor(data.efficiencyClass);
+
 
   // Sort end uses by value descending for the chart
   const sortedEndUses = useMemo(() =>
@@ -182,27 +188,38 @@ export function EnergyPassTab({ language, data }: EnergyPassTabProps) {
 
   return (
     <div className="w-full space-y-6 animate-in fade-in-0 duration-700">
-      {/* Header badge */}
-      <div className="flex items-center gap-3">
-        <div
-          className="flex items-center justify-center w-14 h-14 rounded-2xl text-white font-black text-xl shadow-lg"
-          style={{
-            background: `linear-gradient(135deg, ${activeColor}, ${activeColor}cc)`,
-            boxShadow: `0 4px 20px ${activeColor}40`,
-          }}
+      {/* Header badge with PDF Export */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card/40 p-4 rounded-2xl border border-border/50">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex items-center justify-center w-14 h-14 rounded-2xl text-white font-black text-xl shadow-lg shrink-0"
+            style={{
+              background: `linear-gradient(135deg, ${activeColor}, ${activeColor}cc)`,
+              boxShadow: `0 4px 20px ${activeColor}40`,
+            }}
+          >
+            {data.efficiencyClass}
+          </div>
+          <div>
+            <p className="font-bold text-lg leading-tight">
+              {data.buildingInfo.name}
+            </p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {data.buildingInfo.area.toLocaleString('de-DE', { maximumFractionDigits: 0 })} m²
+              {data.buildingInfo.environment ? ` · ${data.buildingInfo.environment}` : ''}
+            </p>
+          </div>
+        </div>
+
+        <Button
+          onClick={() => setIsPdfPreviewOpen(true)}
+          className="flex items-center gap-2 font-bold px-4 h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-md hover:shadow-red-600/25 transition-all duration-300 shrink-0 self-start sm:self-center"
         >
-          {data.efficiencyClass}
-        </div>
-        <div>
-          <p className="font-bold text-lg">
-            {data.buildingInfo.name}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {data.buildingInfo.area.toLocaleString('de-DE', { maximumFractionDigits: 0 })} m²
-            {data.buildingInfo.environment ? ` · ${data.buildingInfo.environment}` : ''}
-          </p>
-        </div>
+          <FileText className="w-4 h-4 animate-pulse" />
+          {tr(language, 'PDF exportieren', 'Export PDF')}
+        </Button>
       </div>
+
 
       {/* Efficiency scale */}
       <Card className="overflow-hidden">
@@ -281,6 +298,15 @@ export function EnergyPassTab({ language, data }: EnergyPassTabProps) {
           </CardContent>
         </Card>
       )}
+
+      <EnergyPassPdfPreview
+        isOpen={isPdfPreviewOpen}
+        onOpenChange={setIsPdfPreviewOpen}
+        language={language}
+        data={data}
+      />
     </div>
   );
 }
+
+
