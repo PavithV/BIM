@@ -157,7 +157,76 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
   };
 
   const handlePrint = () => {
-    window.print();
+    const el = document.getElementById('printable-energy-pass');
+    if (!el) return;
+
+    const pw = window.open('', '_blank', 'width=794,height=1123');
+    if (!pw) {
+      alert('Bitte erlauben Sie Pop-ups für diese Seite und versuchen Sie es erneut.');
+      return;
+    }
+
+    // Copy all <link rel="stylesheet"> tags (Tailwind, fonts, etc.)
+    const linkTags = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+      .map(l => l.outerHTML)
+      .join('\n');
+
+    // Copy <style> tags but exclude our own component print rules to avoid conflicts
+    const styleTags = Array.from(document.querySelectorAll('style'))
+      .filter(s => !s.textContent?.includes('#printable-energy-pass'))
+      .map(s => s.outerHTML)
+      .join('\n');
+
+    pw.document.open();
+    pw.document.write(`<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Energieausweis – BIMCoach</title>
+  ${linkTags}
+  ${styleTags}
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: white !important;
+      width: 210mm;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    @page { size: A4 portrait; margin: 0; }
+    .print-page-break {
+      page-break-after: always !important;
+      break-after: page !important;
+      page-break-inside: avoid !important;
+    }
+    .print-page-last {
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;">
+  ${el.innerHTML}
+</body>
+</html>`);
+    pw.document.close();
+
+    // Print after styles have loaded
+    pw.addEventListener('load', () => {
+      pw.focus();
+      pw.print();
+      pw.close();
+    });
+
+    // Fallback: some browsers don't fire load for document.write
+    setTimeout(() => {
+      if (pw && !pw.closed) {
+        pw.focus();
+        pw.print();
+      }
+    }, 1500);
   };
 
   // Convert categories names to human-readable per language
@@ -649,52 +718,28 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
         </div>
       </DialogContent>
 
-      {/* Hidden Print Container injected into body for window.print() */}
+      {/* Fallback print CSS – only used if the user presses Ctrl+P directly.
+           Normal "PDF drucken" button opens an isolated popup window instead. */}
       <style jsx global>{`
-        /* Global CSS adjustments to control printing */
         @media print {
-          /* Hide absolutely everything in the browser screen */
-          body * {
-            visibility: hidden !important;
-            height: auto !important;
-            overflow: visible !important;
-          }
-          
-          /* Only display our specific print element */
-          #printable-energy-pass,
-          #printable-energy-pass * {
-            visibility: visible !important;
-          }
-
+          html, body { margin: 0 !important; padding: 0 !important; visibility: hidden !important; }
           #printable-energy-pass {
-            display: block !important;
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 210mm !important;
-            background: white !important;
-            color: black !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
+            display: block !important; visibility: visible !important;
+            position: fixed !important; left: 0 !important; top: 0 !important;
+            width: 210mm !important; margin: 0 !important;
+            -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
           }
-
-          /* Force browser pages printing size */
-          @page {
-            size: A4 portrait !important;
-            margin: 0 !important;
-          }
-
-          .print-page-break {
-            page-break-after: always !important;
-            break-after: page !important;
-          }
+          #printable-energy-pass * { visibility: visible !important; }
+          @page { size: A4 portrait; margin: 0; }
+          .print-page-break { page-break-after: always !important; break-after: page !important; }
+          .print-page-last  { page-break-after: avoid  !important; break-after: avoid  !important; }
         }
       `}</style>
 
-      {/* Actual printed markup: hidden on screen, absolute on print */}
+      {/* Actual printed markup: hidden on screen, visible only on print */}
       <div id="printable-energy-pass" className="hidden select-none" style={{ width: '210mm', background: '#fff', color: '#0f172a' }}>
         {/* PAGE 1 */}
-        <div className="print-page-break flex flex-col p-12 bg-white" style={{ width: '210mm', height: '297mm', minHeight: '297mm', maxHeight: '297mm', boxSizing: 'border-box' }}>
+        <div className="print-page-break flex flex-col p-12 bg-white" style={{ width: '210mm', height: '297mm', minHeight: '297mm', maxHeight: '297mm', overflow: 'hidden', boxSizing: 'border-box' }}>
           {/* Header */}
           <div className="bg-slate-900 text-white p-6 -mx-12 -mt-12 flex flex-col relative" style={{ boxSizing: 'border-box' }}>
             <div className="absolute right-6 top-6 border border-white/20 px-3 py-0.5 rounded-full text-[9px] uppercase font-mono tracking-wider opacity-60">
@@ -843,7 +888,7 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
         </div>
 
         {/* PAGE 2 */}
-        <div className="flex flex-col p-12 bg-white" style={{ width: '210mm', height: '297mm', minHeight: '297mm', maxHeight: '297mm', boxSizing: 'border-box' }}>
+        <div className="print-page-last flex flex-col p-12 bg-white" style={{ width: '210mm', height: '297mm', minHeight: '297mm', maxHeight: '297mm', overflow: 'hidden', boxSizing: 'border-box' }}>
           {/* Page 2 header */}
           <div className="border-b-2 border-slate-950 pb-1.5 flex items-center justify-between">
             <div>
