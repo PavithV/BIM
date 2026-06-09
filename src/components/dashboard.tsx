@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import dynamic from 'next/dynamic';
 import { AnalysisPanel } from '@/components/analysis-panel';
 import { ChatAssistant } from '@/components/chat-assistant';
-import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2, Euro, Leaf, Layers, GitCompare, FilePlus, Sparkles, ShieldCheck, LayoutGrid, Zap } from 'lucide-react';
+import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2, Euro, Leaf, Layers, GitCompare, FilePlus, Sparkles, ShieldCheck, LayoutGrid, Zap, FileDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
@@ -25,6 +25,7 @@ import { ModelChecksTab } from '@/components/model-checks-tab';
 import { Din277Tab } from '@/components/din277-tab';
 import { Din276Tab } from '@/components/din276-tab';
 import { EnergyPassTab } from '@/components/energy-pass-tab';
+import { BimReportPdfExport } from '@/components/bim-report-pdf-export';
 import type { IFCModel, EnergyPassData } from '@/lib/types';
 import { cn, downloadCsv } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -155,6 +156,7 @@ export default function Dashboard() {
   const [isModelAnalysisLoading, setIsModelAnalysisLoading] = useState(false);
 
   const [energyPassData, setEnergyPassData] = useState<EnergyPassData | null>(null);
+  const [isBimReportOpen, setIsBimReportOpen] = useState(false);
   const [isEnergySimRunning, setIsEnergySimRunning] = useState(false);
   const [energyPassNote, setEnergyPassNote] = useState<string | null>(null);
   const [energySimError, setEnergySimError] = useState<{ message: string; hints: string[] } | null>(null);
@@ -961,6 +963,17 @@ export default function Dashboard() {
                     <Layers className="w-4 h-4 mr-2" /> {tr(language, 'IFC herunterladen', 'Download IFC')}
                   </Button>
                 )}
+                {activeProject && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsBimReportOpen(true)}
+                    className="gap-2 border-primary/40 text-primary hover:bg-primary/10 font-semibold"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    {tr(language, 'BIM-Bericht PDF', 'BIM Report PDF')}
+                  </Button>
+                )}
                 <ThemeToggle />
               </div>
             </header>
@@ -1191,6 +1204,13 @@ export default function Dashboard() {
       </ResizablePanelGroup>
 
       <MaterialReviewModal language={language} isOpen={materialReviewOpen} onOpenChange={setMaterialReviewOpen} replacements={pendingReplacements} onConfirm={handleReviewConfirm} />
+      <BimReportPdfExport
+        isOpen={isBimReportOpen}
+        onOpenChange={setIsBimReportOpen}
+        language={language}
+        activeProject={activeProject}
+        modelAnalysis={modelAnalysis}
+      />
     </div>
   );
 }
