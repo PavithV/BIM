@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Bot, CornerDownLeft, Loader2, Send, Sparkles, User } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from './ui/card';
@@ -23,17 +22,15 @@ interface ChatAssistantProps {
 
 export function ChatAssistant({ language, activeMessages, activeProject, startingPrompts, isLoading, onSendMessage }: ChatAssistantProps) {
   const [input, setInput] = useState('');
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  // Plain div ref – kein Radix ScrollArea, damit overflow-x:hidden zuverlässig wirkt
+  const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Automatisch nach unten scrollen wenn neue Nachrichten kommen
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (viewport) {
-        viewport.scrollTop = viewport.scrollHeight;
-      }
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [activeMessages, isLoading]);
-
 
   const handleSendMessage = (prompt?: string) => {
     const userQuestion = prompt || input;
@@ -50,7 +47,6 @@ export function ChatAssistant({ language, activeMessages, activeProject, startin
   };
 
   const ChatContent = () => {
-    // Add null/undefined check for activeMessages
     if (!activeMessages || (isLoading && activeMessages.length === 0)) {
       return (
         <div className="p-4 space-y-4">
@@ -90,19 +86,34 @@ export function ChatAssistant({ language, activeMessages, activeProject, startin
     return (
       <div className="p-4 space-y-6">
         {activeMessages.map((message, index) => (
-          <div key={message.id || index} className={cn('flex items-start gap-3', message.role === 'user' ? 'justify-end' : '')}>
+          <div
+            key={message.id || index}
+            className={cn(
+              'flex items-start gap-3 w-full min-w-0',
+              message.role === 'user' ? 'justify-end' : 'justify-start'
+            )}
+          >
             {message.role === 'assistant' && (
-              <Avatar className="w-8 h-8">
+              <Avatar className="w-8 h-8 shrink-0">
                 <AvatarFallback className="bg-muted">
                   <Bot className="w-4 h-4 text-foreground/80" />
                 </AvatarFallback>
               </Avatar>
             )}
-            <div className={cn('max-w-[85%] rounded-lg px-4 py-3', message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
-              <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+            <div
+              className={cn(
+                'rounded-lg px-4 py-3 min-w-0 overflow-hidden',
+                message.role === 'user'
+                  ? 'max-w-[80%] bg-primary text-primary-foreground shrink-0'
+                  : 'flex-1 bg-muted'
+              )}
+            >
+              <p className="text-sm whitespace-pre-wrap leading-relaxed break-words overflow-wrap-anywhere">
+                {message.content}
+              </p>
             </div>
             {message.role === 'user' && (
-              <Avatar className="w-8 h-8">
+              <Avatar className="w-8 h-8 shrink-0">
                 <AvatarFallback>
                   <User className="w-4 h-4" />
                 </AvatarFallback>
@@ -111,14 +122,14 @@ export function ChatAssistant({ language, activeMessages, activeProject, startin
           </div>
         ))}
         {isLoading && (
-          <div className="flex items-start gap-3">
-            <Avatar className="w-8 h-8">
+          <div className="flex items-start gap-3 w-full min-w-0">
+            <Avatar className="w-8 h-8 shrink-0">
               <AvatarFallback className="bg-muted">
                 <Bot className="w-4 h-4 text-foreground/80" />
               </AvatarFallback>
             </Avatar>
-            <div className="max-w-[85%] rounded-lg px-4 py-3 bg-muted flex items-center">
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            <div className="flex-1 min-w-0 rounded-lg px-4 py-3 bg-muted flex items-center">
+              <Loader2 className="w-4 h-4 animate-spin mr-2 shrink-0" />
               <span className="text-sm">{tr(language, 'Denke...', 'Thinking...')}</span>
             </div>
           </div>
@@ -128,11 +139,21 @@ export function ChatAssistant({ language, activeMessages, activeProject, startin
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <ScrollArea className="flex-1" ref={scrollAreaRef}>
+    <div className="flex flex-col h-full min-w-0 overflow-hidden">
+      {/*
+        Einfaches div statt Radix ScrollArea:
+        - overflow-y-auto  → vertikales Scrollen
+        - overflow-x-hidden → verhindert horizontales Abschneiden
+        - min-w-0          → lässt den Flexbox-Container zusammenschrumpfen
+      */}
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto overflow-x-hidden min-w-0"
+      >
         <ChatContent />
-      </ScrollArea>
-      <div className="p-4 border-t bg-card">
+      </div>
+
+      <div className="p-4 border-t bg-card shrink-0">
         <div className="relative">
           <Textarea
             value={input}

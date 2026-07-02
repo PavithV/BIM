@@ -11,6 +11,7 @@ import { Building, Bot, BarChart3, Menu, LogOut, PanelLeft, Loader2, Euro, Leaf,
 import { Button } from './ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { getStartingPrompts, getAIChatFeedback, getIfcAnalysis, getCostEstimation, checkMaterialReplacements, fetchUserProjects, createSignedUploadUrl, createSignedDownloadUrl, createIfcModelRecord, insertMessage, fetchMessagesForProject, updateIfcModel } from '@/app/actions';
@@ -276,15 +277,21 @@ export default function Dashboard() {
     fetchProjects();
   }, [fetchProjects]);
 
-  // Auto-set comparison projects
+  // Auto-set comparison projects AND sync with fresh DB data when projects changes
   useEffect(() => {
-    const projectsWithAnalysis = projects.filter(p => p.analysisData);
-    if (projectsWithAnalysis.length >= 2 && !comparisonProjectA && !comparisonProjectB) {
-      setComparisonProjectA(projectsWithAnalysis[0]);
-      setComparisonProjectB(projectsWithAnalysis[1]);
-    } else if (projectsWithAnalysis.length >= 1 && !comparisonProjectA) {
-      setComparisonProjectA(projectsWithAnalysis[0]);
-    }
+    const withAnalysis = projects.filter(p => p.analysisData);
+
+    // Use functional setState so we can both sync existing selections AND auto-set new ones
+    setComparisonProjectA(prev =>
+      prev
+        ? (projects.find(p => p.id === prev.id) ?? prev)   // sync with fresh data
+        : (withAnalysis[0] ?? null)                          // auto-set initial
+    );
+    setComparisonProjectB(prev =>
+      prev
+        ? (projects.find(p => p.id === prev.id) ?? prev)   // sync with fresh data
+        : (withAnalysis.length >= 2 ? withAnalysis[1] : null) // auto-set initial
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects]);
 
@@ -548,7 +555,7 @@ export default function Dashboard() {
     router.push('/login');
   };
 
-  const handleSendMessage = async (userQuestion: string) => {
+  const handleSendMessage = async (userQuestion: string, extraUiContext?: Record<string, unknown>) => {
     if (!userQuestion.trim() || !activeProject || !user) return;
     setIsLoading(true);
 
@@ -586,9 +593,13 @@ export default function Dashboard() {
         }
       }
 
-      // 2. AI Response
+      // 2. AI Response – merge question-scoped context with optional extra context
       const questionScoped = buildQuestionScopedContext(userQuestion, modelAnalysis, activeProject);
-      const questionScopedContext = questionScoped?.context;
+      const mergedContext: Record<string, unknown> = {
+        ...(questionScoped?.context ?? {}),
+        ...(extraUiContext ?? {}),
+      };
+      const questionScopedContext = Object.keys(mergedContext).length > 0 ? mergedContext : undefined;
       const matchedBuckets = Array.from(questionScoped?.buckets ?? []);
       const hasDin276Context = Boolean(
         questionScopedContext &&
@@ -638,6 +649,29 @@ export default function Dashboard() {
       if (!materialReviewOpen) setIsLoading(false);
     }
   };
+
+  // Chat-Handler im Projektvergleich – reichert die Anfrage mit Kontext beider Projekte an
+  const handleComparisonSendMessage = async (question: string) => {
+    const ctx: Record<string, unknown> = {};
+    if (comparisonProjectA) {
+      ctx.projektvergleich_A = {
+        name: comparisonProjectA.fileName,
+        gesamtkosten: comparisonProjectA.costEstimationData?.totalEstimatedCost ?? null,
+        materialien: comparisonProjectA.analysisData?.materialComposition ?? [],
+        indikatoren: comparisonProjectA.analysisData?.indicators ?? [],
+      };
+    }
+    if (comparisonProjectB) {
+      ctx.projektvergleich_B = {
+        name: comparisonProjectB.fileName,
+        gesamtkosten: comparisonProjectB.costEstimationData?.totalEstimatedCost ?? null,
+        materialien: comparisonProjectB.analysisData?.materialComposition ?? [],
+        indikatoren: comparisonProjectB.analysisData?.indicators ?? [],
+      };
+    }
+    await handleSendMessage(question, Object.keys(ctx).length > 0 ? ctx : undefined);
+  };
+
 
   // ------------------------------------------------------------------
   // WICHTIG: DIE KORRIGIERTE UPLOAD FUNKTION
@@ -769,6 +803,29 @@ export default function Dashboard() {
         const { runFullAnalysis } = await import('@/utils/modelChecker');
         const analysisResult = await runFullAnalysis(ifcAPI, modelID, WebIFC, data);
         setModelAnalysis(analysisResult);
+
+        // DIN 276 Kosten in costEstimationData persistieren, damit der Projektvergleich
+        // die Kosten anzeigen kann
+        const din276TotalCost = analysisResult.din276?.totalCost ?? 0;
+        if (activeProject && din276TotalCost > 0) {
+          const din276Groups = analysisResult.din276?.groups ?? [];
+          const din276CostData: import('@/lib/types').CostEstimationResult = {
+            // Als einfache Ganzzahl speichern (z.B. "218000") – eindeutig parsebar,
+            // kein Locale-abhängiges Format das zu Parsing-Fehlern führen könnte
+            totalEstimatedCost: String(Math.round(din276TotalCost)),
+            materials: din276Groups.map((g) => ({
+              name: `KG ${g.kg} – ${g.label}`,
+              percentage: din276TotalCost > 0 ? (g.totalCost / din276TotalCost) * 100 : 0,
+              estimatedCost: String(Math.round(g.totalCost)),
+              explanation: `DIN 276 Kostengruppe ${g.kg}: ${g.elementCount} Bauteile, BKI-Einheitspreis.`,
+            })),
+          };
+          const updateResult = await updateIfcModel(activeProject.id, { costEstimationData: din276CostData });
+          if (!updateResult.error) {
+            await fetchProjects();
+          }
+        }
+
         toast({ title: tr(language, 'Modellprüfung abgeschlossen', 'Model check completed') });
       } finally {
         await ifcAPI.CloseModel(modelID);
@@ -901,15 +958,74 @@ export default function Dashboard() {
                   {/* Comparison... */}
                   {projects.filter(p => p.analysisData).length >= 2 && (
                     <div className="pt-2 border-t">
-                      <Sheet>
-                        <SheetTrigger asChild><Button variant="outline" className="w-full justify-start gap-2"><GitCompare className="w-4 h-4" /> {tr(language, 'Projekte vergleichen', 'Compare projects')}</Button></SheetTrigger>
-                        <SheetContent side="right" className="w-[90vw] sm:w-[80vw] overflow-y-auto">
-                          <SheetHeader><SheetTitle>{tr(language, 'Projektvergleich', 'Project comparison')}</SheetTitle></SheetHeader>
-                          <div className="mt-6">
-                            <ProjectComparison projects={projects.filter(p => p.analysisData)} projectA={comparisonProjectA} projectB={comparisonProjectB} onSelectProjectA={setComparisonProjectA} onSelectProjectB={setComparisonProjectB} />
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start gap-2">
+                            <GitCompare className="w-4 h-4" />
+                            {tr(language, 'Projekte vergleichen', 'Compare projects')}
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-[98vw] w-[1700px] h-[92vh] flex flex-col p-0 gap-0">
+                          <DialogHeader className="px-6 py-4 border-b shrink-0">
+                            <DialogTitle className="text-xl font-bold font-headline flex items-center gap-2">
+                              <GitCompare className="w-5 h-5 text-primary" />
+                              {tr(language, 'Projektvergleich', 'Project comparison')}
+                            </DialogTitle>
+                          </DialogHeader>
+                          {/* 2-Spalten Layout: Vergleich | Chat */}
+                          <div className="flex-1 flex overflow-hidden min-h-0">
+                            {/* Linke Spalte: Projektvergleich */}
+                            <div className="flex-1 overflow-y-auto px-6 py-6 min-w-0">
+                              <ProjectComparison
+                                projects={projects.filter(p => p.analysisData)}
+                                projectA={comparisonProjectA}
+                                projectB={comparisonProjectB}
+                                onSelectProjectA={setComparisonProjectA}
+                                onSelectProjectB={setComparisonProjectB}
+                                activeProjectId={activeProject?.id}
+                                activeModelAnalysis={modelAnalysis}
+                              />
+                            </div>
+
+                            {/* Trennlinie */}
+                            <div className="w-px bg-border shrink-0" />
+
+                            {/* Rechte Spalte: KI Chat */}
+                            <div className="w-[400px] shrink-0 flex flex-col bg-background">
+                              <div className="px-4 py-3 border-b shrink-0 bg-card flex items-center gap-2">
+                                <Bot className="w-4 h-4 text-primary" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-sm font-headline">
+                                    {tr(language, 'KI Coach', 'AI Coach')}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground truncate">
+                                    {tr(
+                                      language,
+                                      'Kennt beide Projekte im Vergleich',
+                                      'Knows both comparison projects'
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex-1 overflow-hidden flex flex-col">
+                                <ChatAssistant
+                                  language={language}
+                                  activeProject={comparisonProjectA ?? activeProject}
+                                  activeMessages={activeMessages}
+                                  isLoading={isLoading || messagesLoading}
+                                  onSendMessage={handleComparisonSendMessage}
+                                  startingPrompts={[
+                                    tr(language, 'Welches Projekt ist kostengünstiger?', 'Which project is more cost-effective?'),
+                                    tr(language, 'Vergleiche die CO₂-Emissionen beider Projekte.', 'Compare the CO₂ emissions of both projects.'),
+                                    tr(language, 'Welches Projekt ist nachhaltiger?', 'Which project is more sustainable?'),
+                                    tr(language, 'Was sind die größten Unterschiede?', 'What are the biggest differences?'),
+                                  ]}
+                                />
+                              </div>
+                            </div>
                           </div>
-                        </SheetContent>
-                      </Sheet>
+                        </DialogContent>
+                      </Dialog>
                     </div>
                   )}
                 </div>
