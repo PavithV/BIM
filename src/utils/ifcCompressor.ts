@@ -14,6 +14,104 @@ const VOLUME_PROPERTIES = ["NetVolume", "GrossVolume", "Volume"];
 const AREA_PROPERTIES = ["NetArea", "GrossArea", "Area"];
 const GWP_PROPERTIES = ["GlobalWarmingPotential", "GWP", "CO2", "GWP_A1_A3"];
 
+// ---------------------------------------------------------------------------
+// Mehrsprachige Materialname-Übersetzung (Französisch → Deutsch)
+// Ermöglicht das korrekte Matching von IFC-Dateien in anderen Sprachen.
+// ---------------------------------------------------------------------------
+
+/**
+ * Mapping von Schlüsselwörtern (in Quellsprache) auf deutsche Ersatzbegriffe
+ * die vom OBD-Matching-Algorithmus erkannt werden.
+ * Reihenfolge: Spezifischere Begriffe zuerst.
+ */
+const MULTILINGUAL_KEYWORD_MAP: Array<{ keywords: string[]; germanEquivalent: string }> = [
+  // ---- Französisch ----
+  // Beton
+  { keywords: ['béton armé', 'beton arme', 'béton arme', 'beton armé'], germanEquivalent: 'Stahlbeton' },
+  { keywords: ['béton', 'beton'], germanEquivalent: 'Beton' },
+  // Holz
+  { keywords: ['bois massif'], germanEquivalent: 'Vollholz' },
+  { keywords: ['bois', 'lattage', 'liteaux', 'chevronnage', 'osb', 'contreplaqué', 'contreplaque'], germanEquivalent: 'Holz' },
+  // Mauerwerk / Ziegel
+  { keywords: ['brique', 'parpaing', 'moellon', 'maçonnerie', 'maconnerie'], germanEquivalent: 'Mauerziegel' },
+  { keywords: ['pierre calcaire', 'calcaire'], germanEquivalent: 'Kalksandstein' },
+  // Dämmung
+  { keywords: ['laine de verre'], germanEquivalent: 'Glaswolle' },
+  { keywords: ['laine de roche', 'laine minérale', 'laine minerale'], germanEquivalent: 'Mineralwolle' },
+  { keywords: ['polyuréthane', 'polyurethane', 'pu-mousse', 'mousse polyuréthane'], germanEquivalent: 'PU-Dämmung' },
+  { keywords: ['fibres de bois', 'fibre de bois', 'fibre bois'], germanEquivalent: 'Holzfaser' },
+  { keywords: ['eps', 'polystyrène expansé', 'polystyrene expanse'], germanEquivalent: 'EPS' },
+  { keywords: ['xps', 'polystyrène extrudé', 'polystyrene extrude'], germanEquivalent: 'XPS' },
+  { keywords: ['liège', 'liege'], germanEquivalent: 'Korkdämmung' },
+  { keywords: ['ouate de cellulose', 'cellulose'], germanEquivalent: 'Zellulosedämmung' },
+  { keywords: ['isolation', 'isolant', 'thermique'], germanEquivalent: 'Dämmung' },
+  // Glas
+  { keywords: ['vitrage', 'verre'], germanEquivalent: 'Glas' },
+  // Metall / Stahl
+  { keywords: ['acier'], germanEquivalent: 'Stahl' },
+  { keywords: ['aluminium', 'alu'], germanEquivalent: 'Aluminium' },
+  { keywords: ['cuivre'], germanEquivalent: 'Kupfer' },
+  // Putz / Estrich / Mörtel
+  { keywords: ['enduit plâtre', 'enduit platre', 'plaque de plâtre', 'plaque de platre', 'plaque fibre-gypse', 'placoplatre', 'gypse'], germanEquivalent: 'Gipskarton' },
+  { keywords: ['enduit', 'crépi', 'crepi'], germanEquivalent: 'Putz' },
+  { keywords: ['chape ciment', 'chape'], germanEquivalent: 'Estrich' },
+  { keywords: ['mortier', 'ciment', 'mastic'], germanEquivalent: 'Mörtel' },
+  // Bodenbelag
+  { keywords: ['parquet', 'plancher bois'], germanEquivalent: 'Holz' },
+  { keywords: ['carrelage', 'faïence', 'faience', 'céramique', 'ceramique'], germanEquivalent: 'Keramik' },
+  { keywords: ['moquette', 'tapis'], germanEquivalent: 'Teppich' },
+  { keywords: ['sol'], germanEquivalent: 'Bodenbelag' },
+  // Dach
+  { keywords: ['tuile terre-cuite', 'tuile beton', 'tuile', 'ardoise'], germanEquivalent: 'Dachziegel' },
+  { keywords: ['toiture', 'couverture'], germanEquivalent: 'Dach' },
+  // Abdichtung / Fassade
+  { keywords: ['étanchéité', 'etancheite', 'membrane'], germanEquivalent: 'Abdichtung' },
+  { keywords: ['bardage bois', 'bardage'], germanEquivalent: 'Holz' },
+  { keywords: ['façade', 'facade'], germanEquivalent: 'Fassade' },
+  // Luft / Leerraum (kein Material)
+  { keywords: ['vide', 'lame d air', 'lame d\'air', 'air', 'cavité', 'cavite'], germanEquivalent: 'Luft' },
+  // ---- Englisch (bereits weitgehend abgedeckt, aber Ergänzungen) ----
+  { keywords: ['reinforced concrete'], germanEquivalent: 'Stahlbeton' },
+  { keywords: ['concrete'], germanEquivalent: 'Beton' },
+  { keywords: ['timber', 'wood'], germanEquivalent: 'Holz' },
+  { keywords: ['glass wool', 'glasswool'], germanEquivalent: 'Glaswolle' },
+  { keywords: ['rock wool', 'mineral wool', 'stone wool'], germanEquivalent: 'Mineralwolle' },
+  { keywords: ['insulation', 'thermal insulation'], germanEquivalent: 'Dämmung' },
+  { keywords: ['brick'], germanEquivalent: 'Mauerziegel' },
+  { keywords: ['plasterboard', 'gypsum board', 'drywall'], germanEquivalent: 'Gipskarton' },
+  { keywords: ['render', 'plaster'], germanEquivalent: 'Putz' },
+  { keywords: ['screed'], germanEquivalent: 'Estrich' },
+  { keywords: ['steel'], germanEquivalent: 'Stahl' },
+  { keywords: ['aluminum'], germanEquivalent: 'Aluminium' },
+  { keywords: ['copper'], germanEquivalent: 'Kupfer' },
+  { keywords: ['glass'], germanEquivalent: 'Glas' },
+];
+
+/**
+ * Versucht, einen (potenziell fremdsprachigen) Materialnamen auf einen
+ * bekannten deutschen Begriff zu mappen.
+ * Gibt den gemappten deutschen Namen zurück, oder den Original-String
+ * wenn kein Mapping gefunden wurde.
+ */
+export function translateMaterialToGerman(materialName: string): string {
+  if (!materialName) return materialName;
+  const lower = materialName.toLowerCase()
+    // Normalize IFC X-encoding (\X\E9 → é etc.) – simplified: just lowercase
+    .replace(/\\x\\[0-9a-f]{2}/gi, '')
+    // Remove common French accent combos that survive lowercase
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip diacritics
+    .toLowerCase();
+
+  for (const { keywords, germanEquivalent } of MULTILINGUAL_KEYWORD_MAP) {
+    for (const kw of keywords) {
+      if (lower.includes(kw)) {
+        return germanEquivalent;
+      }
+    }
+  }
+  return materialName; // kein Mapping → Original zurückgeben
+}
+
 export type MaterialReplacement = {
   original: string;
   replacement: string | null;
@@ -1913,9 +2011,10 @@ function matchMaterial(material: string, db: Record<string, { Name: string; GWP_
   // Wichtig: Wir entfernen nur Klammern-Zeichen, nicht den Inhalt.
   // Sonst wird z.B. "Stahlbeton (C25/30)" fälschlich zu "stahlbeton" und matcht dann jede C-Klasse.
   const normalize = (s: string) => (s || '').toLowerCase().replace(/[()]/g, '').replace(/[^a-z0-9]/g, '').trim();
-  const normMat = normalize(material);
   const dbEntries = Object.values(db);
 
+  // Versuche zunächst mit dem Original-Namen zu matchen
+  const normMat = normalize(material);
   for (const candidate of dbEntries) {
     const candNorm = normalize(candidate.Name);
     if (!candNorm) continue;
@@ -1923,6 +2022,20 @@ function matchMaterial(material: string, db: Record<string, { Name: string; GWP_
       return candidate;
     }
   }
+
+  // Fallback: Versuche mit übersetztem (deutschen) Namen
+  const translated = translateMaterialToGerman(material);
+  if (translated !== material) {
+    const normTranslated = normalize(translated);
+    for (const candidate of dbEntries) {
+      const candNorm = normalize(candidate.Name);
+      if (!candNorm) continue;
+      if (candNorm === normTranslated || normTranslated.includes(candNorm) || candNorm.includes(normTranslated) || candNorm.startsWith(normTranslated) || normTranslated.startsWith(candNorm)) {
+        return candidate;
+      }
+    }
+  }
+
   return undefined;
 }
 
@@ -1933,26 +2046,31 @@ function matchMaterials(material: string, db: Record<string, { Name: string; GWP
   // Wichtig: Wir entfernen nur Klammern-Zeichen, nicht den Inhalt.
   // Sonst wird z.B. "Stahlbeton (C25/30)" fälschlich zu "stahlbeton" und matcht dann jede C-Klasse.
   const normalize = (s: string) => (s || '').toLowerCase().replace(/[()]/g, '').replace(/[^a-z0-9]/g, '').trim();
-  const normMat = normalize(material);
   const dbEntries = Object.values(db);
   const matches: Array<{ Name: string; GWP_Wert: number; Preis_pro_m3: number }> = [];
+  const seenNames = new Set<string>();
 
-  for (const candidate of dbEntries) {
-    const candNorm = normalize(candidate.Name);
-    if (!candNorm) continue;
-
-    // Check for match
-    if (candNorm === normMat || normMat.includes(candNorm) || candNorm.includes(normMat) || candNorm.startsWith(normMat) || normMat.startsWith(candNorm)) {
-      matches.push(candidate);
+  // Hilfsfunktion: füge Matches für einen normierten Suchbegriff hinzu
+  const addMatches = (normSearch: string) => {
+    for (const candidate of dbEntries) {
+      const candNorm = normalize(candidate.Name);
+      if (!candNorm) continue;
+      if (seenNames.has(candidate.Name)) continue; // Duplikate vermeiden
+      if (candNorm === normSearch || normSearch.includes(candNorm) || candNorm.includes(normSearch) || candNorm.startsWith(normSearch) || normSearch.startsWith(candNorm)) {
+        matches.push(candidate);
+        seenNames.add(candidate.Name);
+      }
     }
-  }
+  };
 
-  // Sort matches? 
-  // Prefer exact matches or shorter diffs?
-  // Let's sort by length of name (assuming closer match is better? or longer name is more specific?)
-  // Let's sort so that "Beton" matches "Beton C25" better than "Beton C25/30"? Maybe not.
-  // Let's just default to DB order unless we have a smart score.
-  // Actually, usually "Stahlbeton" is better than "Beton".
+  // 1. Suche mit Original-Namen
+  addMatches(normalize(material));
+
+  // 2. Suche mit übersetztem (deutschen) Namen (für fremdsprachige IFC-Dateien)
+  const translated = translateMaterialToGerman(material);
+  if (translated !== material) {
+    addMatches(normalize(translated));
+  }
 
   return matches;
 }

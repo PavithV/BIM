@@ -8,6 +8,7 @@
  */
 
 import type { OBDEntry } from '@/lib/types';
+import { translateMaterialToGerman } from '@/utils/ifcCompressor';
 
 // ---------------------------------------------------------------------------
 // Typen
@@ -45,6 +46,7 @@ export interface MaterialBreakdownEntry {
 // Fallback-Rohdichten (kg/m³)
 // ---------------------------------------------------------------------------
 const DENSITY_FALLBACKS: Record<string, number> = {
+    // Deutsch
     beton: 2400,
     stahlbeton: 2500,
     stahl: 7850,
@@ -65,6 +67,41 @@ const DENSITY_FALLBACKS: Record<string, number> = {
     putz: 1800,
     mörtel: 1900,
     kupfer: 8900,
+    // Französisch
+    'béton armé': 2500,
+    'beton arme': 2500,
+    béton: 2400,
+    bois: 600,
+    'bois massif': 600,
+    chape: 2200,
+    enduit: 1800,
+    isolation: 30,
+    isolant: 30,
+    laine: 60,
+    'laine de verre': 15,
+    'laine de roche': 40,
+    polyuréthane: 35,
+    polyurethane: 35,
+    fibres: 50,
+    plaque: 900,
+    gypse: 1200,
+    verre: 2500,
+    vitrage: 2500,
+    acier: 7850,
+    // Englisch
+    concrete: 2400,
+    'reinforced concrete': 2500,
+    timber: 600,
+    wood: 600,
+    steel: 7850,
+    glass: 2500,
+    insulation: 30,
+    plasterboard: 900,
+    screed: 2200,
+    render: 1800,
+    plaster: 1200,
+    brick: 1800,
+    copper: 8900,
 };
 
 /**
@@ -103,12 +140,17 @@ function normalize(s: string): string {
  *   1. Exakter Match (normalisiert)
  *   2. Keyword-basiertes Mapping (Suche nach Begriffen wie "Stahlbeton", "Holz")
  *   3. Contains-Match (bevorzugt den kürzesten OBD-Namen für generische Matches wie "Beton")
+ *
+ * Fremdsprachige IFC-Namen (z.B. Französisch) werden zuerst in das Deutsche übersetzt.
  */
 function matchMaterialToOBD(
     ifcMaterial: string,
     obdEntries: OBDEntry[],
 ): OBDEntry | null {
-    const normIfc = normalize(ifcMaterial);
+    // 0. Fremdsprachige Namen übersetzen (z.B. Französisch → Deutsch)
+    const resolvedMaterial = translateMaterialToGerman(ifcMaterial);
+
+    const normIfc = normalize(resolvedMaterial);
     if (!normIfc) return null;
 
     // 1. Exakter Match
@@ -122,6 +164,7 @@ function matchMaterialToOBD(
         { kw: 'stahlbeton', search: 'beton' }, // Transportbeton, Normalbeton
         { kw: 'beton', search: 'beton' },
         { kw: 'holz', search: 'vollholz' }, // z.B. Konstruktionsvollholz
+        { kw: 'vollholz', search: 'vollholz' },
         { kw: 'ziegel', search: 'mauerziegel' },
         { kw: 'kalksandstein', search: 'kalksandstein' },
         { kw: 'gipskarton', search: 'gipskarton' },
@@ -137,6 +180,8 @@ function matchMaterialToOBD(
         { kw: 'alu', search: 'aluminium' },
         { kw: 'kupfer', search: 'kupfer' },
         { kw: 'dämm', search: 'dämm' },
+        { kw: 'holzfaser', search: 'holzfaser' },
+        { kw: 'stahl', search: 'stahl' },
     ];
 
     let searchString = normIfc;
