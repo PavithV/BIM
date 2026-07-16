@@ -259,6 +259,7 @@ function MetricRow({
   formatValue,
   noDataA,
   noDataB,
+  language,
 }: {
   label: string;
   icon: React.ReactNode;
