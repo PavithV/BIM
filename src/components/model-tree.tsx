@@ -3,6 +3,8 @@ import { ChevronRight, ChevronDown, Box, Layers, Home, MapPin, Building } from '
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
+import { tr, type Language } from '@/lib/i18n';
+
 export interface SpatialNode {
     expressID: number;
     type: string;
@@ -13,6 +15,7 @@ interface ModelTreeProps {
     tree: SpatialNode | null;
     onSelect: (id: number) => void;
     selectedId: number | null;
+    language: Language;
 }
 
 const TreeNode = ({
@@ -97,11 +100,11 @@ const TreeNode = ({
     );
 };
 
-export function ModelTree({ tree, onSelect, selectedId }: ModelTreeProps) {
+export function ModelTree({ tree, onSelect, selectedId, language }: ModelTreeProps) {
     if (!tree) {
         return (
             <div className="p-4 text-center text-sm text-muted-foreground">
-                Keine Strukturdaten verfügbar.
+                {tr(language, 'Keine Strukturdaten verfügbar.', 'No structure data available.', 'Aucune donnée de structure disponible.')}
             </div>
         );
     }

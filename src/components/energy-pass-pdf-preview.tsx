@@ -129,6 +129,54 @@ const txt = {
     recsA: "Excellent efficiency class! Recommended next steps: Installation of a photovoltaic system for self-consumption and addition of a battery storage system to optimize autarky.",
     recsC: "Good to moderate efficiency. Recommended measures: Insulation of the uppermost ceiling and basement ceiling, replacement of old window panes with triple thermal glazing, and heating system optimization (hydraulic balancing).",
     recsF: "High energy demand. Urgent energy retrofitting measures recommended: Full thermal insulation of external walls and roof, replacement of the heating system with a modern heat pump or pellet boiler, and installation of mechanical ventilation with heat recovery."
+  },
+  fr: {
+    title: "CERTIFICAT ÉNERGÉTIQUE DU BÂTIMENT",
+    subtitle: "conformément aux §§ 79 et suivants de la loi sur l'énergie des bâtiments (GEG)",
+    buildingType: "Type de bâtiment",
+    address: "Adresse / Emplacement",
+    constYear: "Année de construction",
+    area: "Surface nette",
+    primaryEnergyCarrier: "Source d'énergie primaire",
+    ventilation: "Concept de ventilation",
+    issuer: "Émetteur",
+    date: "Date d'émission",
+    scaleTitle: "Demande en énergie finale et primaire",
+    scaleSubtitle: "Exigences selon le GEG. Valeurs comparatives des classes d'efficacité en kWh/(m²·a).",
+    primaryEnergy: "Besoin en énergie primaire",
+    siteEnergy: "Besoin en énergie finale",
+    category: "Consommation d'énergie par catégorie",
+    absolute: "Besoin total (kWh/a)",
+    specific: "Spécifique (kWh/m²a)",
+    proportion: "Proportion",
+    recommendations: "Recommandations de modernisation (données volontaires)",
+    printBtn: "Imprimer / Enregistrer PDF",
+    optionsTitle: "Personnaliser le certificat",
+    optionsSubtitle: "Affinez les détails pour l'exportation PDF.",
+    previewTitle: "Aperçu avant impression PDF (A4)",
+    closeBtn: "Fermer",
+    yourBuilding: "Votre bâtiment",
+    primaryEnergyShort: "Énergie primaire",
+    siteEnergyShort: "Énergie finale",
+    energyUnit: "kWh/(m²·a)",
+    residential: "Bâtiment résidentiel (Immeuble collectif)",
+    nonResidential: "Bâtiment non résidentiel (Bureau/Commerce)",
+    singleFamily: "Maison individuelle",
+    naturalGas: "Gaz naturel",
+    electricityMix: "Mix électrique (Réseau)",
+    woodPellets: "Granulés de bois",
+    districtHeating: "Chauffage urbain",
+    heatPump: "Chaleur ambiante / Pompe à chaleur",
+    ventWindow: "Ventilation naturelle par les fenêtres",
+    ventMechanical: "Ventilation mécanique avec récupération de chaleur",
+    ventExhaust: "Système d'évacuation uniquement",
+    generalData: "Informations générales sur le bâtiment",
+    certNo: "Numéro d'enregistrement (Exemple)",
+    certVal: "Validité",
+    certValDate: "10 ans à compter de la date d'émission",
+    recsA: "Excellente classe d'efficacité ! Prochaines étapes recommandées : Installation d'un système photovoltaïque pour l'autoconsommation et ajout d'un système de stockage par batterie pour optimiser l'autarcie.",
+    recsC: "Efficacité bonne à modérée. Mesures recommandées : Isolation du plafond supérieur et du plafond du sous-sol, remplacement des anciennes vitres par un triple vitrage thermique, et optimisation du système de chauffage (équilibrage hydraulique).",
+    recsF: "Demande énergétique élevée. Mesures urgentes de rénovation énergétique recommandées : Isolation thermique complète des murs extérieurs et du toit, remplacement du système de chauffage par une pompe à chaleur moderne ou une chaudière à granulés, et installation d'une ventilation mécanique avec récupération de chaleur."
   }
 };
 
@@ -231,21 +279,21 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
 
   // Convert categories names to human-readable per language
   const translateCategory = (cat: string) => {
-    const mapping: Record<string, { de: string; en: string }> = {
-      'Heating': { de: 'Heizung (Raumwärme)', en: 'Space Heating' },
-      'Heizung': { de: 'Heizung (Raumwärme)', en: 'Space Heating' },
-      'Cooling': { de: 'Kühlung / Klimatisierung', en: 'Space Cooling' },
-      'Kühlung': { de: 'Kühlung / Klimatisierung', en: 'Space Cooling' },
-      'Interior Lighting': { de: 'Innenbeleuchtung', en: 'Interior Lighting' },
-      'Beleuchtung': { de: 'Innenbeleuchtung', en: 'Interior Lighting' },
-      'Water Systems': { de: 'Warmwasserbereitung', en: 'Domestic Hot Water' },
-      'Warmwasser': { de: 'Warmwasserbereitung', en: 'Domestic Hot Water' },
-      'Fans': { de: 'Lüftungsventilatoren', en: 'Ventilation Fans' },
-      'Lüftung': { de: 'Lüftungsventilatoren', en: 'Ventilation Fans' },
-      'Pumps': { de: 'Pumpsysteme / Hilfsenergie', en: 'Pumps / Auxiliaries' },
-      'Hilfsenergie': { de: 'Pumpsysteme / Hilfsenergie', en: 'Pumps / Auxiliaries' },
-      'Gesamtenergie': { de: 'Gesamtbedarf', en: 'Total Demand' },
-      'Total': { de: 'Gesamtbedarf', en: 'Total Demand' },
+    const mapping: Record<string, { de: string; en: string; fr: string }> = {
+      'Heating': { de: 'Heizung (Raumwärme)', en: 'Space Heating', fr: 'Chauffage (chaleur des locaux)' },
+      'Heizung': { de: 'Heizung (Raumwärme)', en: 'Space Heating', fr: 'Chauffage (chaleur des locaux)' },
+      'Cooling': { de: 'Kühlung / Klimatisierung', en: 'Space Cooling', fr: 'Refroidissement / Climatisation' },
+      'Kühlung': { de: 'Kühlung / Klimatisierung', en: 'Space Cooling', fr: 'Refroidissement / Climatisation' },
+      'Interior Lighting': { de: 'Innenbeleuchtung', en: 'Interior Lighting', fr: 'Éclairage intérieur' },
+      'Beleuchtung': { de: 'Innenbeleuchtung', en: 'Interior Lighting', fr: 'Éclairage intérieur' },
+      'Water Systems': { de: 'Warmwasserbereitung', en: 'Domestic Hot Water', fr: 'Eau chaude sanitaire' },
+      'Warmwasser': { de: 'Warmwasserbereitung', en: 'Domestic Hot Water', fr: 'Eau chaude sanitaire' },
+      'Fans': { de: 'Lüftungsventilatoren', en: 'Ventilation Fans', fr: 'Ventilateurs de ventilation' },
+      'Lüftung': { de: 'Lüftungsventilatoren', en: 'Ventilation Fans', fr: 'Ventilateurs de ventilation' },
+      'Pumps': { de: 'Pumpsysteme / Hilfsenergie', en: 'Pumps / Auxiliaries', fr: 'Pompes / Énergie auxiliaire' },
+      'Hilfsenergie': { de: 'Pumpsysteme / Hilfsenergie', en: 'Pumps / Auxiliaries', fr: 'Pompes / Énergie auxiliaire' },
+      'Gesamtenergie': { de: 'Gesamtbedarf', en: 'Total Demand', fr: 'Demande totale' },
+      'Total': { de: 'Gesamtbedarf', en: 'Total Demand', fr: 'Demande totale' },
     };
     return mapping[cat]?.[language] || cat;
   };
@@ -339,7 +387,7 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
                   </Label>
                   <Input
                     id="net-area"
-                    value={`${data.buildingInfo.area.toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 0 })} m²`}
+                    value={`${data.buildingInfo.area.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 0 })} m²`}
                     disabled
                     className="h-9 text-xs font-mono bg-muted"
                   />
@@ -459,7 +507,7 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
                   <div className="border-b border-slate-200 p-3 text-slate-900 font-semibold font-mono">{constYear}</div>
 
                   <div className="border-r border-b border-slate-200 p-3 bg-slate-50 font-bold text-slate-700">{t.area}</div>
-                  <div className="border-b border-slate-200 p-3 text-slate-900 font-semibold font-mono">{data.buildingInfo.area.toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 0 })} m²</div>
+                  <div className="border-b border-slate-200 p-3 text-slate-900 font-semibold font-mono">{data.buildingInfo.area.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 0 })} m²</div>
 
                   <div className="border-r border-b border-slate-200 p-3 bg-slate-50 font-bold text-slate-700">{t.primaryEnergyCarrier}</div>
                   <div className="border-b border-slate-200 p-3 text-slate-900 font-semibold">{primaryCarrier}</div>
@@ -561,7 +609,7 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
                   <div className="flex flex-col items-end">
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">EFFIZIENZKLASSE</span>
                     <span className="text-xs font-black uppercase mt-1" style={{ color: activeColor }}>
-                      {tr(language, 'Klasse', 'Class')} {data.efficiencyClass}
+                      {tr(language, 'Klasse', 'Class', 'Classe')} {data.efficiencyClass}
                     </span>
                   </div>
                   <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-md border-4 border-white transition-all duration-300"
@@ -608,7 +656,7 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
                 <table className="w-full text-left text-xs border border-slate-100 rounded-lg overflow-hidden">
                   <thead>
                     <tr className="bg-slate-900 text-white font-extrabold uppercase text-[9px] tracking-wider">
-                      <th className="p-3">{tr(language, 'Kategorie / Endnutzung', 'Category / End Use')}</th>
+                      <th className="p-3">{tr(language, 'Kategorie / Endnutzung', 'Category / End Use', 'Catégorie / Utilisation finale')}</th>
                       <th className="p-3 text-right">{t.absolute}</th>
                       <th className="p-3 text-right">{t.specific}</th>
                       <th className="p-3 text-right w-[180px]">{t.proportion}</th>
@@ -622,8 +670,8 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
                       return (
                         <tr key={idx} className="hover:bg-slate-50 font-medium text-slate-700">
                           <td className="p-3 font-bold text-slate-900">{translateCategory(eu.category)}</td>
-                          <td className="p-3 text-right font-mono">{eu.value.toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 0 })}</td>
-                          <td className="p-3 text-right font-mono">{specificVal.toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 1 })}</td>
+                          <td className="p-3 text-right font-mono">{eu.value.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 0 })}</td>
+                          <td className="p-3 text-right font-mono">{specificVal.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 1 })}</td>
                           <td className="p-3">
                             <div className="flex items-center gap-3">
                               {/* Horizontal CSS Bar Chart representing percentage share */}
@@ -644,15 +692,15 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
                     })}
                     {/* Summary row */}
                     <tr className="bg-slate-50 font-extrabold text-slate-900 uppercase text-[10px] border-t-2 border-slate-900">
-                      <td className="p-3">{tr(language, 'Gesamtbedarf (Endenergie)', 'Total Demand (Final Energy)')}</td>
-                      <td className="p-3 text-right font-mono">{data.siteEnergy.total.toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 0 })}</td>
-                      <td className="p-3 text-right font-mono">{data.siteEnergy.perArea.toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 1 })}</td>
+                      <td className="p-3">{tr(language, 'Gesamtbedarf (Endenergie)', 'Total Demand (Final Energy)', 'Besoin total (Énergie finale)')}</td>
+                      <td className="p-3 text-right font-mono">{data.siteEnergy.total.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 0 })}</td>
+                      <td className="p-3 text-right font-mono">{data.siteEnergy.perArea.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 1 })}</td>
                       <td className="p-3 font-mono text-slate-500 text-[10px] pl-3">100%</td>
                     </tr>
                     <tr className="bg-slate-100 font-extrabold text-slate-900 uppercase text-[10px]">
-                      <td className="p-3">{tr(language, 'Gesamtbedarf (Primärenergie)', 'Total Demand (Primary Energy)')}</td>
-                      <td className="p-3 text-right font-mono">{data.sourceEnergy.total.toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 0 })}</td>
-                      <td className="p-3 text-right font-mono">{data.sourceEnergy.perArea.toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 1 })}</td>
+                      <td className="p-3">{tr(language, 'Gesamtbedarf (Primärenergie)', 'Total Demand (Primary Energy)', 'Besoin total (Énergie primaire)')}</td>
+                      <td className="p-3 text-right font-mono">{data.sourceEnergy.total.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 0 })}</td>
+                      <td className="p-3 text-right font-mono">{data.sourceEnergy.perArea.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 1 })}</td>
                       <td className="p-3 text-slate-400 font-mono text-[9px] font-semibold pl-3">GEG COMPLIANT</td>
                     </tr>
                   </tbody>
@@ -669,7 +717,7 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
                   <div className="absolute right-0 top-0 w-1.5 h-full" style={{ background: activeColor }} />
                   <p className="text-xs font-extrabold text-slate-800 uppercase mb-2 tracking-wide flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: activeColor }} />
-                    {tr(language, `Empfehlungen für Effizienzklasse ${data.efficiencyClass}`, `Recommendations for Efficiency Class ${data.efficiencyClass}`)}
+                    {tr(language, `Empfehlungen für Effizienzklasse ${data.efficiencyClass}`, `Recommendations for Efficiency Class ${data.efficiencyClass}`, `Recommandations pour la classe d'efficacité ${data.efficiencyClass}`)}
                   </p>
                   <p className="text-xs text-slate-600 leading-relaxed font-medium">
                     {getRecommendations()}
@@ -678,11 +726,11 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
                   <div className="grid grid-cols-2 gap-4 mt-6 pt-4 border-t border-slate-200 text-[10px] font-bold text-slate-500">
                     <div className="flex items-center gap-2">
                       <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">✓</span>
-                      {tr(language, 'Maßnahmen sind wirtschaftlich sinnvoll', 'Measures are economically viable')}
+                      {tr(language, 'Maßnahmen sind wirtschaftlich sinnvoll', 'Measures are economically viable', 'Les mesures sont économiquement viables')}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">✓</span>
-                      {tr(language, 'Fördermittel über BAFA/KfW möglich', 'Funding through KfW/BAFA possible')}
+                      {tr(language, 'Fördermittel über BAFA/KfW möglich', 'Funding through KfW/BAFA possible', 'Financement possible via KfW/BAFA')}
                     </div>
                   </div>
                 </div>
@@ -766,7 +814,7 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
               <div className="border-b border-slate-200 p-2 text-slate-900 font-semibold font-mono">{constYear}</div>
 
               <div className="border-r border-b border-slate-200 p-2 bg-slate-50 font-bold text-slate-700">{t.area}</div>
-              <div className="border-b border-slate-200 p-2 text-slate-900 font-semibold font-mono">{data.buildingInfo.area.toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 0 })} m²</div>
+              <div className="border-b border-slate-200 p-2 text-slate-900 font-semibold font-mono">{data.buildingInfo.area.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 0 })} m²</div>
 
               <div className="border-r border-b border-slate-200 p-2 bg-slate-50 font-bold text-slate-700">{t.primaryEnergyCarrier}</div>
               <div className="border-b border-slate-200 p-2 text-slate-900 font-semibold">{primaryCarrier}</div>
@@ -866,7 +914,7 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
               <div className="flex flex-col items-end leading-none">
                 <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest leading-none">EFFIZIENZKLASSE</span>
                 <span className="text-[10px] font-extrabold uppercase mt-1" style={{ color: activeColor }}>
-                  {tr(language, 'Klasse', 'Class')} {data.efficiencyClass}
+                  {tr(language, 'Klasse', 'Class', 'Classe')} {data.efficiencyClass}
                 </span>
               </div>
               <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-lg border-2 border-white shadow"
@@ -905,7 +953,7 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
             <table className="w-full text-left text-[10px] border border-slate-150 rounded overflow-hidden">
               <thead>
                 <tr className="bg-slate-900 text-white font-black uppercase text-[8px] tracking-wider">
-                  <th className="p-2">{tr(language, 'Kategorie / Endnutzung', 'Category / End Use')}</th>
+                  <th className="p-2">{tr(language, 'Kategorie / Endnutzung', 'Category / End Use', 'Catégorie / Utilisation finale')}</th>
                   <th className="p-2 text-right">{t.absolute}</th>
                   <th className="p-2 text-right">{t.specific}</th>
                   <th className="p-2 text-right w-[150px]">{t.proportion}</th>
@@ -919,8 +967,8 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
                   return (
                     <tr key={idx} className="font-semibold text-slate-700">
                       <td className="p-2 font-black text-slate-900">{translateCategory(eu.category)}</td>
-                      <td className="p-2 text-right font-mono">{eu.value.toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 0 })}</td>
-                      <td className="p-2 text-right font-mono">{specificVal.toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 1 })}</td>
+                      <td className="p-2 text-right font-mono">{eu.value.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 0 })}</td>
+                      <td className="p-2 text-right font-mono">{specificVal.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 1 })}</td>
                       <td className="p-2">
                         <div className="flex items-center gap-2">
                           <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
@@ -941,15 +989,15 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
                 })}
                 {/* Total demand */}
                 <tr className="bg-slate-50 font-black text-slate-900 uppercase text-[9px] border-t-2 border-slate-900">
-                  <td className="p-2">{tr(language, 'Gesamtbedarf (Endenergie)', 'Total Demand (Final Energy)')}</td>
-                  <td className="p-2 text-right font-mono">{data.siteEnergy.total.toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 0 })}</td>
-                  <td className="p-2 text-right font-mono">{data.siteEnergy.perArea.toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 1 })}</td>
+                  <td className="p-2">{tr(language, 'Gesamtbedarf (Endenergie)', 'Total Demand (Final Energy)', 'Besoin total (Énergie finale)')}</td>
+                  <td className="p-2 text-right font-mono">{data.siteEnergy.total.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 0 })}</td>
+                  <td className="p-2 text-right font-mono">{data.siteEnergy.perArea.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 1 })}</td>
                   <td className="p-2 font-mono text-slate-500 pl-2">100%</td>
                 </tr>
                 <tr className="bg-slate-100 font-black text-slate-900 uppercase text-[9px]">
-                  <td className="p-2">{tr(language, 'Gesamtbedarf (Primärenergie)', 'Total Demand (Primary Energy)')}</td>
-                  <td className="p-2 text-right font-mono">{data.sourceEnergy.total.toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 0 })}</td>
-                  <td className="p-2 text-right font-mono">{data.sourceEnergy.perArea.toLocaleString(language === 'de' ? 'de-DE' : 'en-US', { maximumFractionDigits: 1 })}</td>
+                  <td className="p-2">{tr(language, 'Gesamtbedarf (Primärenergie)', 'Total Demand (Primary Energy)', 'Besoin total (Énergie primaire)')}</td>
+                  <td className="p-2 text-right font-mono">{data.sourceEnergy.total.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 0 })}</td>
+                  <td className="p-2 text-right font-mono">{data.sourceEnergy.perArea.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 1 })}</td>
                   <td className="p-2 text-slate-400 font-mono text-[8px] font-bold pl-2">GEG COMPLIANT</td>
                 </tr>
               </tbody>
@@ -964,7 +1012,7 @@ export function EnergyPassPdfPreview({ isOpen, onOpenChange, language, data }: E
             <div className="rounded-lg border border-slate-200 p-4 bg-slate-50 relative overflow-hidden">
               <div className="absolute right-0 top-0 w-1 h-full" style={{ backgroundColor: activeColor }} />
               <p className="text-[10px] font-extrabold text-slate-800 uppercase mb-1 tracking-wide">
-                {tr(language, `Empfehlungen für Effizienzklasse ${data.efficiencyClass}`, `Recommendations for Efficiency Class ${data.efficiencyClass}`)}
+                {tr(language, `Empfehlungen für Effizienzklasse ${data.efficiencyClass}`, `Recommendations for Efficiency Class ${data.efficiencyClass}`, `Recommandations pour la classe d'efficacité ${data.efficiencyClass}`)}
               </p>
               <p className="text-[10px] text-slate-600 leading-relaxed font-medium">
                 {getRecommendations()}

@@ -31,8 +31,8 @@ export function FileUploader({ language, onFileUploaded, isUploading, onCancel, 
         setFile(selectedFile);
       } else {
         toast({
-          title: tr(language, 'Ungültiger Dateityp', 'Invalid file type'),
-          description: tr(language, 'Bitte laden Sie eine gültige .ifc-Datei hoch.', 'Please upload a valid .ifc file.'),
+          title: tr(language, 'Ungültiger Dateityp', 'Invalid file type', 'Type de fichier invalide'),
+          description: tr(language, 'Bitte laden Sie eine gültige .ifc-Datei hoch.', 'Please upload a valid .ifc file.', 'Veuillez télécharger un fichier .ifc valide.'),
           variant: 'destructive',
         });
         setFile(null);
@@ -75,8 +75,8 @@ export function FileUploader({ language, onFileUploaded, isUploading, onCancel, 
   return (
     <Card className="w-full max-w-lg mx-auto bg-card/80 backdrop-blur-sm border-dashed shadow-none">
       <CardHeader className="text-center">
-        <CardTitle className="text-xl font-headline">{tr(language, 'Neue Analyse starten', 'Start a new analysis')}</CardTitle>
-        <CardDescription>{tr(language, 'Laden Sie Ihr IFC-Modell hoch, um zu beginnen.', 'Upload your IFC model to begin.')}</CardDescription>
+        <CardTitle className="text-xl font-headline">{tr(language, 'Neue Analyse starten', 'Start a new analysis', 'Démarrer une nouvelle analyse')}</CardTitle>
+        <CardDescription>{tr(language, 'Laden Sie Ihr IFC-Modell hoch, um zu beginnen.', 'Upload your IFC model to begin.', 'Téléchargez votre modèle IFC pour commencer.')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div
@@ -91,28 +91,28 @@ export function FileUploader({ language, onFileUploaded, isUploading, onCancel, 
         >
           <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center justify-center">
             <UploadCloud className="w-10 h-10 text-muted-foreground mb-3" />
-            <p className="font-semibold text-sm">{tr(language, 'Ziehen Sie Ihre .ifc-Datei hierher', 'Drag your .ifc file here')}</p>
-            <p className="text-xs text-muted-foreground mt-1">{tr(language, 'oder klicken Sie zum Durchsuchen', 'or click to browse')}</p>
+            <p className="font-semibold text-sm">{tr(language, 'Ziehen Sie Ihre .ifc-Datei hierher', 'Drag your .ifc file here', 'Glissez votre fichier .ifc ici')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{tr(language, 'oder klicken Sie zum Durchsuchen', 'or click to browse', 'ou cliquez pour parcourir')}</p>
             <Input id="file-upload" type="file" className="hidden" accept=".ifc" onChange={handleFileChange} disabled={totalIsLoading} />
           </label>
         </div>
         {file && (
           <div className="text-center space-y-4 pt-2">
-            <p className="text-sm">{tr(language, 'Ausgewählt:', 'Selected:')} <span className="font-semibold">{file.name}</span></p>
+            <p className="text-sm">{tr(language, 'Ausgewählt:', 'Selected:', 'Sélectionné :')} <span className="font-semibold">{file.name}</span></p>
             <Button className="w-full" onClick={handleSubmit} disabled={totalIsLoading}>
               {totalIsLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {tr(language, 'Verarbeite...', 'Processing...')}
+                  {tr(language, 'Verarbeite...', 'Processing...', 'Traitement...')}
                 </>
-              ) : tr(language, 'Projekt erstellen & analysieren', 'Create and analyze project')}
+              ) : tr(language, 'Projekt erstellen & analysieren', 'Create and analyze project', 'Créer et analyser le projet')}
             </Button>
           </div>
         )}
         {showCancelButton && onCancel && (
           <Button variant="ghost" className="w-full" onClick={onCancel} disabled={totalIsLoading}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            {tr(language, 'Zurück zur Projektliste', 'Back to project list')}
+            {tr(language, 'Zurück zur Projektliste', 'Back to project list', 'Retour à la liste des projets')}
           </Button>
         )}
       </CardContent>

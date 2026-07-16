@@ -298,7 +298,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const saved = window.localStorage.getItem('app-language');
-    if (saved === 'de' || saved === 'en') setLanguage(saved);
+    if (saved === 'de' || saved === 'en' || saved === 'fr') setLanguage(saved);
   }, []);
 
   useEffect(() => {
@@ -951,6 +951,7 @@ export default function Dashboard() {
                           tree={modelStructure}
                           onSelect={(id) => setSelectedElementId(id)}
                           selectedId={selectedElementId}
+                          language={language}
                         />
                       )}
                     </div>
@@ -984,6 +985,7 @@ export default function Dashboard() {
                                 onSelectProjectB={setComparisonProjectB}
                                 activeProjectId={activeProject?.id}
                                 activeModelAnalysis={modelAnalysis}
+                                language={language}
                               />
                             </div>
 
@@ -1050,9 +1052,9 @@ export default function Dashboard() {
               {activeProject ? (
                 <div className="flex items-center gap-2 overflow-hidden">
                   <span className="font-medium truncate">{activeProject.fileName}</span>
-                  {activeProject.analysisData && <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">{tr(language, 'Analysiert', 'Analyzed')}</span>}
+                  {activeProject.analysisData && <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">{tr(language, 'Analysiert', 'Analyzed', 'Analysé')}</span>}
                 </div>
-              ) : <span className="text-muted-foreground">{tr(language, 'Kein Projekt ausgewählt', 'No project selected')}</span>}
+              ) : <span className="text-muted-foreground">{tr(language, 'Kein Projekt ausgewählt', 'No project selected', 'Aucun projet sélectionné')}</span>}
               <div className="ml-auto flex items-center gap-2">
                 <Select value={language} onValueChange={(v) => setLanguage(v as Language)}>
                   <SelectTrigger className="w-[120px] h-8 text-xs">
@@ -1061,6 +1063,7 @@ export default function Dashboard() {
                   <SelectContent>
                     <SelectItem value="de">Deutsch</SelectItem>
                     <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="fr">Français</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={selectedModel} onValueChange={(v) => setSelectedModel(v as AIModelId)}>
@@ -1090,7 +1093,7 @@ export default function Dashboard() {
                     {tr(language, 'BIM-Bericht PDF', 'BIM Report PDF')}
                   </Button>
                 )}
-                <ThemeToggle />
+                <ThemeToggle language={language} />
               </div>
             </header>
 

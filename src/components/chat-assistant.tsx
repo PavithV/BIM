@@ -67,10 +67,10 @@ export function ChatAssistant({ language, activeMessages, activeProject, startin
                   <Bot className="w-8 h-8 text-foreground/80" />
                 </AvatarFallback>
               </Avatar>
-              <h2 className="text-lg font-semibold font-headline">{tr(language, 'KI-Coach', 'AI coach')}</h2>
-              <p className="text-muted-foreground text-sm mb-6">{tr(language, 'Fragen Sie mich alles über Ihr Modell.', 'Ask me anything about your model.')}</p>
+              <h2 className="text-lg font-semibold font-headline">{tr(language, 'KI-Coach', 'AI coach', 'Coach IA')}</h2>
+              <p className="text-muted-foreground text-sm mb-6">{tr(language, 'Fragen Sie mich alles über Ihr Modell.', 'Ask me anything about your model.', 'Posez-moi toutes vos questions sur votre modèle.')}</p>
               <div className="space-y-2 text-sm">
-                <p className="text-muted-foreground font-semibold flex items-center justify-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> {tr(language, 'Probieren Sie einen Vorschlag aus', 'Try a suggested prompt')}</p>
+                <p className="text-muted-foreground font-semibold flex items-center justify-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> {tr(language, 'Probieren Sie einen Vorschlag aus', 'Try a suggested prompt', 'Essayez une suggestion')}</p>
                 {startingPrompts.slice(0, 3).map((prompt, index) => (
                   <button key={index} onClick={() => handleSendMessage(prompt)} className="text-left p-3 rounded-md bg-muted/50 hover:bg-muted w-full transition-colors text-foreground/80">
                     {prompt}
@@ -130,7 +130,7 @@ export function ChatAssistant({ language, activeMessages, activeProject, startin
             </Avatar>
             <div className="flex-1 min-w-0 rounded-lg px-4 py-3 bg-muted flex items-center">
               <Loader2 className="w-4 h-4 animate-spin mr-2 shrink-0" />
-              <span className="text-sm">{tr(language, 'Denke...', 'Thinking...')}</span>
+              <span className="text-sm">{tr(language, 'Denke...', 'Thinking...', 'Réflexion...')}</span>
             </div>
           </div>
         )}
@@ -159,7 +159,7 @@ export function ChatAssistant({ language, activeMessages, activeProject, startin
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={tr(language, 'Fragen zu Nachhaltigkeit, Barrierefreiheit, etc.', 'Ask about sustainability, accessibility, etc.')}
+            placeholder={tr(language, 'Fragen zu Nachhaltigkeit, Barrierefreiheit, etc.', 'Ask about sustainability, accessibility, etc.', 'Questions sur la durabilité, l\'accessibilité, etc.')}
             className="pr-24 min-h-[50px] resize-none"
             rows={1}
             disabled={isLoading}
@@ -167,7 +167,7 @@ export function ChatAssistant({ language, activeMessages, activeProject, startin
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
             <Button type="submit" size="icon" onClick={() => handleSendMessage()} disabled={isLoading || !input.trim()}>
               <Send className="w-4 h-4" />
-              <span className="sr-only">{tr(language, 'Nachricht senden', 'Send message')}</span>
+              <span className="sr-only">{tr(language, 'Nachricht senden', 'Send message', 'Envoyer le message')}</span>
             </Button>
             <kbd className="hidden lg:inline-flex items-center gap-1 text-xs text-muted-foreground"><CornerDownLeft className="w-3 h-3" /> Enter</kbd>
           </div>

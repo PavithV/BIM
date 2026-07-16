@@ -7,7 +7,7 @@ import { Button } from './ui/button';
 import { FileUploader } from './file-uploader';
 import { Building, FilePlus, Loader2, Trash2, CheckCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { de, enUS } from 'date-fns/locale';
+import { de, enUS, fr as frLocale } from 'date-fns/locale';
 import type { IFCModel } from '@/lib/types';
 import {
   AlertDialog,
@@ -74,7 +74,7 @@ export function ProjectSelector({ language, projects, isLoading, onSelectProject
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-4">
         <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground text-sm">{tr(language, 'Lade Projekte...', 'Loading projects...')}</p>
+        <p className="text-muted-foreground text-sm">{tr(language, 'Lade Projekte...', 'Loading projects...', 'Chargement des projets...')}</p>
       </div>
     );
   }
@@ -119,8 +119,8 @@ export function ProjectSelector({ language, projects, isLoading, onSelectProject
                 <p className="font-medium text-sm truncate">{project.fileName}</p>
                 <p className="text-xs text-muted-foreground">
                   {project.uploadDate ?
-                    `${language === 'de' ? 'vor ' : ''}${formatDistanceToNow(new Date(project.uploadDate), { locale: language === 'de' ? de : enUS })}` :
-                    tr(language, 'Wird erstellt...', 'Being created...')
+                    `${language === 'de' ? 'vor ' : language === 'fr' ? 'il y a ' : ''}${formatDistanceToNow(new Date(project.uploadDate), { locale: language === 'de' ? de : language === 'fr' ? frLocale : enUS })}` :
+                    tr(language, 'Wird erstellt...', 'Being created...', 'En cours de création...')
                   }
                 </p>
               </div>
@@ -129,20 +129,24 @@ export function ProjectSelector({ language, projects, isLoading, onSelectProject
               <AlertDialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-destructive w-7 h-7">
                   <Trash2 className="w-4 h-4" />
-                  <span className="sr-only">{tr(language, 'Projekt löschen', 'Delete project')}</span>
+                  <span className="sr-only">{tr(language, 'Projekt löschen', 'Delete project', 'Supprimer le projet')}</span>
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>{tr(language, 'Sind Sie sicher?', 'Are you sure?')}</AlertDialogTitle>
+                  <AlertDialogTitle>{tr(language, 'Sind Sie sicher?', 'Are you sure?', 'Êtes-vous sûr ?')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Diese Aktion kann nicht rückgängig gemacht werden. Dadurch werden das Projekt '{project.fileName}', die IFC-Datei im Storage und alle zugehörigen Chat-Nachrichten endgültig gelöscht.
+                    {tr(language,
+                      `Diese Aktion kann nicht rückgängig gemacht werden. Dadurch werden das Projekt '${project.fileName}', die IFC-Datei im Storage und alle zugehörigen Chat-Nachrichten endgültig gelöscht.`,
+                      `This action cannot be undone. This will permanently delete the project '${project.fileName}', the IFC file in storage, and all related chat messages.`,
+                      `Cette action est irréversible. Le projet '${project.fileName}', le fichier IFC dans le stockage et tous les messages de chat associés seront définitivement supprimés.`
+                    )}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>{tr(language, 'Abbrechen', 'Cancel')}</AlertDialogCancel>
+                  <AlertDialogCancel>{tr(language, 'Abbrechen', 'Cancel', 'Annuler')}</AlertDialogCancel>
                   <AlertDialogAction onClick={() => handleDeleteProject(project.id)} className="bg-destructive hover:bg-destructive/90">
-                    {tr(language, 'Löschen', 'Delete')}
+                    {tr(language, 'Löschen', 'Delete', 'Supprimer')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -153,7 +157,7 @@ export function ProjectSelector({ language, projects, isLoading, onSelectProject
       <div className="mt-4 px-2">
         <Button className="w-full" variant="outline" onClick={() => setShowUploader(true)}>
           <FilePlus className="mr-2 h-4 w-4" />
-          {tr(language, 'Neues Projekt starten', 'Start new project')}
+          {tr(language, 'Neues Projekt starten', 'Start new project', 'Démarrer un nouveau projet')}
         </Button>
       </div>
     </div>

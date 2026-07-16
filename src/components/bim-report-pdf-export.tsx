@@ -37,7 +37,7 @@ function fmt(v: number | undefined | null, unit: string): string {
 }
 
 function fmtCurrency(v: number, lang: Language): string {
-  return new Intl.NumberFormat(lang === 'en' ? 'en-US' : 'de-DE', {
+  return new Intl.NumberFormat(lang === 'en' ? 'en-US' : lang === 'fr' ? 'fr-FR' : 'de-DE', {
     style: 'currency',
     currency: 'EUR',
     maximumFractionDigits: 0,
@@ -86,6 +86,22 @@ function kgColor(kg: string): string {
 
 function translateKgLabel(language: Language, label: string): string {
   if (language === 'de') return label;
+  if (language === 'fr') {
+    const mapFr: Record<string, string> = {
+      'Baugrube / Erdbau': 'Fouille / terrassement',
+      'Gründung': 'Fondation',
+      'Außenwände': 'Murs extérieurs',
+      'Außentüren und -fenster': 'Portes et fenêtres extérieures',
+      'Innenwände': 'Murs intérieurs',
+      'Innentüren und -fenster': 'Portes et fenêtres intérieures',
+      'Decken': 'Dalles et plafonds',
+      'Dächer': 'Toitures',
+      'Infrastrukturanlagen': 'Installations d\'infrastructure',
+      'Baukonstruktive Einbauten': 'Éléments structurels intégrés',
+      'Sonstige Maßnahmen': 'Autres mesures',
+    };
+    return mapFr[label] ?? label;
+  }
   const map: Record<string, string> = {
     'Baugrube / Erdbau': 'Excavation / earthworks',
     'Gründung': 'Foundation',
@@ -201,7 +217,7 @@ export function BimReportPdfExport({
   const spaceStatus: Status =
     !mc ? 'warn' : !mc.spacesExist ? 'error' : mc.unnamedSpaceCount > 0 ? 'warn' : 'ok';
 
-  const today = new Date().toLocaleDateString(language === 'de' ? 'de-DE' : 'en-US');
+  const today = new Date().toLocaleDateString(language === 'de' ? 'de-DE' : language === 'fr' ? 'fr-FR' : 'en-US');
 
   // ─────────────────────────────────────────────
   // Render
@@ -213,7 +229,7 @@ export function BimReportPdfExport({
           <div>
             <DialogTitle className="text-xl font-bold font-headline flex items-center gap-2">
               <FileText className="w-5 h-5 text-primary animate-pulse" />
-              {tr(language, 'BIM-Bericht exportieren', 'Export BIM Report')}
+              {tr(language, 'BIM-Bericht exportieren', 'Export BIM Report', 'Exporter le rapport BIM')}
             </DialogTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
               {activeProject?.fileName ?? ''}
@@ -226,31 +242,31 @@ export function BimReportPdfExport({
           <div className="w-[280px] border-r bg-card flex flex-col shrink-0 overflow-y-auto p-5 space-y-5">
             <div>
               <h3 className="font-bold text-xs uppercase tracking-widest text-muted-foreground mb-3">
-                {tr(language, 'Abschnitte auswählen', 'Select sections')}
+                {tr(language, 'Abschnitte auswählen', 'Select sections', 'Sélectionner les sections')}
               </h3>
               <div className="space-y-2">
                 {[
                   {
                     key: 'modelCheck' as const,
-                    label: tr(language, 'Modellprüfung', 'Model check'),
+                    label: tr(language, 'Modellprüfung', 'Model check', 'Vérification du modèle'),
                     icon: <ShieldCheck className="w-4 h-4 text-primary" />,
                     available: !!mc,
                   },
                   {
                     key: 'sustainability' as const,
-                    label: tr(language, 'Nachhaltigkeitsanalyse', 'Sustainability analysis'),
+                    label: tr(language, 'Nachhaltigkeitsanalyse', 'Sustainability analysis', 'Analyse de durabilité'),
                     icon: <Leaf className="w-4 h-4 text-emerald-500" />,
                     available: !!analysis,
                   },
                   {
                     key: 'din277' as const,
-                    label: tr(language, 'DIN 277 Flächen', 'DIN 277 Areas'),
+                    label: tr(language, 'DIN 277 Flächen', 'DIN 277 Areas', 'DIN 277 Surfaces'),
                     icon: <LayoutGrid className="w-4 h-4 text-blue-500" />,
                     available: !!(din277 && din277.spaces.length > 0),
                   },
                   {
                     key: 'din276' as const,
-                    label: tr(language, 'DIN 276 Mengen', 'DIN 276 Quantities'),
+                    label: tr(language, 'DIN 276 Mengen', 'DIN 276 Quantities', 'DIN 276 Quantités'),
                     icon: <Layers className="w-4 h-4 text-amber-500" />,
                     available: !!(din276 && din276.groups.length > 0),
                   },
@@ -300,10 +316,10 @@ export function BimReportPdfExport({
                 className="w-full h-11 font-bold flex items-center justify-center gap-2 shadow-lg transition-all duration-300"
               >
                 <Printer className="w-5 h-5" />
-                {tr(language, 'PDF drucken / speichern', 'Print / Save PDF')}
+                {tr(language, 'PDF drucken / speichern', 'Print / Save PDF', 'Imprimer / Enregistrer PDF')}
               </Button>
               <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full h-9 font-medium">
-                {tr(language, 'Schließen', 'Close')}
+                {tr(language, 'Schließen', 'Close', 'Fermer')}
               </Button>
             </div>
           </div>
@@ -333,10 +349,10 @@ export function BimReportPdfExport({
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                   <div>
                     <p style={{ fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, marginBottom: 6 }}>
-                      BIMCoach Studio · {tr(language, 'Projektbericht', 'Project Report')}
+                      BIMCoach Studio · {tr(language, 'Projektbericht', 'Project Report', 'Rapport de projet')}
                     </p>
                     <h1 style={{ fontSize: 22, fontWeight: 900, margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-                      {tr(language, 'BIM-Analyse & Qualitätsbericht', 'BIM Analysis & Quality Report')}
+                      {tr(language, 'BIM-Analyse & Qualitätsbericht', 'BIM Analysis & Quality Report', 'Analyse BIM et rapport qualité')}
                     </h1>
                     <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 6, fontWeight: 600 }}>
                       {activeProject?.fileName ?? '—'}
@@ -352,12 +368,12 @@ export function BimReportPdfExport({
                 <div style={{ display: 'flex', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
                   {sectionsToInclude.modelCheck && (
                     <span style={{ background: 'rgba(255,255,255,0.12)', color: '#e2e8f0', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '3px 10px', borderRadius: 99 }}>
-                      {tr(language, 'Modellprüfung', 'Model check')}
+                      {tr(language, 'Modellprüfung', 'Model check', 'Vérification du modèle')}
                     </span>
                   )}
                   {sectionsToInclude.sustainability && (
                     <span style={{ background: 'rgba(255,255,255,0.12)', color: '#e2e8f0', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '3px 10px', borderRadius: 99 }}>
-                      {tr(language, 'Nachhaltigkeit', 'Sustainability')}
+                      {tr(language, 'Nachhaltigkeit', 'Sustainability', 'Durabilité')}
                     </span>
                   )}
                   {sectionsToInclude.din277 && (
@@ -378,25 +394,25 @@ export function BimReportPdfExport({
               ══════════════════════════════════════════ */}
               {sectionsToInclude.modelCheck && (
                 <div style={{ padding: '28px 36px', borderBottom: '2px solid #e2e8f0' }}>
-                  <SectionHeading icon="🔍" title={tr(language, 'Modellprüfung', 'Model check')} color="#6366f1" />
+                  <SectionHeading icon="🔍" title={tr(language, 'Modellprüfung', 'Model check', 'Vérification du modèle')} color="#6366f1" />
 
                   {!mc ? (
                     <NoData language={language} />
                   ) : (
                     <>
                       {/* IFC Version */}
-                      <SubHeading title={tr(language, 'IFC-Version & Metadaten', 'IFC Version & Metadata')} />
+                      <SubHeading title={tr(language, 'IFC-Version & Metadaten', 'IFC Version & Metadata', 'Version IFC et métadonnées')} />
                       <table style={{ marginBottom: 16 }}>
                         <tbody>
                           <tr>
-                            <TdLabel>{tr(language, 'Schema', 'Schema')}</TdLabel>
+                            <TdLabel>{tr(language, 'Schema', 'Schema', 'Schéma')}</TdLabel>
                             <TdValue>{mc.ifcVersion ?? '—'}</TdValue>
-                            <TdLabel>{tr(language, 'Projekt', 'Project')}</TdLabel>
+                            <TdLabel>{tr(language, 'Projekt', 'Project', 'Projet')}</TdLabel>
                             <TdValue>{mc.projectName ?? '—'}</TdValue>
                           </tr>
                           {mc.creationDate && (
                             <tr>
-                              <TdLabel>{tr(language, 'Erstellt am', 'Created on')}</TdLabel>
+                              <TdLabel>{tr(language, 'Erstellt am', 'Created on', 'Créé le')}</TdLabel>
                               <TdValue colSpan={3}>{mc.creationDate}</TdValue>
                             </tr>
                           )}
@@ -404,42 +420,42 @@ export function BimReportPdfExport({
                       </table>
 
                       {/* Räume */}
-                      <SubHeading title={tr(language, 'Räume (IfcSpace)', 'Spaces (IfcSpace)')} />
+                      <SubHeading title={tr(language, 'Räume (IfcSpace)', 'Spaces (IfcSpace)', 'Espaces (IfcSpace)')} />
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 11 }}>
                         <StatusDot status={spaceStatus} />
                         {mc.spacesExist ? (
                           <span>
-                            <strong>{mc.spaceCount}</strong> {tr(language, 'Räume gefunden', 'spaces found')}
+                            <strong>{mc.spaceCount}</strong> {tr(language, 'Räume gefunden', 'spaces found', 'espaces trouvés')}
                             {mc.unnamedSpaceCount > 0 && (
                               <span style={{ color: '#ca8a04', marginLeft: 8 }}>
-                                ({mc.unnamedSpaceCount} {tr(language, 'ohne Namen', 'unnamed')})
+                                ({mc.unnamedSpaceCount} {tr(language, 'ohne Namen', 'unnamed', 'sans nom')})
                               </span>
                             )}
                           </span>
                         ) : (
                           <span style={{ color: '#dc2626', fontWeight: 700 }}>
-                            {tr(language, 'Keine IfcSpace-Entitäten vorhanden!', 'No IfcSpace entities found!')}
+                            {tr(language, 'Keine IfcSpace-Entitäten vorhanden!', 'No IfcSpace entities found!', 'Aucune entité IfcSpace trouvée !')}
                           </span>
                         )}
                       </div>
 
                       {/* Materialzuordnung */}
-                      <SubHeading title={tr(language, 'Materialzuordnung', 'Material assignment')} />
+                      <SubHeading title={tr(language, 'Materialzuordnung', 'Material assignment', 'Attribution des matériaux')} />
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 11 }}>
                         <StatusDot status={matStatus} />
                         <span>
                           <strong>{totalElements - totalWithout}</strong> / {totalElements}{' '}
-                          {tr(language, 'Bauteile mit Material', 'components with material')}
+                          {tr(language, 'Bauteile mit Material', 'components with material', 'composants avec matériau')}
                         </span>
                       </div>
                       {mc.materialChecks.length > 0 && (
                         <table style={{ marginBottom: 16, fontSize: 10 }}>
                           <thead>
                             <tr style={{ background: '#f1f5f9' }}>
-                              <Th>{tr(language, 'Bauteiltyp', 'Component type')}</Th>
-                              <Th right>{tr(language, 'Mit Material', 'With material')}</Th>
-                              <Th right>{tr(language, 'Ohne Material', 'Without material')}</Th>
-                              <Th right>{tr(language, 'Gesamt', 'Total')}</Th>
+                              <Th>{tr(language, 'Bauteiltyp', 'Component type', 'Type de composant')}</Th>
+                              <Th right>{tr(language, 'Mit Material', 'With material', 'Avec matériau')}</Th>
+                              <Th right>{tr(language, 'Ohne Material', 'Without material', 'Sans matériau')}</Th>
+                              <Th right>{tr(language, 'Gesamt', 'Total', 'Total')}</Th>
                               <Th right>%</Th>
                             </tr>
                           </thead>
@@ -461,12 +477,12 @@ export function BimReportPdfExport({
                       )}
 
                       {/* OBD Match */}
-                      <SubHeading title={tr(language, 'Ökobaudat-Verknüpfung', 'Ökobaudat linkage')} />
+                      <SubHeading title={tr(language, 'Ökobaudat-Verknüpfung', 'Ökobaudat linkage', 'Liaison Ökobaudat')} />
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 11 }}>
                         <StatusDot status={obdStatus} />
                         <span>
                           <strong>{mc.obdMatchCount}</strong> / {mc.totalIfcMaterials}{' '}
-                          {tr(language, 'Materialien verknüpft', 'materials linked')}
+                          {tr(language, 'Materialien verknüpft', 'materials linked', 'matériaux liés')}
                         </span>
                       </div>
                       {mc.matchingMaterials && mc.matchingMaterials.length > 0 && (
@@ -489,14 +505,14 @@ export function BimReportPdfExport({
               ══════════════════════════════════════════ */}
               {sectionsToInclude.sustainability && (
                 <div style={{ padding: '28px 36px', borderBottom: '2px solid #e2e8f0' }}>
-                  <SectionHeading icon="🌱" title={tr(language, 'Nachhaltigkeitsanalyse', 'Sustainability analysis')} color="#10b981" />
+                  <SectionHeading icon="🌱" title={tr(language, 'Nachhaltigkeitsanalyse', 'Sustainability analysis', 'Analyse de durabilité')} color="#10b981" />
 
                   {!analysis ? (
                     <NoData language={language} />
                   ) : (
                     <>
                       {/* Summary */}
-                      <SubHeading title={tr(language, 'Zusammenfassung', 'Summary')} />
+                      <SubHeading title={tr(language, 'Zusammenfassung', 'Summary', 'Résumé')} />
                       <p style={{ fontSize: 11, lineHeight: 1.6, color: '#475569', marginBottom: 16, background: '#f8fafc', padding: '10px 14px', borderRadius: 8, borderLeft: '3px solid #10b981' }}>
                         {analysis.summary}
                       </p>
@@ -504,15 +520,15 @@ export function BimReportPdfExport({
                       {/* Indicators */}
                       {analysis.indicators.length > 0 && (
                         <>
-                          <SubHeading title={tr(language, 'Kennwerte', 'Key indicators')} />
+                          <SubHeading title={tr(language, 'Kennwerte', 'Key indicators', 'Indicateurs clés')} />
                           <table style={{ marginBottom: 16 }}>
                             <thead>
                               <tr style={{ background: '#f1f5f9' }}>
-                                <Th>{tr(language, 'Indikator', 'Indicator')}</Th>
-                                <Th right>{tr(language, 'Wert', 'Value')}</Th>
-                                <Th>{tr(language, 'Einheit', 'Unit')}</Th>
-                                <Th>{tr(language, 'Lebensphase', 'Life phase')}</Th>
-                                <Th>{tr(language, 'Bewertung', 'Rating')}</Th>
+                                <Th>{tr(language, 'Indikator', 'Indicator', 'Indicateur')}</Th>
+                                <Th right>{tr(language, 'Wert', 'Value', 'Valeur')}</Th>
+                                <Th>{tr(language, 'Einheit', 'Unit', 'Unité')}</Th>
+                                <Th>{tr(language, 'Lebensphase', 'Life phase', 'Phase de vie')}</Th>
+                                <Th>{tr(language, 'Bewertung', 'Rating', 'Évaluation')}</Th>
                               </tr>
                             </thead>
                             <tbody>
@@ -524,7 +540,7 @@ export function BimReportPdfExport({
                                   <td style={{ padding: '4px 8px', fontSize: 10, fontFamily: 'monospace' }}>{ind.a}</td>
                                   <td style={{ padding: '4px 8px', fontSize: 10, color: ind.rating === 'low' ? '#16a34a' : ind.rating === 'medium' ? '#ca8a04' : '#dc2626', fontWeight: 700 }}>
                                     {ind.rating === 'low' ? '↓ ' : ind.rating === 'medium' ? '→ ' : '↑ '}
-                                    {ind.rating === 'low' ? tr(language, 'Niedrig', 'Low') : ind.rating === 'medium' ? tr(language, 'Mittel', 'Medium') : tr(language, 'Hoch', 'High')}
+                                    {ind.rating === 'low' ? tr(language, 'Niedrig', 'Low', 'Faible') : ind.rating === 'medium' ? tr(language, 'Mittel', 'Medium', 'Moyen') : tr(language, 'Hoch', 'High', 'Élevé')}
                                   </td>
                                 </tr>
                               ))}
@@ -536,13 +552,13 @@ export function BimReportPdfExport({
                       {/* Material composition */}
                       {analysis.materialComposition.length > 0 && (
                         <>
-                          <SubHeading title={tr(language, 'Materialzusammensetzung', 'Material composition')} />
+                          <SubHeading title={tr(language, 'Materialzusammensetzung', 'Material composition', 'Composition des matériaux')} />
                           <table style={{ marginBottom: 4 }}>
                             <thead>
                               <tr style={{ background: '#f1f5f9' }}>
-                                <Th>{tr(language, 'Material', 'Material')}</Th>
-                                <Th right>{tr(language, 'Anteil (%)', 'Share (%)')}</Th>
-                                <Th right>{tr(language, 'Verteilung', 'Distribution')}</Th>
+                                <Th>{tr(language, 'Material', 'Material', 'Matériau')}</Th>
+                                <Th right>{tr(language, 'Anteil (%)', 'Share (%)', 'Part (%)')}</Th>
+                                <Th right>{tr(language, 'Verteilung', 'Distribution', 'Distribution')}</Th>
                               </tr>
                             </thead>
                             <tbody>
@@ -574,21 +590,21 @@ export function BimReportPdfExport({
               ══════════════════════════════════════════ */}
               {sectionsToInclude.din277 && (
                 <div style={{ padding: '28px 36px', borderBottom: '2px solid #e2e8f0' }}>
-                  <SectionHeading icon="📐" title={tr(language, 'DIN 277 Flächenauswertung', 'DIN 277 Area Evaluation')} color="#3b82f6" />
+                  <SectionHeading icon="📐" title={tr(language, 'DIN 277 Flächenauswertung', 'DIN 277 Area Evaluation', 'Évaluation des surfaces DIN 277')} color="#3b82f6" />
 
                   {!din277 || din277.spaces.length === 0 ? (
                     <NoData language={language} />
                   ) : (
                     <>
                       {/* Summary KPIs */}
-                      <SubHeading title={tr(language, 'Flächenkennwerte', 'Area key figures')} />
+                      <SubHeading title={tr(language, 'Flächenkennwerte', 'Area key figures', 'Indicateurs de surface')} />
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 20 }}>
                         {[
-                          { label: 'BGF', sub: tr(language, 'Bruttogrundfläche', 'Gross floor area'), val: din277.summary.bgf, color: '#1e293b' },
-                          { label: 'NRF', sub: tr(language, 'Nettoraumfläche', 'Net room area'), val: din277.summary.nrf, color: '#1e293b' },
-                          { label: 'NUF', sub: tr(language, 'Nutzungsfläche', 'Usable area'), val: din277.summary.nuf, color: '#3b82f6' },
-                          { label: 'VF', sub: tr(language, 'Verkehrsfläche', 'Circulation area'), val: din277.summary.vf, color: '#f59e0b' },
-                          { label: 'TF', sub: tr(language, 'Technikfläche', 'Technical area'), val: din277.summary.tf, color: '#a855f7' },
+                          { label: 'BGF', sub: tr(language, 'Bruttogrundfläche', 'Gross floor area', 'Surface brute de plancher'), val: din277.summary.bgf, color: '#1e293b' },
+                          { label: 'NRF', sub: tr(language, 'Nettoraumfläche', 'Net room area', 'Surface nette'), val: din277.summary.nrf, color: '#1e293b' },
+                          { label: 'NUF', sub: tr(language, 'Nutzungsfläche', 'Usable area', 'Surface utile'), val: din277.summary.nuf, color: '#3b82f6' },
+                          { label: 'VF', sub: tr(language, 'Verkehrsfläche', 'Circulation area', 'Surface de circulation'), val: din277.summary.vf, color: '#f59e0b' },
+                          { label: 'TF', sub: tr(language, 'Technikfläche', 'Technical area', 'Surface technique'), val: din277.summary.tf, color: '#a855f7' },
                         ].map(({ label, sub, val, color }) => (
                           <div key={label} style={{ border: `2px solid ${color}30`, borderRadius: 8, padding: '10px 12px', background: `${color}08` }}>
                             <p style={{ fontSize: 9, fontWeight: 800, color, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 2px' }}>{label}</p>
@@ -599,15 +615,15 @@ export function BimReportPdfExport({
                       </div>
 
                       {/* Space table */}
-                      <SubHeading title={tr(language, `Raumdetails (${din277.spaces.length} Räume)`, `Room details (${din277.spaces.length} rooms)`)} />
+                      <SubHeading title={tr(language, `Raumdetails (${din277.spaces.length} Räume)`, `Room details (${din277.spaces.length} rooms)`, `Détails des pièces (${din277.spaces.length} pièces)`)} />
                       <table style={{ marginBottom: 4, fontSize: 10 }}>
                         <thead>
                           <tr style={{ background: '#f1f5f9' }}>
-                            <Th>{tr(language, 'Name', 'Name')}</Th>
-                            <Th>{tr(language, 'Kategorie', 'Category')}</Th>
+                            <Th>{tr(language, 'Name', 'Name', 'Nom')}</Th>
+                            <Th>{tr(language, 'Kategorie', 'Category', 'Catégorie')}</Th>
                             <Th right>NGA (m²)</Th>
                             <Th right>BGA (m²)</Th>
-                            <Th right>{tr(language, 'Volumen (m³)', 'Volume (m³)')}</Th>
+                            <Th right>{tr(language, 'Volumen (m³)', 'Volume (m³)', 'Volume (m³)')}</Th>
                           </tr>
                         </thead>
                         <tbody>
@@ -627,14 +643,14 @@ export function BimReportPdfExport({
                           {din277.spaces.length > 40 && (
                             <tr>
                               <td colSpan={5} style={{ padding: '4px 8px', fontSize: 9, color: '#64748b', textAlign: 'center', fontStyle: 'italic' }}>
-                                ... {din277.spaces.length - 40} {tr(language, 'weitere Räume (im UI sichtbar)', 'more rooms (visible in UI)')}
+                                ... {din277.spaces.length - 40} {tr(language, 'weitere Räume (im UI sichtbar)', 'more rooms (visible in UI)', 'pièces supplémentaires (visibles dans l\'interface)')}
                               </td>
                             </tr>
                           )}
                         </tbody>
                         <tfoot>
                           <tr style={{ background: '#1e293b', color: '#fff', fontWeight: 800 }}>
-                            <td colSpan={2} style={{ padding: '5px 8px', fontSize: 10 }}>{tr(language, 'Summe', 'Total')}</td>
+                            <td colSpan={2} style={{ padding: '5px 8px', fontSize: 10 }}>{tr(language, 'Summe', 'Total', 'Total')}</td>
                             <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: 10 }}>
                               {din277.summary.nrf != null ? din277.summary.nrf.toFixed(2) : '—'}
                             </td>
@@ -657,7 +673,7 @@ export function BimReportPdfExport({
               ══════════════════════════════════════════ */}
               {sectionsToInclude.din276 && (
                 <div style={{ padding: '28px 36px' }}>
-                  <SectionHeading icon="💶" title={tr(language, 'DIN 276 Mengenauswertung', 'DIN 276 Quantity Evaluation')} color="#f59e0b" />
+                  <SectionHeading icon="💶" title={tr(language, 'DIN 276 Mengenauswertung', 'DIN 276 Quantity Evaluation', 'Évaluation quantitative DIN 276')} color="#f59e0b" />
 
                   {!din276 || din276.groups.length === 0 ? (
                     <NoData language={language} />
@@ -667,14 +683,14 @@ export function BimReportPdfExport({
                       <div style={{ background: 'linear-gradient(135deg, #1e293b, #334155)', borderRadius: 12, padding: '16px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div>
                           <p style={{ fontSize: 9, color: '#94a3b8', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 4px' }}>
-                            {tr(language, 'Geschätzte Gesamtbaukosten (KG 300)', 'Estimated total construction costs (KG 300)')}
+                            {tr(language, 'Geschätzte Gesamtbaukosten (KG 300)', 'Estimated total construction costs (KG 300)', 'Coûts de construction totaux estimés (KG 300)')}
                           </p>
                           <p style={{ fontSize: 24, fontWeight: 900, color: '#f8fafc', margin: 0, letterSpacing: '-0.02em' }}>
                             {fmtCurrency(din276.totalCost, language)}
                           </p>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <p style={{ fontSize: 9, color: '#64748b', margin: '0 0 2px' }}>{tr(language, 'Basierend auf BKI-Mittelwerten', 'Based on BKI averages')}</p>
+                          <p style={{ fontSize: 9, color: '#64748b', margin: '0 0 2px' }}>{tr(language, 'Basierend auf BKI-Mittelwerten', 'Based on BKI averages', 'Basé sur les moyennes BKI')}</p>
                           <p style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, margin: 0 }}>
                             {din276.totalArea.toFixed(0)} m² · {din276.totalVolume.toFixed(0)} m³
                           </p>
@@ -682,16 +698,16 @@ export function BimReportPdfExport({
                       </div>
 
                       {/* Cost groups table */}
-                      <SubHeading title={tr(language, 'Kostengruppen nach DIN 276', 'Cost groups per DIN 276')} />
+                      <SubHeading title={tr(language, 'Kostengruppen nach DIN 276', 'Cost groups per DIN 276', 'Groupes de coûts selon DIN 276')} />
                       <table style={{ marginBottom: 16, fontSize: 10 }}>
                         <thead>
                           <tr style={{ background: '#f1f5f9' }}>
-                            <Th>{tr(language, 'KG', 'CG')}</Th>
-                            <Th>{tr(language, 'Bezeichnung', 'Description')}</Th>
-                            <Th right>{tr(language, 'Bauteile', 'Components')}</Th>
-                            <Th right>{tr(language, 'Fläche/Volumen', 'Area/Volume')}</Th>
-                            <Th right>{tr(language, 'Einheitspreis', 'Unit price')}</Th>
-                            <Th right>{tr(language, 'Kosten', 'Costs')}</Th>
+                            <Th>{tr(language, 'KG', 'CG', 'GC')}</Th>
+                            <Th>{tr(language, 'Bezeichnung', 'Description', 'Désignation')}</Th>
+                            <Th right>{tr(language, 'Bauteile', 'Components', 'Composants')}</Th>
+                            <Th right>{tr(language, 'Fläche/Volumen', 'Area/Volume', 'Surface/Volume')}</Th>
+                            <Th right>{tr(language, 'Einheitspreis', 'Unit price', 'Prix unitaire')}</Th>
+                            <Th right>{tr(language, 'Kosten', 'Costs', 'Coûts')}</Th>
                           </tr>
                         </thead>
                         <tbody>
@@ -719,7 +735,7 @@ export function BimReportPdfExport({
                         <tfoot>
                           <tr style={{ background: '#1e293b', color: '#fff', fontWeight: 900 }}>
                             <td colSpan={5} style={{ padding: '6px 8px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                              {tr(language, 'Gesamtkosten KG 300', 'Total costs KG 300')}
+                              {tr(language, 'Gesamtkosten KG 300', 'Total costs KG 300', 'Coûts totaux KG 300')}
                             </td>
                             <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
                               {fmtCurrency(din276.totalCost, language)}
@@ -785,7 +801,7 @@ function Th({ children, right }: { children: React.ReactNode; right?: boolean })
 function NoData({ language }: { language: Language }) {
   return (
     <p style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', padding: '12px 0' }}>
-      {tr(language, 'Keine Daten verfügbar – bitte Analyse zuerst ausführen.', 'No data available – please run analysis first.')}
+      {tr(language, 'Keine Daten verfügbar – bitte Analyse zuerst ausführen.', 'No data available – please run analysis first.', 'Aucune donnée disponible – veuillez d\'abord lancer l\'analyse.')}
     </p>
   );
 }
