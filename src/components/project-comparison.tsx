@@ -35,6 +35,7 @@ import type { IFCModel } from '@/lib/types';
 import type { FullModelAnalysis } from '@/utils/modelChecker';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Language, tr } from '@/lib/i18n';
 
 interface ProjectComparisonProps {
   projects: IFCModel[];
@@ -45,6 +46,7 @@ interface ProjectComparisonProps {
   /** Lokale Modellanalyse des aktiven Projekts – wird als Fallback für Kostendaten genutzt */
   activeProjectId?: string | null;
   activeModelAnalysis?: FullModelAnalysis | null;
+  language: Language;
 }
 
 interface ComparisonMetrics {
@@ -268,8 +270,13 @@ function MetricRow({
   formatValue?: (v: number) => string;
   noDataA?: boolean;
   noDataB?: boolean;
+  language: Language;
 }) {
-  const fmt = formatValue ?? ((v: number) => v.toLocaleString('de-DE', { maximumFractionDigits: 2 }));
+  const defaultFmt = (v: number) => {
+    const loc = language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE';
+    return v.toLocaleString(loc, { maximumFractionDigits: 2 });
+  };
+  const fmt = formatValue ?? defaultFmt;
   const max = Math.max(valueA, valueB, 1);
   const barA = (valueA / max) * 100;
   const barB = (valueB / max) * 100;
@@ -316,13 +323,13 @@ function MetricRow({
                 'text-blue-600 dark:text-blue-400'
               )}
             >
-              Projekt A
+              {tr(language, 'Projekt A', 'Project A', 'Projet A')}
             </span>
             {aWins && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
           </div>
           <p className="text-xl font-bold leading-none">
             {noDataA ? (
-              <span className="text-sm font-normal text-muted-foreground italic">Nicht verfügbar</span>
+              <span className="text-sm font-normal text-muted-foreground italic">{tr(language, 'Nicht verfügbar', 'Not available', 'Non disponible')}</span>
             ) : (
               <>{fmt(valueA)}<span className="text-xs font-normal text-muted-foreground ml-1">{unit}</span></>
             )}
@@ -344,13 +351,13 @@ function MetricRow({
                 'text-violet-600 dark:text-violet-400'
               )}
             >
-              Projekt B
+              {tr(language, 'Projekt B', 'Project B', 'Projet B')}
             </span>
             {bWins && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
           </div>
           <p className="text-xl font-bold leading-none">
             {noDataB ? (
-              <span className="text-sm font-normal text-muted-foreground italic">Nicht verfügbar</span>
+              <span className="text-sm font-normal text-muted-foreground italic">{tr(language, 'Nicht verfügbar', 'Not available', 'Non disponible')}</span>
             ) : (
               <>{fmt(valueB)}<span className="text-xs font-normal text-muted-foreground ml-1">{unit}</span></>
             )}
@@ -367,7 +374,7 @@ function MetricRow({
   );
 }
 
-function SustainabilityGauge({ score, label, color }: { score: number; label: string; color: 'blue' | 'violet' }) {
+function SustainabilityGauge({ score, label, color, language }: { score: number; label: string; color: 'blue' | 'violet'; language: Language }) {
   const clampedScore = Math.min(100, Math.max(0, score));
   const circumference = 2 * Math.PI * 36;
   const strokeDashoffset = circumference - (clampedScore / 100) * circumference;
@@ -380,12 +387,12 @@ function SustainabilityGauge({ score, label, color }: { score: number; label: st
 
   const grade =
     clampedScore >= 80
-      ? 'Ausgezeichnet'
+      ? tr(language, 'Ausgezeichnet', 'Excellent', 'Excellent')
       : clampedScore >= 60
-      ? 'Gut'
+      ? tr(language, 'Gut', 'Good', 'Bien')
       : clampedScore >= 40
-      ? 'Befriedigend'
-      : 'Verbesserungsbedarf';
+      ? tr(language, 'Befriedigend', 'Satisfactory', 'Satisfaisant')
+      : tr(language, 'Verbesserungsbedarf', 'Needs improvement', 'À améliorer');
 
   return (
     <div className={cn('flex flex-col items-center gap-2 rounded-xl border p-5', c.bg)}>
@@ -449,6 +456,7 @@ export function ProjectComparison({
   onSelectProjectB,
   activeProjectId,
   activeModelAnalysis,
+  language,
 }: ProjectComparisonProps) {
   // Fallback: DIN 276 Kosten aus lokalem State, falls noch nicht in DB persistiert
   const din276Fallback = activeProjectId && activeModelAnalysis?.din276?.totalCost
@@ -466,27 +474,27 @@ export function ProjectComparison({
     if (!comparisonData.projectA || !comparisonData.projectB) return [];
     return [
       {
-        metric: 'Kosten (T€)',
+        metric: tr(language, 'Kosten (T€)', 'Cost (k€)', 'Coût (k€)'),
         A: +(comparisonData.projectA.totalCost / 1000).toFixed(1),
         B: +(comparisonData.projectB.totalCost / 1000).toFixed(1),
       },
       {
-        metric: 'CO₂ (kg/m²)',
+        metric: tr(language, 'CO₂ (kg/m²)', 'CO₂ (kg/m²)', 'CO₂ (kg/m²)'),
         A: +comparisonData.projectA.co2Emissions.toFixed(1),
         B: +comparisonData.projectB.co2Emissions.toFixed(1),
       },
       {
-        metric: 'Recycling (%)',
+        metric: tr(language, 'Recycling (%)', 'Recycling (%)', 'Recyclage (%)'),
         A: +comparisonData.projectA.recyclingRate.toFixed(1),
         B: +comparisonData.projectB.recyclingRate.toFixed(1),
       },
       {
-        metric: 'Nachhaltigkeit (%)',
+        metric: tr(language, 'Nachhaltigkeit (%)', 'Sustainability (%)', 'Durabilité (%)'),
         A: +comparisonData.projectA.sustainabilityScore.toFixed(1),
         B: +comparisonData.projectB.sustainabilityScore.toFixed(1),
       },
     ];
-  }, [comparisonData]);
+  }, [comparisonData, language]);
 
   const radarData = useMemo(() => {
     if (!comparisonData.projectA || !comparisonData.projectB) return [];
@@ -496,31 +504,31 @@ export function ProjectComparison({
 
     return [
       {
-        subject: 'Nachhaltigkeit',
+        subject: tr(language, 'Nachhaltigkeit', 'Sustainability', 'Durabilité'),
         A: +comparisonData.projectA.sustainabilityScore.toFixed(1),
         B: +comparisonData.projectB.sustainabilityScore.toFixed(1),
       },
       {
-        subject: 'Recycling',
+        subject: tr(language, 'Recycling', 'Recycling', 'Recyclage'),
         A: +comparisonData.projectA.recyclingRate.toFixed(1),
         B: +comparisonData.projectB.recyclingRate.toFixed(1),
       },
       {
-        subject: 'Kosteneff.',
+        subject: tr(language, 'Kosteneff.', 'Cost eff.', 'Eff. coût'),
         A: +(100 - (comparisonData.projectA.totalCost / maxCost) * 100).toFixed(1),
         B: +(100 - (comparisonData.projectB.totalCost / maxCost) * 100).toFixed(1),
       },
       {
-        subject: 'CO₂-Eff.',
+        subject: tr(language, 'CO₂-Eff.', 'CO₂ eff.', 'Eff. CO₂'),
         A: +(100 - (comparisonData.projectA.co2Emissions / maxCO2) * 100).toFixed(1),
         B: +(100 - (comparisonData.projectB.co2Emissions / maxCO2) * 100).toFixed(1),
       },
     ];
-  }, [comparisonData]);
+  }, [comparisonData, language]);
 
   const chartConfig: ChartConfig = {
-    A: { label: projectA?.fileName ?? 'Projekt A', color: 'hsl(217 91% 60%)' },
-    B: { label: projectB?.fileName ?? 'Projekt B', color: 'hsl(263 70% 50%)' },
+    A: { label: projectA?.fileName ?? tr(language, 'Projekt A', 'Project A', 'Projet A'), color: 'hsl(217 91% 60%)' },
+    B: { label: projectB?.fileName ?? tr(language, 'Projekt B', 'Project B', 'Projet B'), color: 'hsl(263 70% 50%)' },
   };
 
   // ── Empty state ─────────────────────────────────────────────────────────
@@ -531,9 +539,9 @@ export function ProjectComparison({
           <ArrowLeftRight className="w-9 h-9 text-muted-foreground/50" />
         </div>
         <div>
-          <h3 className="font-semibold text-xl mb-1">Projektvergleich</h3>
+          <h3 className="font-semibold text-xl mb-1">{tr(language, 'Projektvergleich', 'Project comparison', 'Comparaison de projets')}</h3>
           <p className="text-muted-foreground text-sm max-w-xs">
-            Wählen Sie zwei Projekte aus den Dropdowns aus, um eine detaillierte Gegenüberstellung zu sehen.
+            {tr(language, 'Wählen Sie zwei Projekte aus den Dropdowns aus, um eine detaillierte Gegenüberstellung zu sehen.', 'Select two projects from the dropdowns to see a detailed comparison.', 'Sélectionnez deux projets dans les menus déroulants pour voir une comparaison détaillée.')}
           </p>
         </div>
       </div>
@@ -547,9 +555,9 @@ export function ProjectComparison({
           <AlertCircle className="w-9 h-9 text-amber-500" />
         </div>
         <div>
-          <h3 className="font-semibold text-xl mb-1">Unvollständige Daten</h3>
+          <h3 className="font-semibold text-xl mb-1">{tr(language, 'Unvollständige Daten', 'Incomplete data', 'Données incomplètes')}</h3>
           <p className="text-muted-foreground text-sm max-w-xs">
-            Beide Projekte benötigen Analysedaten für einen Vergleich. Führen Sie zuerst eine Analyse durch.
+            {tr(language, 'Beide Projekte benötigen Analysedaten für einen Vergleich. Führen Sie zuerst eine Analyse durch.', 'Both projects need analysis data for a comparison. Run an analysis first.', 'Les deux projets ont besoin de données d\'analyse pour une comparaison. Exécutez d\'abord une analyse.')}
           </p>
         </div>
       </div>
@@ -567,7 +575,7 @@ export function ProjectComparison({
         <div className="rounded-xl border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-4 space-y-2">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-blue-500" />
-            <span className="text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">Projekt A</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">{tr(language, 'Projekt A', 'Project A', 'Projet A')}</span>
           </div>
           <Select
             value={projectA.id}
@@ -605,7 +613,7 @@ export function ProjectComparison({
         <div className="rounded-xl border-2 border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 p-4 space-y-2">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-violet-500" />
-            <span className="text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">Projekt B</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">{tr(language, 'Projekt B', 'Project B', 'Projet B')}</span>
           </div>
           <Select
             value={projectB.id}
@@ -636,11 +644,11 @@ export function ProjectComparison({
       {/* ── 2. Kennzahlen ─────────────────────────────────────────────────── */}
       <div>
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-          Kennzahlen im Vergleich
+          {tr(language, 'Kennzahlen im Vergleich', 'Key metrics comparison', 'Comparaison des indicateurs clés')}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <MetricRow
-            label="Gesamtkosten"
+            label={tr(language, 'Gesamtkosten', 'Total costs', 'Coûts totaux')}
             icon={<Euro className="w-4 h-4" />}
             valueA={comparisonData.projectA?.totalCost ?? 0}
             valueB={comparisonData.projectB?.totalCost ?? 0}
@@ -651,36 +659,40 @@ export function ProjectComparison({
                 ? differences?.totalCost ?? null
                 : null
             }
-            formatValue={(v) => v.toLocaleString('de-DE', { maximumFractionDigits: 0 })}
+            formatValue={(v) => v.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 0 })}
             noDataA={!projectA.costEstimationData?.totalEstimatedCost}
             noDataB={!projectB.costEstimationData?.totalEstimatedCost}
+            language={language}
           />
           <MetricRow
-            label="CO₂-Emissionen"
+            label={tr(language, 'CO₂-Emissionen', 'CO₂ emissions', 'Émissions de CO₂')}
             icon={<Leaf className="w-4 h-4" />}
             valueA={comparisonData.projectA?.co2Emissions ?? 0}
             valueB={comparisonData.projectB?.co2Emissions ?? 0}
             unit="kg CO₂/m²"
             metricKey="co2Emissions"
             difference={differences?.co2Emissions ?? null}
+            language={language}
           />
           <MetricRow
-            label="Recyclinganteil"
+            label={tr(language, 'Recyclinganteil', 'Recycling rate', 'Taux de recyclage')}
             icon={<Recycle className="w-4 h-4" />}
             valueA={comparisonData.projectA?.recyclingRate ?? 0}
             valueB={comparisonData.projectB?.recyclingRate ?? 0}
             unit="%"
             metricKey="recyclingRate"
             difference={differences?.recyclingRate ?? null}
+            language={language}
           />
           <MetricRow
-            label="Materialvolumen gesamt"
+            label={tr(language, 'Materialvolumen gesamt', 'Total material volume', 'Volume total de matériaux')}
             icon={<Layers className="w-4 h-4" />}
             valueA={comparisonData.projectA?.totalElements ?? 0}
             valueB={comparisonData.projectB?.totalElements ?? 0}
-            unit="%"
+            unit=""
             metricKey="totalElements"
             difference={differences?.totalElements ?? null}
+            language={language}
           />
         </div>
       </div>
@@ -690,8 +702,8 @@ export function ProjectComparison({
         {/* Bar Chart */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-headline">Metriken im Überblick</CardTitle>
-            <CardDescription>Normalisierter Vergleich aller Kennzahlen</CardDescription>
+            <CardTitle className="text-base font-headline">{tr(language, 'Metriken im Überblick', 'Metrics overview', 'Aperçu des métriques')}</CardTitle>
+            <CardDescription>{tr(language, 'Normalisierter Vergleich aller Kennzahlen', 'Normalized comparison of all metrics', 'Comparaison normalisée de toutes les métriques')}</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[260px] w-full">
@@ -718,13 +730,13 @@ export function ProjectComparison({
                     fontSize: '12px',
                   }}
                   formatter={(value: number, name: string) => [
-                    value.toLocaleString('de-DE'),
-                    name === 'A' ? (projectA?.fileName ?? 'Projekt A') : (projectB?.fileName ?? 'Projekt B'),
+                    value.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE'),
+                    name === 'A' ? (projectA?.fileName ?? tr(language, 'Projekt A', 'Project A', 'Projet A')) : (projectB?.fileName ?? tr(language, 'Projekt B', 'Project B', 'Projet B')),
                   ]}
                 />
                 <Legend
                   formatter={(value) =>
-                    value === 'A' ? (projectA?.fileName ?? 'Projekt A') : (projectB?.fileName ?? 'Projekt B')
+                    value === 'A' ? (projectA?.fileName ?? tr(language, 'Projekt A', 'Project A', 'Projet A')) : (projectB?.fileName ?? tr(language, 'Projekt B', 'Project B', 'Projet B'))
                   }
                   wrapperStyle={{ fontSize: '11px' }}
                 />
@@ -738,8 +750,8 @@ export function ProjectComparison({
         {/* Radar Chart */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-headline">Stärken-Profil</CardTitle>
-            <CardDescription>Effizienz-Radar (höher = besser)</CardDescription>
+            <CardTitle className="text-base font-headline">{tr(language, 'Stärken-Profil', 'Strengths profile', 'Profil des forces')}</CardTitle>
+            <CardDescription>{tr(language, 'Effizienz-Radar (höher = besser)', 'Efficiency radar (higher = better)', 'Radar d\'efficacité (plus élevé = meilleur)')}</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[260px] w-full">
@@ -750,14 +762,14 @@ export function ProjectComparison({
                   tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                 />
                 <Radar
-                  name={projectA?.fileName ?? 'Projekt A'}
+                  name={projectA?.fileName ?? tr(language, 'Projekt A', 'Project A', 'Projet A')}
                   dataKey="A"
                   stroke="hsl(217 91% 60%)"
                   fill="hsl(217 91% 60%)"
                   fillOpacity={0.25}
                 />
                 <Radar
-                  name={projectB?.fileName ?? 'Projekt B'}
+                  name={projectB?.fileName ?? tr(language, 'Projekt B', 'Project B', 'Projet B')}
                   dataKey="B"
                   stroke="hsl(263 70% 50%)"
                   fill="hsl(263 70% 50%)"
@@ -765,9 +777,9 @@ export function ProjectComparison({
                 />
                 <Legend
                   formatter={(value) =>
-                    value === (projectA?.fileName ?? 'Projekt A')
-                      ? (projectA?.fileName ?? 'Projekt A')
-                      : (projectB?.fileName ?? 'Projekt B')
+                    value === (projectA?.fileName ?? tr(language, 'Projekt A', 'Project A', 'Projet A'))
+                      ? (projectA?.fileName ?? tr(language, 'Projekt A', 'Project A', 'Projet A'))
+                      : (projectB?.fileName ?? tr(language, 'Projekt B', 'Project B', 'Projet B'))
                   }
                   wrapperStyle={{ fontSize: '11px' }}
                 />
@@ -788,8 +800,8 @@ export function ProjectComparison({
       {/* ── 4. Materialzusammensetzung ─────────────────────────────────────── */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-headline">Materialzusammensetzung</CardTitle>
-          <CardDescription>Anteil der Materialien an der Gesamtkomposition</CardDescription>
+          <CardTitle className="text-base font-headline">{tr(language, 'Materialzusammensetzung', 'Material composition', 'Composition des matériaux')}</CardTitle>
+          <CardDescription>{tr(language, 'Anteil der Materialien an der Gesamtkomposition', 'Share of materials in total composition', 'Part des matériaux dans la composition totale')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -797,7 +809,7 @@ export function ProjectComparison({
               <div className="flex items-center gap-2 mb-1">
                 <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
                 <span className="text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">
-                  Projekt A
+                  {tr(language, 'Projekt A', 'Project A', 'Projet A')}
                 </span>
               </div>
               {projectA.analysisData.materialComposition.map((mat, idx) => (
@@ -808,7 +820,7 @@ export function ProjectComparison({
               <div className="flex items-center gap-2 mb-1">
                 <div className="w-2.5 h-2.5 rounded-full bg-violet-500" />
                 <span className="text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">
-                  Projekt B
+                  {tr(language, 'Projekt B', 'Project B', 'Projet B')}
                 </span>
               </div>
               {projectB.analysisData.materialComposition.map((mat, idx) => (
@@ -824,10 +836,10 @@ export function ProjectComparison({
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-headline flex items-center gap-2">
             <Award className="w-5 h-5 text-amber-500" />
-            Nachhaltigkeitsbewertung
+            {tr(language, 'Nachhaltigkeitsbewertung', 'Sustainability evaluation', 'Évaluation de durabilité')}
           </CardTitle>
           <CardDescription>
-            Kombinierter Score aus CO₂-Emissionen (50%), Recyclinganteil (30%) und Kosten (20%)
+            {tr(language, 'Kombinierter Score aus CO₂-Emissionen (50%), Recyclinganteil (30%) und Kosten (20%)', 'Combined score from CO₂ emissions (50%), recycling rate (30%) and costs (20%)', 'Score combiné des émissions de CO₂ (50%), du taux de recyclage (30%) et des coûts (20%)')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -835,13 +847,15 @@ export function ProjectComparison({
           <div className="grid grid-cols-2 gap-4">
             <SustainabilityGauge
               score={comparisonData.projectA?.sustainabilityScore ?? 0}
-              label="Projekt A"
+              label={tr(language, 'Projekt A', 'Project A', 'Projet A')}
               color="blue"
+              language={language}
             />
             <SustainabilityGauge
               score={comparisonData.projectB?.sustainabilityScore ?? 0}
-              label="Projekt B"
+              label={tr(language, 'Projekt B', 'Project B', 'Projet B')}
               color="violet"
+              language={language}
             />
           </div>
 
@@ -865,12 +879,12 @@ export function ProjectComparison({
               />
               <div>
                 <p className="font-semibold text-sm">
-                  {differences.sustainabilityScore.absolute > 0 ? 'Projekt B' : 'Projekt A'} ist nachhaltiger
+                  {differences.sustainabilityScore.absolute > 0 ? tr(language, 'Projekt B', 'Project B', 'Projet B') : tr(language, 'Projekt A', 'Project A', 'Projet A')} {tr(language, 'ist nachhaltiger', 'is more sustainable', 'est plus durable')}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Vorsprung:{' '}
+                  {tr(language, 'Vorsprung', 'Advantage', 'Avantage')}:{' '}
                   <span className="font-semibold">
-                    {Math.abs(differences.sustainabilityScore.absolute).toFixed(1)} Punkte (
+                    {Math.abs(differences.sustainabilityScore.absolute).toFixed(1)} {tr(language, 'Punkte', 'points', 'points')} (
                     {Math.abs(differences.sustainabilityScore.percentage).toFixed(1)}%)
                   </span>
                 </p>
@@ -888,7 +902,7 @@ export function ProjectComparison({
             <div className="flex items-center gap-3 rounded-xl p-4 border bg-muted/40">
               <ArrowRight className="w-6 h-6 text-muted-foreground flex-shrink-0" />
               <p className="text-sm text-muted-foreground">
-                Beide Projekte haben den gleichen Nachhaltigkeitswert.
+                {tr(language, 'Beide Projekte haben den gleichen Nachhaltigkeitswert.', 'Both projects have the same sustainability score.', 'Les deux projets ont le même score de durabilité.')}
               </p>
             </div>
           )}

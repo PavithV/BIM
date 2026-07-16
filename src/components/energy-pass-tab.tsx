@@ -48,7 +48,7 @@ function EfficiencyScale({ activeClass, language }: { activeClass: EnergyEfficie
   return (
     <div className="w-full">
       <p className="text-xs text-muted-foreground mb-2 font-medium">
-        {tr(language, 'Energieeffizienzklasse', 'Energy efficiency class')}
+        {tr(language, 'Energieeffizienzklasse', 'Energy efficiency class', 'Classe d\'efficacité énergétique')}
       </p>
       <div className="relative flex flex-col gap-0.5">
         {EFFICIENCY_CLASSES.map((cls, idx) => {
@@ -105,7 +105,7 @@ function EfficiencyScale({ activeClass, language }: { activeClass: EnergyEfficie
                       background: `${cls.color}18`,
                     }}
                   >
-                    {tr(language, 'Ihr Gebäude', 'Your building')}
+                    {tr(language, 'Ihr Gebäude', 'Your building', 'Votre bâtiment')}
                   </span>
                 </div>
               )}
@@ -114,7 +114,7 @@ function EfficiencyScale({ activeClass, language }: { activeClass: EnergyEfficie
         })}
       </div>
       <p className="text-[10px] text-muted-foreground mt-2 tracking-wide">
-        {tr(language, 'Skala nach GEG / EnEV in kWh/(m²·a)', 'Scale per GEG / EnEV in kWh/(m²·a)')}
+        {tr(language, 'Skala nach GEG / EnEV in kWh/(m²·a)', 'Scale per GEG / EnEV in kWh/(m²·a)', 'Échelle selon GEG / EnEV en kWh/(m²·a)')}
       </p>
     </div>
   );
@@ -138,15 +138,14 @@ function MetricCard({
         <p className="text-xs font-medium text-muted-foreground tracking-wide uppercase">{title}</p>
         <div className="flex items-end gap-2">
           <span className="text-3xl font-extrabold tabular-nums" style={{ color: accentColor }}>
-            {perArea.toLocaleString('de-DE', { maximumFractionDigits: 1 })}
+            {perArea.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 1 })}
           </span>
           <span className="text-sm text-muted-foreground pb-1">kWh/(m²·a)</span>
         </div>
         <p className="text-xs text-muted-foreground">
           {tr(
             'de' as any,
-            `Gesamt: ${total.toLocaleString('de-DE', { maximumFractionDigits: 0 })} kWh/a`,
-            `Total: ${total.toLocaleString('en-US', { maximumFractionDigits: 0 })} kWh/a`
+            language === 'de' ? `Gesamt: ${total.toLocaleString('de-DE', { maximumFractionDigits: 0 })} kWh/a` : language === 'fr' ? `Total : ${total.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} kWh/a` : `Total: ${total.toLocaleString('en-US', { maximumFractionDigits: 0 })} kWh/a`
           )}
         </p>
       </CardContent>
@@ -205,7 +204,7 @@ export function EnergyPassTab({ language, data }: EnergyPassTabProps) {
               {data.buildingInfo.name}
             </p>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {data.buildingInfo.area.toLocaleString('de-DE', { maximumFractionDigits: 0 })} m²
+              {data.buildingInfo.area.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE', { maximumFractionDigits: 0 })} m²
               {data.buildingInfo.environment ? ` · ${data.buildingInfo.environment}` : ''}
             </p>
           </div>
@@ -216,7 +215,7 @@ export function EnergyPassTab({ language, data }: EnergyPassTabProps) {
           className="flex items-center gap-2 font-bold px-4 h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-md hover:shadow-red-600/25 transition-all duration-300 shrink-0 self-start sm:self-center"
         >
           <FileText className="w-4 h-4 animate-pulse" />
-          {tr(language, 'PDF exportieren', 'Export PDF')}
+          {tr(language, 'PDF exportieren', 'Export PDF', 'Exporter en PDF')}
         </Button>
       </div>
 
@@ -231,13 +230,13 @@ export function EnergyPassTab({ language, data }: EnergyPassTabProps) {
       {/* KPI metric cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <MetricCard
-          title={tr(language, 'Endenergiebedarf', 'Final energy demand')}
+          title={tr(language, 'Endenergiebedarf', 'Final energy demand', 'Besoin en énergie finale')}
           total={data.siteEnergy.total}
           perArea={data.siteEnergy.perArea}
           accentColor="hsl(210, 70%, 50%)"
         />
         <MetricCard
-          title={tr(language, 'Primärenergiebedarf', 'Primary energy demand')}
+          title={tr(language, 'Primärenergiebedarf', 'Primary energy demand', 'Besoin en énergie primaire')}
           total={data.sourceEnergy.total}
           perArea={data.sourceEnergy.perArea}
           accentColor={activeColor}
@@ -249,7 +248,7 @@ export function EnergyPassTab({ language, data }: EnergyPassTabProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="font-headline text-lg">
-              {tr(language, 'Energieverbrauch nach Kategorie', 'Energy consumption by category')}
+              {tr(language, 'Energieverbrauch nach Kategorie', 'Energy consumption by category', 'Consommation d\'énergie par catégorie')}
             </CardTitle>
           </CardHeader>
           <CardContent className="pl-0 pr-2">
@@ -266,7 +265,7 @@ export function EnergyPassTab({ language, data }: EnergyPassTabProps) {
                 <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis
                   type="number"
-                  tickFormatter={(v: number) => `${v.toLocaleString('de-DE')} kWh`}
+                  tickFormatter={(v: number) => `${v.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE')} kWh`}
                   tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                 />
                 <YAxis
@@ -286,7 +285,7 @@ export function EnergyPassTab({ language, data }: EnergyPassTabProps) {
                     borderRadius: '8px',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                   }}
-                  formatter={(value: number) => [`${value.toLocaleString('de-DE')} kWh`, '']}
+                  formatter={(value: number) => [`${value.toLocaleString(language === 'en' ? 'en-US' : language === 'fr' ? 'fr-FR' : 'de-DE')} kWh`, '']}
                 />
                 <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={24}>
                   {sortedEndUses.map((_, idx) => (

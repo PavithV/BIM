@@ -344,20 +344,20 @@ export function IfcViewer({ language, ifcFile, ifcContent, ifcUrl, ifcStoragePat
     if (isLoading) return (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/80 backdrop-blur-sm rounded-md text-center p-4 z-20">
         <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
-        <p className="font-semibold">{tr(language, 'Lade Modell...', 'Loading model...')}</p>
+        <p className="font-semibold">{tr(language, 'Lade Modell...', 'Loading model...', 'Chargement du modèle...')}</p>
       </div>
     );
     if (error) return (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/80 backdrop-blur-sm rounded-md text-center p-4 z-20">
         <AlertTriangle className="w-8 h-8 text-destructive mb-2" />
-        <p className="font-semibold text-destructive">{tr(language, 'Fehler', 'Error')}</p>
+        <p className="font-semibold text-destructive">{tr(language, 'Fehler', 'Error', 'Erreur')}</p>
         <p className="text-sm text-muted-foreground">{error}</p>
       </div>
     );
     if (!hasModel && !isLoading) return (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/80 backdrop-blur-sm rounded-md text-center p-4 z-10 pointer-events-none">
         <Layers className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
-        <p className="font-semibold text-muted-foreground">{tr(language, 'Kein Modell geladen', 'No model loaded')}</p>
+        <p className="font-semibold text-muted-foreground">{tr(language, 'Kein Modell geladen', 'No model loaded', 'Aucun modèle chargé')}</p>
       </div>
     );
     return null;
@@ -388,11 +388,11 @@ export function IfcViewer({ language, ifcFile, ifcContent, ifcUrl, ifcStoragePat
         </div>
         <div className="overflow-y-auto p-3 text-xs space-y-4">
           <div>
-            <strong className="block mb-1 text-primary">{tr(language, 'Basisdaten', 'Basic data')}</strong>
+            <strong className="block mb-1 text-primary">{tr(language, 'Basisdaten', 'Basic data', 'Données de base')}</strong>
             <div className="grid grid-cols-[1fr_2fr] gap-1">
-              <span className="text-muted-foreground">{tr(language, 'Name:', 'Name:')}</span>
+              <span className="text-muted-foreground">{tr(language, 'Name:', 'Name:', 'Nom :')}</span>
               <span className="break-all">{formatValue(selectedElement.props.Name)}</span>
-              <span className="text-muted-foreground">{tr(language, 'Tag:', 'Tag:')}</span>
+              <span className="text-muted-foreground">{tr(language, 'Tag:', 'Tag:', 'Étiquette :')}</span>
               <span className="break-all">{formatValue(selectedElement.props.Tag) || selectedElement.id}</span>
             </div>
           </div>
@@ -424,8 +424,8 @@ export function IfcViewer({ language, ifcFile, ifcContent, ifcUrl, ifcStoragePat
   return (
     <Card className="flex flex-col h-[600px] md:h-[calc(100vh-100px)] min-h-0 relative">
       <CardHeader>
-        <CardTitle className="font-headline">{tr(language, '3D-Modell-Ansicht', '3D model view')}</CardTitle>
-        <CardDescription>{tr(language, 'Interaktive Ansicht Ihres IFC-Modells (IFC.js).', 'Interactive view of your IFC model (IFC.js).')}</CardDescription>
+        <CardTitle className="font-headline">{tr(language, '3D-Modell-Ansicht', '3D model view', 'Vue du modèle 3D')}</CardTitle>
+        <CardDescription>{tr(language, 'Interaktive Ansicht Ihres IFC-Modells (IFC.js).', 'Interactive view of your IFC model (IFC.js).', 'Vue interactive de votre modèle IFC (IFC.js).')}</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 relative overflow-hidden p-0 bg-muted/30">
         <div

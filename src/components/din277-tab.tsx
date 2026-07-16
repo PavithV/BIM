@@ -47,9 +47,9 @@ export function Din277Tab({ language, result }: Din277TabProps) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
         <LayoutGrid className="w-12 h-12 text-muted-foreground/50 mb-4" />
-        <h3 className="font-semibold text-lg">{tr(language, 'DIN 277 Flächenauswertung', 'DIN 277 area evaluation')}</h3>
+        <h3 className="font-semibold text-lg">{tr(language, 'DIN 277 Flächenauswertung', 'DIN 277 area evaluation', 'Évaluation des surfaces DIN 277')}</h3>
         <p className="text-muted-foreground text-sm mt-1">
-          {tr(language, 'Starten Sie die Modellprüfung, um die DIN 277 Auswertung hier anzuzeigen.', 'Run the model check to display DIN 277 evaluation here.')}
+          {tr(language, 'Starten Sie die Modellprüfung, um die DIN 277 Auswertung hier anzuzeigen.', 'Run the model check to display DIN 277 evaluation here.', 'Lancez la vérification du modèle pour afficher l\'évaluation DIN 277 ici.')}
         </p>
       </div>
     );
@@ -59,11 +59,11 @@ export function Din277Tab({ language, result }: Din277TabProps) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
         <Info className="w-12 h-12 text-yellow-500/70 mb-4" />
-        <h3 className="font-semibold text-lg">{tr(language, 'Keine Raumdaten gefunden', 'No room data found')}</h3>
+        <h3 className="font-semibold text-lg">{tr(language, 'Keine Raumdaten gefunden', 'No room data found', 'Aucune donnée de pièce trouvée')}</h3>
         <p className="text-muted-foreground text-sm mt-1 max-w-md">
-          {tr(language, 'Das IFC-Modell enthält keine ', 'The IFC model contains no ')}
+          {tr(language, 'Das IFC-Modell enthält keine ', 'The IFC model contains no ', 'Le modèle IFC ne contient aucune ')}
           <code className="text-xs bg-muted px-1 rounded">IfcSpace</code>
-          {tr(language, ' Entitäten. Für eine DIN 277 Auswertung müssen Räume im Modell definiert sein.', ' entities. Spaces must be defined in the model for DIN 277 evaluation.')}
+          {tr(language, ' Entitäten. Für eine DIN 277 Auswertung müssen Räume im Modell definiert sein.', ' entities. Spaces must be defined in the model for DIN 277 evaluation.', ' entité. Les espaces doivent être définis dans le modèle pour l\'évaluation DIN 277.')}
         </p>
       </div>
     );
@@ -76,34 +76,34 @@ export function Din277Tab({ language, result }: Din277TabProps) {
       {/* Zusammenfassung */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium">{tr(language, 'Flächenübersicht nach DIN 277', 'Area overview according to DIN 277')}</CardTitle>
+          <CardTitle className="text-sm font-medium">{tr(language, 'Flächenübersicht nach DIN 277', 'Area overview according to DIN 277', 'Aperçu des surfaces selon DIN 277')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-lg border p-3">
               <p className="text-xs text-muted-foreground uppercase tracking-wider">BGF</p>
               <p className="text-lg font-bold">{formatArea(summary.bgf)}</p>
-              <p className="text-xs text-muted-foreground">{tr(language, 'Bruttogrundfläche', 'Gross floor area')}</p>
+              <p className="text-xs text-muted-foreground">{tr(language, 'Bruttogrundfläche', 'Gross floor area', 'Surface brute de plancher')}</p>
             </div>
             <div className="rounded-lg border p-3">
               <p className="text-xs text-muted-foreground uppercase tracking-wider">NRF</p>
               <p className="text-lg font-bold">{formatArea(summary.nrf)}</p>
-              <p className="text-xs text-muted-foreground">{tr(language, 'Nettoraumfläche', 'Net room area')}</p>
+              <p className="text-xs text-muted-foreground">{tr(language, 'Nettoraumfläche', 'Net room area', 'Surface nette')}</p>
             </div>
             <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3">
               <p className="text-xs text-blue-600 uppercase tracking-wider">NUF</p>
               <p className="text-lg font-bold text-blue-700">{formatArea(summary.nuf)}</p>
-              <p className="text-xs text-muted-foreground">{tr(language, 'Nutzungsfläche', 'Usable area')}</p>
+              <p className="text-xs text-muted-foreground">{tr(language, 'Nutzungsfläche', 'Usable area', 'Surface utile')}</p>
             </div>
             <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
               <p className="text-xs text-amber-600 uppercase tracking-wider">VF</p>
               <p className="text-lg font-bold text-amber-700">{formatArea(summary.vf)}</p>
-              <p className="text-xs text-muted-foreground">{tr(language, 'Verkehrsfläche', 'Circulation area')}</p>
+              <p className="text-xs text-muted-foreground">{tr(language, 'Verkehrsfläche', 'Circulation area', 'Surface de circulation')}</p>
             </div>
             <div className="rounded-lg border border-purple-200 bg-purple-50/50 p-3 col-span-2">
               <p className="text-xs text-purple-600 uppercase tracking-wider">TF</p>
               <p className="text-lg font-bold text-purple-700">{formatArea(summary.tf)}</p>
-              <p className="text-xs text-muted-foreground">{tr(language, 'Technikfläche', 'Technical area')}</p>
+              <p className="text-xs text-muted-foreground">{tr(language, 'Technikfläche', 'Technical area', 'Surface technique')}</p>
             </div>
           </div>
         </CardContent>
@@ -113,18 +113,18 @@ export function Din277Tab({ language, result }: Din277TabProps) {
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-medium">
-            {tr(language, `Raumdetails (${spaces.length} Räume)`, `Room details (${spaces.length} rooms)`)}
+            {tr(language, `Raumdetails (${spaces.length} Räume)`, `Room details (${spaces.length} rooms)`, `Détails des pièces (${spaces.length} pièces)`)}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[180px]">{tr(language, 'Name', 'Name')}</TableHead>
-                <TableHead>{tr(language, 'Kategorie', 'Category')}</TableHead>
+                <TableHead className="w-[180px]">{tr(language, 'Name', 'Name', 'Nom')}</TableHead>
+                <TableHead>{tr(language, 'Kategorie', 'Category', 'Catégorie')}</TableHead>
                 <TableHead className="text-right">NGA</TableHead>
                 <TableHead className="text-right">BGA</TableHead>
-                <TableHead className="text-right">{tr(language, 'Volumen', 'Volume')}</TableHead>
+                <TableHead className="text-right">{tr(language, 'Volumen', 'Volume', 'Volume')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -133,7 +133,7 @@ export function Din277Tab({ language, result }: Din277TabProps) {
                   <TableCell className="font-medium">
                     <div>
                       <span className="block truncate max-w-[180px]">
-                        {space.name || space.longName || tr(language, `Raum #${space.expressID}`, `Room #${space.expressID}`)}
+                        {space.name || space.longName || tr(language, `Raum #${space.expressID}`, `Room #${space.expressID}`, `Pièce #${space.expressID}`)}
                       </span>
                       {space.longName && space.name && (
                         <span className="text-xs text-muted-foreground truncate block max-w-[180px]">
@@ -165,7 +165,7 @@ export function Din277Tab({ language, result }: Din277TabProps) {
             <TableFooter>
               <TableRow>
                 <TableCell colSpan={2} className="font-semibold">
-                  {tr(language, 'Summe', 'Total')}
+                  {tr(language, 'Summe', 'Total', 'Total')}
                 </TableCell>
                 <TableCell className="text-right font-semibold tabular-nums">
                   {formatArea(summary.nrf)}
@@ -191,7 +191,7 @@ export function Din277Tab({ language, result }: Din277TabProps) {
             <Badge variant="outline" className={`${categoryColors[cat]} text-[10px] px-1.5 py-0`}>
               {cat}
             </Badge>
-            <span>{language === 'en' ? (cat === 'NUF' ? 'Usable area' : cat === 'VF' ? 'Circulation area' : 'Technical area') : label}</span>
+            <span>{language === 'fr' ? (cat === 'NUF' ? 'Surface utile' : cat === 'VF' ? 'Surface de circulation' : 'Surface technique') : language === 'en' ? (cat === 'NUF' ? 'Usable area' : cat === 'VF' ? 'Circulation area' : 'Technical area') : label}</span>
           </div>
         ))}
       </div>

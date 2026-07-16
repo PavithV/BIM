@@ -37,6 +37,14 @@ const RatingIcon = ({ rating }: { rating: string }) => {
 
 function translateIndicatorName(language: Language, name: string): string {
   if (language === 'de') return name;
+  if (language === 'fr') {
+    const mapFr: Record<string, string> = {
+      'Erderwärmungspotenzial (GWP)': 'Potentiel de réchauffement climatique (GWP)',
+      'Primärenergie nicht erneuerbar (PENRT)': 'Énergie primaire non renouvelable (PENRT)',
+      'GWP Gesamt': 'GWP total',
+    };
+    return mapFr[name] ?? name;
+  }
   const map: Record<string, string> = {
     'Erderwärmungspotenzial (GWP)': 'Global warming potential (GWP)',
     'Primärenergie nicht erneuerbar (PENRT)': 'Non-renewable primary energy (PENRT)',
@@ -51,8 +59,8 @@ export function AnalysisPanel({ language, project, isProcessing, onRunAnalysis, 
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
         <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
-        <p className="font-semibold">{tr(language, 'Analyse wird durchgeführt...', 'Analysis is running...')}</p>
-        <p className="text-muted-foreground text-sm">{tr(language, 'Dies kann einen Moment dauern.', 'This may take a moment.')}</p>
+        <p className="font-semibold">{tr(language, 'Analyse wird durchgeführt...', 'Analysis is running...', 'Analyse en cours...')}</p>
+        <p className="text-muted-foreground text-sm">{tr(language, 'Dies kann einen Moment dauern.', 'This may take a moment.', 'Cela peut prendre un moment.')}</p>
       </div>
     );
   }
@@ -61,11 +69,11 @@ export function AnalysisPanel({ language, project, isProcessing, onRunAnalysis, 
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
         <BarChart3 className="w-12 h-12 text-muted-foreground/50 mb-4" />
-        <h3 className="font-semibold text-lg">{tr(language, 'Analyse bereit', 'Analysis ready')}</h3>
-        <p className="text-muted-foreground text-sm mb-4">{tr(language, 'Starten Sie die KI-Analyse für dieses Modell.', 'Start the AI analysis for this model.')}</p>
+        <h3 className="font-semibold text-lg">{tr(language, 'Analyse bereit', 'Analysis ready', 'Analyse prête')}</h3>
+        <p className="text-muted-foreground text-sm mb-4">{tr(language, 'Starten Sie die KI-Analyse für dieses Modell.', 'Start the AI analysis for this model.', 'Démarrez l\'analyse IA pour ce modèle.')}</p>
         <Button onClick={onRunAnalysis} disabled={isProcessing}>
           {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Leaf className="mr-2 h-4 w-4" />}
-          {tr(language, 'Nachhaltigkeitsanalyse starten', 'Start sustainability analysis')}
+          {tr(language, 'Nachhaltigkeitsanalyse starten', 'Start sustainability analysis', 'Démarrer l\'analyse de durabilité')}
         </Button>
       </div>
     );
@@ -82,7 +90,7 @@ export function AnalysisPanel({ language, project, isProcessing, onRunAnalysis, 
     <div className="w-full mt-4 space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline text-lg">{tr(language, 'Zusammenfassung', 'Summary')}</CardTitle>
+          <CardTitle className="font-headline text-lg">{tr(language, 'Zusammenfassung', 'Summary', 'Résumé')}</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground leading-relaxed">{analysisData.summary}</p>
@@ -106,7 +114,7 @@ export function AnalysisPanel({ language, project, isProcessing, onRunAnalysis, 
 
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline text-lg">{tr(language, 'Materialzusammensetzung (Massen-%)', 'Material composition (mass %)')}</CardTitle>
+          <CardTitle className="font-headline text-lg">{tr(language, 'Materialzusammensetzung (Massen-%)', 'Material composition (mass %)', 'Composition des matériaux (masse %)')}</CardTitle>
         </CardHeader>
         <CardContent className="pl-0">
           <ChartContainer config={chartConfig} className="h-[250px] w-full">
@@ -127,13 +135,13 @@ export function AnalysisPanel({ language, project, isProcessing, onRunAnalysis, 
 
       <Button onClick={onExport} className="w-full">
         <FileText className="mr-2 h-4 w-4" />
-        {tr(language, 'Materialpass exportieren', 'Export material passport')}
+        {tr(language, 'Materialpass exportieren', 'Export material passport', 'Exporter le passeport matériaux')}
       </Button>
 
       {onDownloadExchangedIfc && (
         <Button onClick={onDownloadExchangedIfc} variant="outline" className="w-full mt-2">
           <TrendingUp className="mr-2 h-4 w-4 transform rotate-45" />
-          {tr(language, 'Aktualisierte IFC herunterladen', 'Download updated IFC')}
+          {tr(language, 'Aktualisierte IFC herunterladen', 'Download updated IFC', 'Télécharger l\'IFC mis à jour')}
         </Button>
       )}
     </div>

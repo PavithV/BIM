@@ -97,18 +97,18 @@ export function MaterialReviewModal({
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
-                    <DialogTitle>{tr(language, 'Material-Ersetzungen prüfen', 'Review material replacements')}</DialogTitle>
+                    <DialogTitle>{tr(language, 'Material-Ersetzungen prüfen', 'Review material replacements', 'Vérifier les remplacements de matériaux')}</DialogTitle>
                     <DialogDescription>
-                        {tr(language, 'Wir haben für einige Materialien aus Ihrer IFC-Datei bessere Übereinstimmungen in unserer Ökobilanz-Datenbank gefunden. Bitte wählen Sie aus, welche Ersetzungen durchgeführt werden sollen.', 'We found better matches in our LCA database for some materials from your IFC file. Please choose which replacements should be applied.')}
+                        {tr(language, 'Wir haben für einige Materialien aus Ihrer IFC-Datei bessere Übereinstimmungen in unserer Ökobilanz-Datenbank gefunden. Bitte wählen Sie aus, welche Ersetzungen durchgeführt werden sollen.', 'We found better matches in our LCA database for some materials from your IFC file. Please choose which replacements should be applied.', 'Nous avons trouvé de meilleures correspondances dans notre base de données ACV pour certains matériaux de votre fichier IFC. Veuillez choisir les remplacements à appliquer.')}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="py-4">
                     <div className="grid grid-cols-[1fr,auto,1fr,auto] gap-4 font-semibold text-sm mb-2 px-2 text-muted-foreground">
-                        <div>{tr(language, 'Original (IFC)', 'Original (IFC)')}</div>
+                        <div>{tr(language, 'Original (IFC)', 'Original (IFC)', 'Original (IFC)')}</div>
                         <div></div>
-                        <div>{tr(language, 'Vorschlag (Datenbank)', 'Suggestion (database)')}</div>
-                        <div>{tr(language, 'Ersetzen?', 'Replace?')}</div>
+                        <div>{tr(language, 'Vorschlag (Datenbank)', 'Suggestion (database)', 'Suggestion (base de données)')}</div>
+                        <div>{tr(language, 'Ersetzen?', 'Replace?', 'Remplacer ?')}</div>
                     </div>
                     <ScrollArea className="h-[300px] rounded-md border p-2">
                         <div className="space-y-2">
@@ -126,7 +126,7 @@ export function MaterialReviewModal({
                                                 disabled={!selected[item.original]}
                                             >
                                                 <SelectTrigger className="h-8 w-full text-xs">
-                                                    <SelectValue placeholder={tr(language, 'Wähle Material', 'Choose material')} />
+                                                    <SelectValue placeholder={tr(language, 'Wähle Material', 'Choose material', 'Choisir le matériau')} />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {item.suggestions.map((s) => (
@@ -154,9 +154,9 @@ export function MaterialReviewModal({
                 </div>
 
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>{tr(language, 'Abbrechen', 'Cancel')}</Button>
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>{tr(language, 'Abbrechen', 'Cancel', 'Annuler')}</Button>
                     <Button onClick={handleConfirm} disabled={isProcessing}>
-                        {isProcessing ? tr(language, 'Verarbeite...', 'Processing...') : tr(language, 'Auswahl bestätigen & Fortfahren', 'Confirm selection & continue')}
+                        {isProcessing ? tr(language, 'Verarbeite...', 'Processing...', 'Traitement...') : tr(language, 'Auswahl bestätigen & Fortfahren', 'Confirm selection & continue', 'Confirmer la sélection et continuer')}
                     </Button>
                 </DialogFooter>
             </DialogContent>
