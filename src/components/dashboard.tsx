@@ -956,80 +956,7 @@ export default function Dashboard() {
                       )}
                     </div>
                   </div>
-                  {/* Comparison... */}
-                  {projects.filter(p => p.analysisData).length >= 2 && (
-                    <div className="pt-2 border-t">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" className="w-full justify-start gap-2">
-                            <GitCompare className="w-4 h-4" />
-                            {tr(language, 'Projekte vergleichen', 'Compare projects')}
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-[98vw] w-[1700px] h-[92vh] flex flex-col p-0 gap-0">
-                          <DialogHeader className="px-6 py-4 border-b shrink-0">
-                            <DialogTitle className="text-xl font-bold font-headline flex items-center gap-2">
-                              <GitCompare className="w-5 h-5 text-primary" />
-                              {tr(language, 'Projektvergleich', 'Project comparison')}
-                            </DialogTitle>
-                          </DialogHeader>
-                          {/* 2-Spalten Layout: Vergleich | Chat */}
-                          <div className="flex-1 flex overflow-hidden min-h-0">
-                            {/* Linke Spalte: Projektvergleich */}
-                            <div className="flex-1 overflow-y-auto px-6 py-6 min-w-0">
-                              <ProjectComparison
-                                projects={projects.filter(p => p.analysisData)}
-                                projectA={comparisonProjectA}
-                                projectB={comparisonProjectB}
-                                onSelectProjectA={setComparisonProjectA}
-                                onSelectProjectB={setComparisonProjectB}
-                                activeProjectId={activeProject?.id}
-                                activeModelAnalysis={modelAnalysis}
-                                language={language}
-                              />
-                            </div>
-
-                            {/* Trennlinie */}
-                            <div className="w-px bg-border shrink-0" />
-
-                            {/* Rechte Spalte: KI Chat */}
-                            <div className="w-[400px] shrink-0 flex flex-col bg-background">
-                              <div className="px-4 py-3 border-b shrink-0 bg-card flex items-center gap-2">
-                                <Bot className="w-4 h-4 text-primary" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-semibold text-sm font-headline">
-                                    {tr(language, 'KI Coach', 'AI Coach')}
-                                  </p>
-                                  <p className="text-[10px] text-muted-foreground truncate">
-                                    {tr(
-                                      language,
-                                      'Kennt beide Projekte im Vergleich',
-                                      'Knows both comparison projects'
-                                    )}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex-1 overflow-hidden flex flex-col">
-                                <ChatAssistant
-                                  language={language}
-                                  activeProject={comparisonProjectA ?? activeProject}
-                                  activeMessages={activeMessages}
-                                  isLoading={isLoading || messagesLoading}
-                                  onSendMessage={handleComparisonSendMessage}
-                                  startingPrompts={[
-                                    tr(language, 'Welches Projekt ist kostengünstiger?', 'Which project is more cost-effective?'),
-                                    tr(language, 'Vergleiche die CO₂-Emissionen beider Projekte.', 'Compare the CO₂ emissions of both projects.'),
-                                    tr(language, 'Welches Projekt ist nachhaltiger?', 'Which project is more sustainable?'),
-                                    tr(language, 'Was sind die größten Unterschiede?', 'What are the biggest differences?'),
-                                  ]}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  )}
+                  {/* Comparison moved to main panel */}
                 </div>
                 <div className="p-4 border-t">
                   <div className="flex items-center gap-3 mb-4 p-2 rounded-lg bg-muted/50">
@@ -1292,6 +1219,35 @@ export default function Dashboard() {
                               )}
                             </div>
                           </div>
+                          
+                          {/* Projektvergleich */}
+                          <div className="space-y-6 border-t pt-8 pb-8">
+                            <div className="max-w-5xl mx-auto space-y-6">
+                              <div className="flex items-center justify-between">
+                                <div><h2 className="text-2xl font-bold font-headline mb-1">{tr(language, 'Projektvergleich', 'Project comparison')}</h2></div>
+                              </div>
+                              {projects.filter(p => p.analysisData).length < 2 ? (
+                                <div className="p-8 border rounded-xl bg-card text-center text-muted-foreground">
+                                  <GitCompare className="w-8 h-8 mx-auto mb-3 opacity-20" />
+                                  <p>{tr(language, 'Es werden mindestens zwei analysierte Projekte für einen Vergleich benötigt.', 'At least two analyzed projects are required for a comparison.', 'Au moins deux projets analysés sont nécessaires pour une comparaison.')}</p>
+                                </div>
+                              ) : (
+                                <div className="mt-2 border rounded-xl overflow-hidden bg-card p-6 shadow-sm">
+                                  <ProjectComparison
+                                    projects={projects.filter(p => p.analysisData)}
+                                    projectA={comparisonProjectA}
+                                    projectB={comparisonProjectB}
+                                    onSelectProjectA={setComparisonProjectA}
+                                    onSelectProjectB={setComparisonProjectB}
+                                    activeProjectId={activeProject?.id}
+                                    activeModelAnalysis={modelAnalysis}
+                                    language={language}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
                         </div>
                       </ResizablePanel>
                     </ResizablePanelGroup>
