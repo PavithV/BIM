@@ -125,11 +125,13 @@ function MetricCard({
   total,
   perArea,
   accentColor,
+  language,
 }: {
   title: string;
   total: number;
   perArea: number;
   accentColor: string;
+  language: Language;
 }) {
   return (
     <Card className="overflow-hidden border-0 shadow-md bg-gradient-to-br from-card to-card/80">
@@ -143,10 +145,11 @@ function MetricCard({
           <span className="text-sm text-muted-foreground pb-1">kWh/(m²·a)</span>
         </div>
         <p className="text-xs text-muted-foreground">
-          {tr(
-            'de' as any,
-            language === 'de' ? `Gesamt: ${total.toLocaleString('de-DE', { maximumFractionDigits: 0 })} kWh/a` : language === 'fr' ? `Total : ${total.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} kWh/a` : `Total: ${total.toLocaleString('en-US', { maximumFractionDigits: 0 })} kWh/a`
-          )}
+          {language === 'de'
+            ? `Gesamt: ${total.toLocaleString('de-DE', { maximumFractionDigits: 0 })} kWh/a`
+            : language === 'fr'
+            ? `Total : ${total.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} kWh/a`
+            : `Total: ${total.toLocaleString('en-US', { maximumFractionDigits: 0 })} kWh/a`}
         </p>
       </CardContent>
     </Card>
@@ -234,12 +237,14 @@ export function EnergyPassTab({ language, data }: EnergyPassTabProps) {
           total={data.siteEnergy.total}
           perArea={data.siteEnergy.perArea}
           accentColor="hsl(210, 70%, 50%)"
+          language={language}
         />
         <MetricCard
           title={tr(language, 'Primärenergiebedarf', 'Primary energy demand', 'Besoin en énergie primaire')}
           total={data.sourceEnergy.total}
           perArea={data.sourceEnergy.perArea}
           accentColor={activeColor}
+          language={language}
         />
       </div>
 
